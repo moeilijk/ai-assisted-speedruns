@@ -247,12 +247,11 @@ line plus its `SHA256:` fingerprint. It is safe to call unconditionally, so a sc
 the machine: signing writes a signature over `manifest.json`, and because the manifest holds a hash of every
 other file, that one signature covers the whole bundle.
 
-For the marker to say anything about *you* rather than about a key, an archive has to know the key is yours.
-That is one paste of the public line into your profile there, whenever you feel like it — a bundle signed with
-a key an archive has never seen is still published, simply as a signature whose publisher is not established,
-and it gains the match when you register the line later. Some code hosts publish an account's keys (GitHub at
-`https://github.com/<user>.keys`), which lets an archive match without the paste; most sign-in providers do
-not, so treat that as a shortcut for people who have such an account, not as the route.
+For the marker to say anything about *you* rather than about a key, whoever reads it has to know the key is
+yours. The public line is one line of text, so that is wherever you and they can both reach: your profile at
+the archive, a file on a domain you control, a key directory, an account list your host happens to serve. A
+bundle signed with a key nobody has seen is still published — it is simply a signature whose publisher is not
+established — and it gains the match whenever you record the line somewhere the archive reads.
 
 `--sign <path>` takes any ed25519 key — an OpenSSH key without a passphrase (the signer cannot unlock one) or
 PKCS#8 — and `AAS_SIGN_KEY` sets a default path for a machine. Without a path, `--sign` uses the `aas key` key,

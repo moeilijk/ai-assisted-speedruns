@@ -232,9 +232,13 @@ second machine, a replacement — so the account is the identity and a key is on
 on a fingerprint. Retiring a key means "accept no new publications signed with this one", never "the older ones
 become doubtful": which key signed a publication is a fact about that publication and stays true after the key is
 gone. A key an archive has not seen before does not make a bundle less publishable; it is simply a signature whose
-publisher is not established, and it gains its match if that publisher registers the line later. Where a host
-publishes an account's keys (GitHub at `/<user>.keys`, and its SSH signing keys through its API) an archive may
-read those instead of asking for a paste, but only some hosts do, so that route can never be the only one.
+publisher is not established, and it gains its match if that publisher registers the line later.
+
+This standard names no place to record a key. The public line is one line of text, so anywhere a publisher can
+publish text and an archive can read it will do: the archive's own profile, a file at a location the publisher
+controls, a key directory, an account list some hosts serve for their users. Which of those an archive accepts is
+its own policy, and an archive that offers several ways to sign in cannot lean on any single host's list, because
+most identity providers publish no keys at all.
 
 The signature covers the bundle, not where the recording is published. Publication links are mutable by design
 (a VOD expires, a run may be re-uploaded), so they stay outside what is signed; the recording is bound to the

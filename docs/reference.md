@@ -115,9 +115,9 @@ and is a complete bundle, because who published a run is what an archive's accou
 signed in there — while a key that gates nothing would be one more thing to install and register for no visible
 effect. What it earns a publisher who wants it: their publications are tied to one key, inside an archive and
 outside it. A signature an archive has not seen before is published as one whose publisher is not established,
-and gains its match if that publisher registers the line later. Where a code host publishes an account's keys
-(GitHub at `https://github.com/<user>.keys`) an archive may match without that paste, but most sign-in
-providers publish nothing, so that is a shortcut and not the route. It is not an upload credential: the upload
+and gains its match if that publisher records the line somewhere the archive reads: its own profile, a location
+the publisher controls, a key directory, an account list a host happens to serve. The standard names none of
+them. It is not an upload credential: the upload
 is the zip through a submission form. Setting a key up:
 [install.md](install.md#10-optional-signing-your-bundles).
 
