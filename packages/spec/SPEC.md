@@ -228,7 +228,10 @@ second way at all, because only some hosts publish keys.
 
 A verifier can say that the signature is valid for the key in the file. It cannot say whose key that is: that
 binding belongs to whoever keeps the accounts, and an archive records which key signed and when it last matched
-which account, because a published key list changes over time. A signature only means something together with
+which account, because a published key list changes over time. A publisher has more than one key over a lifetime
+— a second machine, a replacement — so an archive keeps a list per account rather than one key, and retiring a
+key means "accept no new publications signed with this one", never "the older ones become doubtful". Which key
+signed a publication is a fact about that publication and stays true after the key is gone. A signature only means something together with
 that binding: anyone can make a key and sign anything, so an archive that requires a signature must also require
 that the key is one the submitting account publishes, or the requirement is decoration.
 
