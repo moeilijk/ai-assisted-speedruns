@@ -213,7 +213,10 @@ manifest therefore does not list, the way it does not list itself or `run.jsonl`
 
 The key is ed25519 in the one-line OpenSSH form, which is the string a code-hosting account publishes: an archive
 with sign-in can confirm that the key which signed a bundle is one that account publishes, without a registration
-flow of its own, and ed25519 verifies in a browser and in a plain runtime without any dependency.
+flow of its own, and ed25519 verifies in a browser and in a plain runtime without any dependency. Where a host
+keeps more than one list — GitHub serves authentication keys at `/<user>.keys` and SSH signing keys only through
+its API — an archive that matches keys to accounts reads every list the host offers, so a publisher is not caught
+out by which kind they registered.
 
 A verifier can say that the signature is valid for the key in the file. It cannot say whose key that is: that
 binding belongs to whoever keeps the accounts, and an archive records which key signed and when it last matched
