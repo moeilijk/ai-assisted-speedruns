@@ -50,7 +50,7 @@ runs. Three layouts work, and the middle one is what this repository is develope
 - Put the run directories on the drive OBS records to — a Windows drive, reached as `/mnt/<letter>/…`. OBS then
   records straight into `<run>/recording/` and nothing has to be moved across the boundary afterwards.
 - The game roots and the `AAS_*_EXE` settings in `.env` are WSL paths to Windows programs
-  (`/mnt/c/Program Files/…`); the launch and install scripts call those executables from WSL.
+  (under `/mnt/<letter>/`); the launch and install scripts call those executables from WSL.
 - Install the agent CLI **inside WSL** (Claude Code's Linux installer, or npm), not the Windows build: the
   harness starts it as a child process from the same shell.
 
