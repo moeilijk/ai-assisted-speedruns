@@ -1,0 +1,8 @@
+{
+  "name": "@aas/recorder-source-demo",
+  "version": "0.1.0",
+  "description": "AAS recorder plugin: source-demo",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./index.mjs" }
+}

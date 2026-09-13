@@ -1,0 +1,8 @@
+{
+  "name": "@aas/recorder-obs",
+  "version": "0.1.0",
+  "description": "AAS recorder plugin: OBS Studio via obs-websocket v5 (scenes per phase, chapters, replay buffer, no microphone)",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./index.mjs", "./obs-ws": "./obs-ws.mjs" }
+}

@@ -1,0 +1,13 @@
+{
+  "communication_mod": {
+    "repo": "https://github.com/ForgottenArbiter/CommunicationMod",
+    "version": "1.2.1",
+    "jar": "https://github.com/ForgottenArbiter/CommunicationMod/releases/download/v1.2.1/CommunicationMod.jar",
+    "sha256": "12b99249eccfd5245ddb0b6b7575e1a1dfba0ce0ed6fad5bd5bbd4a303897ef5",
+    "sts_version": "11-30-2020",
+    "mts_version": "3.18.1",
+    "dependencies": ["basemod"]
+  },
+  "modthespire": { "workshop_id": 1605060445 },
+  "basemod": { "workshop_id": 1605833019 }
+}

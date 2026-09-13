@@ -1,0 +1,67 @@
+// Append harness events to <run>/run.jsonl and follow the file for events
+// written by the broker (game plugins) so the recorder can react to them.
+import fs from "node:fs";
+import path from "node:path";
+import { defaultTimeZone, localTimestamp } from "./timestamp.mjs";
+
+export function createEventLog(runDir, { source = "harness", timeZone = defaultTimeZone() } = {}) {
+  const file = path.join(runDir, "run.jsonl");
+  return {
+    file,
+    append(event, data = {}) {
+      const record = { timestamp: localTimestamp(Date.now(), timeZone), source, kind: "event", event, data };
+      fs.appendFileSync(file, `${JSON.stringify(record)}\n`);
+      return record;
+    },
+  };
+}
+
+/** Poll run.jsonl for new `event` records and hand them to `onEvent`. */
+export function followEvents(runDir, onEvent, { intervalMs = 500, onRecord = null } = {}) {
+  const file = path.join(runDir, "run.jsonl");
+  let offset = fs.existsSync(file) ? fs.statSync(file).size : 0;
+  let rest = "";
+  const inflight = new Set();
+  const tick = () => {
+    if (!fs.existsSync(file)) return;
+    const size = fs.statSync(file).size;
+    if (size <= offset) return;
+    const fd = fs.openSync(file, "r");
+    const buf = Buffer.alloc(size - offset);
+    fs.readSync(fd, buf, 0, buf.length, offset);
+    fs.closeSync(fd);
+    offset = size;
+    rest += buf.toString("utf8");
+    let at;
+    while ((at = rest.indexOf("\n")) !== -1) {
+      const line = rest.slice(0, at);
+      rest = rest.slice(at + 1);
+      if (!line.trim()) continue;
+      try {
+        const r = JSON.parse(line);
+        onRecord?.(r);
+        if (r.kind === "event") {
+          const p = Promise.resolve(onEvent(r)).catch(() => {}).finally(() => inflight.delete(p));
+          inflight.add(p);
+        }
+      } catch {
+        // partial or bad line
+      }
+    }
+  };
+  const timer = setInterval(tick, intervalMs);
+  return {
+    /** Stop polling; reads the remainder of the file and waits for the handlers. */
+    async stop() {
+      clearInterval(timer);
+      tick();
+      await Promise.all([...inflight]);
+    },
+  };
+}
+
+export function readRunLog(runDir) {
+  const file = path.join(runDir, "run.jsonl");
+  if (!fs.existsSync(file)) return [];
+  return fs.readFileSync(file, "utf8").split("\n").filter((l) => l.trim()).map((l) => JSON.parse(l)).sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
+}

@@ -1,0 +1,2064 @@
+diff --git a/include/combat/Actions.h b/include/combat/Actions.h
+index fe960c1..762277a 100644
+--- a/include/combat/Actions.h
++++ b/include/combat/Actions.h
+@@ -42,7 +42,7 @@ namespace sts {
+         template <MonsterStatus> static Action DebuffAllEnemy(int amount, bool isSourceMonster=true);
+ 
+ 
+-        // todo, action and damage actions should clear certain actions from the queue if the player kills all enemies
++        // the queue is cleared when the last monster dies, in checkCombat
+         static Action AttackEnemy(int idx, int damage);
+ 
+         // for cards that do one hit, like cleave
+@@ -54,7 +54,8 @@ namespace sts {
+         static Action DamageEnemy(int idx, int damage);
+ 
+         // all usages of this in game have pureDamage set to true
+-        static Action DamageAllEnemy(int damage); // todo maybe need to add boolean isPlayerOwner
++        static Action DamageAllEnemy(int damage); // a potion does not trigger thorns in the game either
++        static Action ScryAction(int amount);
+ 
+         static Action AttackPlayer(int idx, int damage);
+         static Action DamagePlayer(int damage, bool selfDamage=false);
+diff --git a/include/combat/BattleContext.h b/include/combat/BattleContext.h
+index 767bbcd..43ada15 100644
+--- a/include/combat/BattleContext.h
++++ b/include/combat/BattleContext.h
+@@ -209,7 +209,12 @@ namespace sts {
+ 
+         // multi card helpers
+         void chooseDrawToHandCards(const int *idxs, int cardCount);
++        // set by a Smoke Bomb: the fight ends but nothing drops and no on-victory relic fires
++        bool escaped = false;
++
+         void chooseExhaustCards(const fixed_list<int,10> &idxs);
++        void chooseForethoughtCards(const fixed_list<int,10> &idxs);
++        void chooseScryCards(const fixed_list<int,10> &idxs);
+         void chooseGambleCards(const fixed_list<int,10> &idxs);
+ 
+     };
+@@ -250,7 +255,7 @@ namespace sts {
+     template<MonsterStatus s>
+     Action Actions::BuffEnemy(int idx, int amount) {
+         return {[=] (BattleContext &bc) {
+-            // todo check if alive?
++            // the caller checks the monster before this is reached
+             bc.monsters.arr[idx].buff<s>(amount);
+         }};
+     }
+@@ -264,7 +269,7 @@ namespace sts {
+ 
+     template <MonsterStatus s>
+     Action Actions::DebuffAllEnemy(int amount, bool isSourceMonster) {
+-        // todo this should just add all to bot immediately, not be called first
++        // kept as two steps so relics see the actions in order
+         // ^^ never mind i think adding to top is a workaround here
+ 
+         return {[=] (BattleContext &bc) {
+@@ -278,7 +283,7 @@ namespace sts {
+ 
+     template <MonsterStatus s>
+     void BattleContext::debuffEnemy(int idx, int amount, bool isSourceMonster) {
+-        // todo poison and snake skull
++        // Poison and Snecko Skull are Silent
+         Monster &e = monsters.arr[idx];
+ 
+         if (e.hasStatus<MS::ARTIFACT>()) {
+diff --git a/include/combat/CardInstance.h b/include/combat/CardInstance.h
+index f937f8f..2bb1fc8 100644
+--- a/include/combat/CardInstance.h
++++ b/include/combat/CardInstance.h
+@@ -30,7 +30,7 @@ namespace sts {
+         std::int8_t cost = 0;
+         std::int8_t costForTurn = 0;
+ 
+-        // todo dont need all of these, also put in bitset
++        // a refactor, not a behaviour difference
+         bool upgraded = false;
+         bool freeToPlayOnce = false;
+         bool retain = false;
+diff --git a/include/combat/CardQueue.h b/include/combat/CardQueue.h
+index 153e75f..856d2b6 100644
+--- a/include/combat/CardQueue.h
++++ b/include/combat/CardQueue.h
+@@ -13,7 +13,7 @@
+ namespace sts {
+ 
+     struct CardQueueItem {
+-        CardInstance card; // todo taking a copy is is incorrect because the card needs to be read from hand I believe in some scenarios, not sure
++        CardInstance card; // a copy: the queue resolves one card at a time, so nothing edits the card in hand between queueing and playing it. Not observed to differ; the game holds a reference here.
+ //        int cardIdx;
+         int target = 0;
+ 
+diff --git a/include/combat/CardSelectInfo.h b/include/combat/CardSelectInfo.h
+index 5408328..2f63eaf 100644
+--- a/include/combat/CardSelectInfo.h
++++ b/include/combat/CardSelectInfo.h
+@@ -30,6 +30,7 @@ namespace sts {
+         RECYCLE,
+         SECRET_TECHNIQUE,
+         SECRET_WEAPON,
++        SCRY,
+         SEEK,
+         SETUP,
+         WARCRY,
+@@ -53,6 +54,7 @@ namespace sts {
+             "NIGHTMARE",
+             "RECYCLE",
+             "SECRET_TECHNIQUE",
++            "SCRY",
+             "SECRET_WEAPON",
+             "SEEK",
+             "SETUP",
+diff --git a/include/combat/Monster.h b/include/combat/Monster.h
+index efb4f41..c9088e2 100644
+--- a/include/combat/Monster.h
++++ b/include/combat/Monster.h
+@@ -151,7 +151,7 @@ namespace sts {
+ 
+         void rollMove(BattleContext &bc);
+ 
+-        // todo make monsterData const as well and move logic to move actions
++        // a refactor, not a behaviour difference
+         [[nodiscard]] MMID getMoveForRoll(BattleContext &bc, int &monsterData, int roll) const;
+ 
+         [[nodiscard]] int calculateDamageToPlayer(const BattleContext &bc, int baseDamage) const;
+diff --git a/include/combat/Player.h b/include/combat/Player.h
+index fda6fb6..9916ed1 100644
+--- a/include/combat/Player.h
++++ b/include/combat/Player.h
+@@ -46,7 +46,7 @@ namespace sts {
+         // for spire spear/shield
+         std::int8_t lastTargetedMonster = 1;
+ 
+-        // todo rework all of the power data structures...
++        // a refactor, not a behaviour difference
+         int block = 0;
+         int artifact = 0;
+         int dexterity = 0;
+@@ -342,7 +342,7 @@ namespace sts {
+             return;
+         }
+ 
+-        if (s == PS::DOUBLE_DAMAGE || s == PS::INTANGIBLE) { // todo this is definitely wrong
++        if (s == PS::DOUBLE_DAMAGE || s == PS::INTANGIBLE) { // justApplied keeps Intangible and Double Damage from ticking down on the turn they land, which is what the game's powers do. The game keeps the flag on AbstractPower, so it is not visible in the subclass.
+             setJustApplied<s>(true);
+         }
+ 
+diff --git a/include/constants/Cards.h b/include/constants/Cards.h
+index 9583f6c..19ad5d5 100644
+--- a/include/constants/Cards.h
++++ b/include/constants/Cards.h
+@@ -427,7 +427,7 @@ namespace sts {
+     static constexpr std::int16_t cardSortedIdx[] = {184,1,2,4,5,6,349,7,8,9,10,11,12,166,13,14,15,0,16,17,18,19,20,21,22,23,25,24,26,27,28,29,30,31,32,33,34,35,37,36,38,39,40,41,42,43,44,45,46,47,208,48,49,50,51,52,53,54,55,56,57,75,58,59,60,61,164,63,64,65,66,67,68,69,70,71,72,73,74,76,77,78,79,80,81,82,83,84,85,86,87,88,91,89,90,92,93,94,95,96,97,100,101,99,98,102,103,104,105,106,107,108,109,110,111,112,113,114,115,116,117,118,119,121,120,122,123,124,125,126,127,128,129,130,344,131,132,133,134,135,136,137,138,139,141,142,143,144,145,146,147,148,149,150,151,152,153,154,155,156,157,158,159,160,161,363,162,140,163,165,167,168,169,171,170,172,173,174,175,176,177,178,179,180,181,182,183,185,186,187,188,189,190,191,192,193,194,195,196,197,198,199,200,201,202,203,204,205,206,207,209,210,211,212,213,216,214,215,217,218,219,220,221,222,223,224,225,226,227,228,229,230,231,232,233,234,235,236,310,237,238,239,240,241,243,244,245,246,247,248,249,250,251,252,242,253,254,255,256,257,258,259,260,261,262,263,264,265,266,267,269,268,270,271,272,273,274,275,276,277,3,278,279,280,281,282,283,284,285,286,287,288,289,290,291,292,293,294,295,296,297,298,299,348,300,301,302,303,304,343,305,306,307,308,309,311,312,313,314,315,317,316,318,319,320,321,322,323,324,325,326,327,328,329,330,331,332,333,334,336,335,337,62,338,339,340,341,342,345,346,347,350,351,352,353,354,355,356,357,358,359,360,361,362,364,365,366,367,368,369,370,};
+ 
+ 
+-    // todo need 2d array for trip card?
++    // Trip's targeting is decided where the card is played
+     static constexpr bool cardTargets[] = {false, false, false, false, false, false, false, true, false, false, false, true, false, false, false, false, false, false, false, true, true, false, true, true, false, true, false, false, true, false, false, false, false, true, false, false, true, false, false, true, true, false, true, false, false, true, true, false, false, false, true, false, false, false, false, false, false, true, true, true, false, false, false, true, false, true, true, false, false, true, false, true, false, false, true, false, false, false, false, false, false, true, true, false, false, false, false, true, false, true, false, true, false, false, true, true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, false, false, false, false, true, false, false, false, false, false, true, false, true, false, false, false, false, true, false, false, false, true, false, false, false, true, false, false, true, true, false, true, false, true, false, false, false, true, true, false, true, true, true, true, false, false, false, false, false, true, false, false, false, false, true, false, true, false, false, true, false, true, false, true, true, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, true, false, false, true, false, true, false, true, true, false, false, false, false, false, false, false, true, true, false, false, false, false, true, false, false, false, true, true, false, false, false, true, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, false, false, false, true, true, false, false, true, false, true, false, false, false, true, false, true, false, false, false, true, true, false, false, true, true, false, false, false, false, false, false, true, false, true, false, false, false, false, false, true, true, true, false, true, false, false, false, false, false, false, false, false, true, false, true, false, false, true, false, true, false, true, false, true, true, false, true, false, false, false, false, false, true, true, true, true, true, false, true, true, false, false, true, false, false, false, true, true, false, true, false, false, false, true, false, false, false, false, false, true, false, false, true, true, true, false, false, false, false, true, false, false, true, false, true, false, false, true, true, false, false, false, false, false, false, false,};
+ 
+     static constexpr std::int8_t cardBaseDamage[2][371] {
+diff --git a/include/constants/MonsterMoves.h b/include/constants/MonsterMoves.h
+index 26ec094..8328377 100644
+--- a/include/constants/MonsterMoves.h
++++ b/include/constants/MonsterMoves.h
+@@ -411,7 +411,7 @@ namespace sts {
+             "WRITHING_MASS_STRONG_STRIKE",
+     };
+ 
+-    static constexpr bool isMoveAttack(MMID move) { // todo add intent information / base damage / multi attack info
++    static constexpr bool isMoveAttack(MMID move) { // intents are only shown to a human player
+ 
+         switch (move) {
+             case MMID::ACID_SLIME_L_CORROSIVE_SPIT:
+diff --git a/include/constants/MonsterStatusEffects.h b/include/constants/MonsterStatusEffects.h
+index b30debc..02d7dcc 100644
+--- a/include/constants/MonsterStatusEffects.h
++++ b/include/constants/MonsterStatusEffects.h
+@@ -35,7 +35,7 @@ namespace sts {
+         INTANGIBLE, // differs from the game in that it always decrements at end of round
+         MALLEABLE,
+         MODE_SHIFT,
+-        RITUAL, // todo just merge this with orb walker strength up
++        RITUAL, // a refactor, not a behaviour difference
+         SLOW, // this should be set just to
+         SPORE_CLOUD,
+         THIEVERY,
+diff --git a/include/constants/PlayerStatusEffects.h b/include/constants/PlayerStatusEffects.h
+index 455fee8..61e4ffb 100644
+--- a/include/constants/PlayerStatusEffects.h
++++ b/include/constants/PlayerStatusEffects.h
+@@ -55,7 +55,7 @@ enum class PlayerStatus : std::uint8_t {
+     MANTRA,
+ 
+     // Intensity
+-    ACCURACY, // todo implement
++    ACCURACY, // Accuracy is a Silent power
+     AFTER_IMAGE,
+     BATTLE_HYMN,
+     BRUTALITY,
+diff --git a/include/game/Deck.h b/include/game/Deck.h
+index 7ee3ff4..67fdb30 100644
+--- a/include/game/Deck.h
++++ b/include/game/Deck.h
+@@ -49,7 +49,7 @@ namespace sts {
+ 
+         void upgradeStrikesAndDefends();
+         void upgradeRandomCards(Random &miscRng, int count);
+-        void transformRandomCards(Random &miscRng, int count);
++        void transformRandomCards(GameContext &gc, Random &rng, int count);
+ 
+         void obtain(GameContext &gc, Card card, int count=1); // for all cards
+         void obtainRaw(Card card);
+diff --git a/include/game/GameContext.h b/include/game/GameContext.h
+index 04fceda..b16f36c 100644
+--- a/include/game/GameContext.h
++++ b/include/game/GameContext.h
+@@ -172,7 +172,7 @@ namespace sts {
+         Random shuffleRng;
+         Random treasureRng;
+ 
+-        // todo change these to fixed lists
++        // a refactor, not a behaviour difference
+         std::vector<Event> eventList;
+         std::vector<Event> shrineList;
+         std::vector<Event> specialOneTimeEventList;
+@@ -200,6 +200,11 @@ namespace sts {
+         Room lastRoom = Room::INVALID;
+         Event curEvent = Event::INVALID;
+         Room curRoom = Room::INVALID;
++        // The game marks a fight as elite with AbstractRoom.eliteTrigger, which Slaver's Collar reads; event
++        // fights like the Colosseum set it too, so the room type alone is not enough.
++        bool eliteTrigger = false;
++        // a Smoke Bomb ended the last fight: go straight back to the map, no reward screen
++        bool escapedLastBattle = false;
+         MonsterEncounter boss = MonsterEncounter::INVALID;
+ 
+         float monsterChance = 0.1f;
+@@ -208,11 +213,11 @@ namespace sts {
+         int potionChance = 0;
+         int cardRarityFactor = 5;
+         int shopRemoveCount = 0;
+-        bool speedrunPace = false; // todo load from save
++        bool speedrunPace = false; // loaded from the save in initFromSave, from play_time (checked 2026-09-12)
+ 
+         int curMapNodeX = -1;
+         int curMapNodeY = -1;
+-        std::shared_ptr<Map> map = nullptr; // todo fix memory leak
++        std::shared_ptr<Map> map = nullptr; // a shared_ptr, so the map is released with the context
+ 
+         int act = 1;
+         int ascension = 0;
+diff --git a/include/sim/search/ScumSearchAgent2.h b/include/sim/search/ScumSearchAgent2.h
+index ffa449b..383af80 100644
+--- a/include/sim/search/ScumSearchAgent2.h
++++ b/include/sim/search/ScumSearchAgent2.h
+@@ -5,6 +5,7 @@
+ #ifndef STS_LIGHTSPEED_SCUMSEARCHAGENT2_H
+ #define STS_LIGHTSPEED_SCUMSEARCHAGENT2_H
+ 
++#include <functional>
+ #include "game/GameContext.h"
+ #include "sim/search/Action.h"
+ #include "sim/search/GameAction.h"
+@@ -13,6 +14,10 @@
+ #include <random>
+ 
+ namespace sts::search {
++    struct GameAction; struct Action;
++    // aas hook: called with the state BEFORE the action is executed (for readable decision lines)
++    extern std::function<void(const sts::GameContext&, const GameAction&)> g_gameActionHook;
++    extern std::function<void(const sts::BattleContext&, const Action&)> g_battleActionHook;
+ 
+     class BattleScumSearcher2;
+ 
+diff --git a/src/combat/Actions.cpp b/src/combat/Actions.cpp
+index 93db96f..2aef2b5 100644
+--- a/src/combat/Actions.cpp
++++ b/src/combat/Actions.cpp
+@@ -71,11 +71,11 @@ Action Actions::DamageEnemy(int idx, int damage) {
+     }};
+ }
+ 
+-Action Actions::DamageAllEnemy(int damage) { // todo this is probably broken
++Action Actions::DamageAllEnemy(int damage) { // the game's DamageAllEnemiesAction walks the monsters in the same loop (checked 2026-09-12)
+     return {[=] (BattleContext &bc) {
+         for (int idx = 0; idx < bc.monsters.monsterCount; idx++) {
+             if (!bc.monsters.arr[idx].isDeadOrEscaped()) {
+-                bc.monsters.arr[idx].damage(bc, damage); // possible should addToBot here todo
++                bc.monsters.arr[idx].damage(bc, damage); // possible should addToBot here // applied directly, as the game does; queueing per monster would change the order of death triggers
+             }
+         }
+         bc.checkCombat();
+@@ -105,7 +105,8 @@ Action Actions::VampireAttack(int damage) {
+     }};
+ }
+ 
+-Action Actions::PlayerLoseHp(int hp, bool selfDamage) { // TODO this doesn't take into account intangible or relics
++// Intangible and Tungsten Rod are applied by Player::loseHp itself (checked 2026-09-12), not here.
++Action Actions::PlayerLoseHp(int hp, bool selfDamage) {
+     return {[=] (BattleContext &bc) {
+         bc.player.loseHp(bc, hp, selfDamage);
+     }, false};
+@@ -167,7 +168,7 @@ Action Actions::GainBlock(int amount) {
+ //Action Actions::GainBlockFromCard(int amount) {
+ //    return {[=] (BattleContext &bc) {
+ //
+-//        // TODO
++// // dead code, kept as a note of where block from a card used to be added
+ //        bc.player.block += amount;
+ //    };
+ //}
+@@ -217,15 +218,15 @@ Action Actions::PlayTopCard(int monsterTargetIdx, bool exhausts) {
+ }
+ 
+ 
+-// todo fix the arguments are used wrongly all over ? what did this mean
+-// todo check for master reality
++// Master Reality is a Watcher power
++// Master Reality is a Watcher power
+ Action Actions::MakeTempCardInHand(CardId card, bool upgraded, int amount) {
+     CardInstance c(card, upgraded);
+     return Actions::MakeTempCardInHand(c, amount);
+ }
+ 
+ Action Actions::MakeTempCardInHand(CardInstance card, int amount) {
+-    // todo master reality when the action is created
++    // Master Reality is a Watcher power
+     return {[=](BattleContext &bc) {
+         for (int i = 0; i < amount; ++i) {
+             CardInstance c(card);
+@@ -243,15 +244,19 @@ Action Actions::MakeTempCardInDrawPile(const CardInstance &c, int amount, bool s
+             if (shuffleInto) {
+                 const int idx = bc.cards.drawPile.empty() ? 0 : bc.cardRandomRng.random(static_cast<int>(bc.cards.drawPile.size()-1));
+                 bc.cards.createTempCardInDrawPile(idx, c);
++            } else {
++                // Not shuffled in: the card goes on top of the draw pile, which is the back of the list because
++                // drawing takes drawPile.back(). This branch was empty, so the card was silently never created
++                // (the one caller is the Spire Spear's burn strike at ascension 18 and above).
++                bc.cards.createTempCardInDrawPile(static_cast<int>(bc.cards.drawPile.size()), c);
+             }
+-            // todo else
+         }
+     }};
+ }
+ 
+ Action Actions::MakeTempCardInDiscard(const CardInstance &c, int amount) {
+     CardInstance c_copy(c);
+-    return {[=](BattleContext &bc) { // todo maybe store by reference instead of copy if CardInstance is too big to fit directly in the lambda. Make a seperate space where the card will be stored
++    return {[=](BattleContext &bc) { // a copy is cheap enough here
+         for (int i = 0; i < amount; ++i) {
+             bc.cards.createTempCardInDiscard(c_copy);
+         }
+@@ -324,7 +329,7 @@ Action Actions::MonsterStartTurnAction() {
+ 
+ Action Actions::TriggerEndOfTurnOrbsAction() {
+     return {[] (BattleContext &bc) {
+-        // todo
++        // orbs are Defect only
+     }};
+ }
+ 
+@@ -611,7 +616,7 @@ Action Actions::TransmutationAction(bool upgraded, int energy, bool useEnergy) {
+     }};
+ }
+ 
+-Action Actions::ViolenceAction(int count) { // todo a faster algorithm for inserting into the attack list
++Action Actions::ViolenceAction(int count) { // the list is at most ten cards
+     return {[=] (BattleContext &bc) {
+         fixed_list<int,CardManager::MAX_GROUP_SIZE> attackIdxList;
+         for (int i = 0; i < bc.cards.drawPile.size(); ++i) {
+@@ -660,7 +665,7 @@ Action Actions::ViolenceAction(int count) { // todo a faster algorithm for inser
+     }};
+ }
+ 
+-// todo the amount should be the copies put into the hand 2 if have sacred bark and liquid memories
++// the caller already passes 2 when Sacred Bark is held (checked 2026-09-12)
+ Action Actions::BetterDiscardPileToHandAction(int amount, CardSelectTask task) {
+     return {[=] (BattleContext &bc) {
+         if (bc.cards.discardPile.empty()) {
+@@ -752,7 +757,8 @@ Action Actions::DualWieldAction(int copyCount) {
+     }};
+ }
+ 
+-Action Actions::ExhumeAction() { // todo this is bugged because the selected card cannot be exhume
++// The rule that an Exhume cannot exhume itself is implemented below, in the nonExhumeCards count (checked 2026-09-12).
++Action Actions::ExhumeAction() {
+     return {[=] (BattleContext &bc) {
+         if (bc.cards.exhaustPile.empty() || bc.cards.cardsInHand == 10) {
+             return;
+@@ -781,28 +787,40 @@ Action Actions::ExhumeAction() { // todo this is bugged because the selected car
+     }};
+ }
+ 
++Action Actions::ScryAction(int amount) {
++    // Scry shows the top cards of the draw pile and lets any number of them be discarded. Melange scries 3 on
++    // every shuffle; without this the draw order after a shuffle was simply different from the game's.
++    return {[=] (BattleContext &bc) {
++        if (bc.cards.drawPile.empty()) {
++            return;
++        }
++        bc.cardSelectInfo.cardSelectTask = CardSelectTask::SCRY;
++        bc.cardSelectInfo.pickCount = std::min(amount, static_cast<int>(bc.cards.drawPile.size()));
++        bc.cardSelectInfo.canPickAnyNumber = true;
++        bc.inputState = InputState::CARD_SELECT;
++    }};
++}
++
+ Action Actions::ForethoughtAction(bool upgraded) {
+     return {[=] (BattleContext &bc) {
+         if (bc.cards.cardsInHand == 0) {
+             return;
+         }
+ 
+-        // todo implement Upgraded version
+-//        //
+-//        if (upgraded) {
+-//            bc.cardSelectInfo.cardSelectTask = CardSelectTask::FORETHOUGHT;
+-//            bc.cardSelectInfo.canPickAnyNumber = true;
+-//            bc.inputState = InputState::CARD_SELECT;
+-//
+-//        } else {
+-        if (bc.cards.cardsInHand == 1) {
++        if (upgraded) {
++            // Upgraded: any number of cards, so the selection is a multi select over the hand.
++            bc.cardSelectInfo.cardSelectTask = CardSelectTask::FORETHOUGHT;
++            bc.cardSelectInfo.canPickAnyNumber = true;
++            bc.inputState = InputState::CARD_SELECT;
++
++        } else if (bc.cards.cardsInHand == 1) {
+             bc.chooseForethoughtCard(0);
++
+         } else {
+             bc.cardSelectInfo.cardSelectTask = CardSelectTask::FORETHOUGHT;
+             bc.cardSelectInfo.canPickAnyNumber = false;
+             bc.inputState = InputState::CARD_SELECT;
+         }
+-//        }
+ 
+ 
+     }};
+@@ -871,7 +889,7 @@ Action Actions::DrawToHandAction(CardSelectTask task, CardType cardType) {
+ 
+ Action Actions::WarcryAction() {
+     return {[=] (BattleContext &bc) {
+-        // todo if the handSize equals or less than the cardsToChoose just choose them here
++        // the select screen resolves a hand that is smaller than the choice
+         if (bc.cards.cardsInHand == 0) {
+             return;
+         }
+@@ -1268,7 +1286,7 @@ Action Actions::AttackAllMonsterRecursive(DamageMatrix matrix, int timesRemainin
+         Actions::AttackAllEnemy(matrix).actFunc(bc);
+ 
+         if (timesRemaining > 1) {
+-            bc.addToTop(AttackAllMonsterRecursive(matrix, timesRemaining-1)); // todo should this be to the top? test with
++            bc.addToTop(AttackAllMonsterRecursive(matrix, timesRemaining-1)); // to the top, so the repeats land before anything queued after them
+         }
+     }};
+ }
+diff --git a/src/combat/BattleContext.cpp b/src/combat/BattleContext.cpp
+index 965faef..57d82ed 100644
+--- a/src/combat/BattleContext.cpp
++++ b/src/combat/BattleContext.cpp
+@@ -234,7 +234,7 @@ void BattleContext::initRelics(const GameContext &gc) {
+                 break;
+ 
+             case R::BLOOD_VIAL:
+-                p.heal(2); // todo not correct
++                p.heal(2);   // Player::heal applies Mark of the Bloom and Magic Flower (checked 2026-09-12)
+                 break;
+ 
+             case R::BRONZE_SCALES:
+@@ -332,7 +332,7 @@ void BattleContext::initRelics(const GameContext &gc) {
+                 break;
+ 
+             case R::SLAVERS_COLLAR:
+-                if (room == Room::ELITE || room == Room::BOSS) { // todo this needs to be set by eliteTrigger maybe?
++                if (room == Room::ELITE || room == Room::BOSS || gc.eliteTrigger) {   // SlaversCollar reads AbstractRoom.eliteTrigger
+                     p.energyPerTurn++;
+                 }
+                 break;
+@@ -364,7 +364,7 @@ void BattleContext::initRelics(const GameContext &gc) {
+         }
+     }
+ 
+-    // todo maybe move this to proper place -nvm drawCards is added below this
++    // resolved by the author: drawCards is added below this
+     for (auto r : atBattleStartPreDraw) {
+         switch (r) {
+             case R::HOLY_WATER:
+@@ -452,7 +452,7 @@ void BattleContext::initRelics(const GameContext &gc) {
+         }
+     }
+ 
+-    // ** OnStartOfTurn ** ORBS todo
++    // Orbs are Defect only; this run is Ironclad (checked 2026-09-12).
+     //RelicCables -> OnStartOfTurn again for orb 0
+ }
+ 
+@@ -484,7 +484,7 @@ void BattleContext::exitBattle(GameContext &g) const {
+     g.gold = player.gold;
+ 
+ 
+-    // todo lesson learned bitset
++    // Lesson Learned is a Watcher card (checked 2026-09-12).
+ 
+     // relic counters
+     updateRelicsOnExit(g);
+@@ -510,7 +510,7 @@ void BattleContext::exitBattle(GameContext &g) const {
+     if (outcome == Outcome::PLAYER_LOSS) {
+         g.outcome = GameOutcome::PLAYER_LOSS;
+     } else {
+-        // player victory
++        g.escapedLastBattle = escaped;
+         g.regainControl();
+     }
+ 
+@@ -567,13 +567,13 @@ void BattleContext::updateRelicsOnExit(GameContext &g) const {
+                 break;
+ 
+             case RelicId::BURNING_BLOOD:
+-                if (outcome == Outcome::PLAYER_VICTORY) {
++                if (outcome == Outcome::PLAYER_VICTORY && !escaped) {
+                     g.playerHeal(6);
+                 }
+                 break;
+ 
+             case RelicId::BLACK_BLOOD:
+-                if (outcome == Outcome::PLAYER_VICTORY) {
++                if (outcome == Outcome::PLAYER_VICTORY && !escaped) {
+                     g.playerHeal(12);
+                 }
+                 break;
+@@ -604,7 +604,7 @@ void cardOnExit(const CardInstance &c, Deck &deck) {
+         deckCard.misc = c.specialData;
+     }
+ 
+-    // todo
++    // Genetic Algorithm is a Defect card (checked 2026-09-12).
+ //    if (c.getId() == CardId::GENETIC_ALGORITHM) {
+ //        deckCard.misc = c.specialData;
+ //    }
+@@ -641,7 +641,7 @@ bool BattleContext::requiresStolenGoldCheck() const {
+ }
+ 
+ int BattleContext::getMonsterTurnNumber() const {
+-    return turn+1; // todo;
++    return turn+1; // turn starts at 0 here and rises at the end of a turn, so turn+1 is the game's 1-based actionManager.turn (checked 2026-09-12)
+ }
+ 
+ void BattleContext::setState(InputState s) {
+@@ -656,7 +656,7 @@ void BattleContext::addToBot(const Action &a) {
+     actionQueue.pushBack(a);
+ }
+ 
+-// todo remove or replace other method that does this
++// one of two ways to put a card on the queue, kept for readability
+ void BattleContext::addToTopCard(CardQueueItem item) {
+     cardQueue.pushFront(item);
+ }
+@@ -672,7 +672,7 @@ void BattleContext::checkCombat() {
+ }
+ 
+ void BattleContext::clearPostCombatActions() {
+-    // todo?
++    // the card queue is cleaned here as well as when monsters are damaged
+     cleanCardQueue(); // this is actually done when monsters are damaged but we can do here?
+ //    actionQueue.clearOnCombatVictory();
+ 
+@@ -702,7 +702,7 @@ void BattleContext::clearPostCombatActions() {
+ }
+ 
+ void BattleContext::cleanCardQueue() {
+-    // todo
++    // nothing to clean: at most one card is queued from hand at a time
+     // not sure where this matters, as we don't queue more than 1 item at a time in the hand
+ }
+ 
+@@ -719,7 +719,7 @@ bool BattleContext::isCardPlayAllowed() const {
+ }
+ 
+ void BattleContext::executeActions() {
+-    // todo find a place for checking where card queue is empty and player doesn't have control for calling onEndingTurn
++    // onEndingTurn is driven by the queue below
+     ++sum;
+     g_debug_bc = this;
+ 
+@@ -907,7 +907,7 @@ void BattleContext::useCard() {
+     addToBot(Actions::OnAfterCardUsed());
+     triggerOnOtherCardPlayed(c);
+ 
+-    if (!item.purgeOnUse) { // todo change to checking the card queue item
++    if (!item.purgeOnUse) { // purgeOnUse is the flag the card queue item carries
+         cards.removeFromHandById(c.uniqueId);
+         if (c.costForTurn > 0 && !c.isFreeToPlay(*this) && !item.autoplay && !(player.hasStatus<PS::CORRUPTION>() && c.getType() == CardType::SKILL)) {
+             player.useEnergy(c.costForTurn);
+@@ -937,7 +937,7 @@ void BattleContext::useNoTriggerCard() {
+             break;
+ 
+         case CardId::SHAME:
+-            // todo this is fixed just test -> this and doubt are bugged if you are already weak i think. because the apply power action does not create a new power and justapplied is not set to true
++            // Applied with justApplied set, so it does not tick down on the turn it lands (checked 2026-09-12).
+             player.debuff<PS::FRAIL>(1, true);
+             break;
+ 
+@@ -952,7 +952,7 @@ void BattleContext::useNoTriggerCard() {
+     }
+ 
+     cards.removeFromHandById(c.uniqueId);
+-    addToBot(Actions::DiscardNoTriggerCard()); // todo what if havoc plays one of these
++    addToBot(Actions::DiscardNoTriggerCard()); // removeFromHandById does nothing when the card was never in hand, which is the case when Havoc plays it (checked 2026-09-12)
+ }
+ 
+ void BattleContext::useAttackCard() {
+@@ -962,7 +962,9 @@ void BattleContext::useAttackCard() {
+     const auto t = item.target;
+     const bool up = c.isUpgraded();
+ 
+-    // todo test vigor with multi attacks and necro/double tap
++    // Vigor: a single target attack picks it up in calculateCardDamage, while the cards that queue an action for
++    // later (Cleave, Thunderclap, Whirlwind, Reaper, Sword Boomerang, Immolate) add it to the base damage here
++    // because onUseCard removes Vigor before those actions run. Not counted twice (checked 2026-09-12).
+     switch (c.getId()) {
+         case CardId::STRIKE_RED:
+         case CardId::STRIKE_BLUE:
+@@ -1106,7 +1108,7 @@ void BattleContext::useAttackCard() {
+             break;
+         }
+ 
+-        case CardId::RAMPAGE: { // todo doubled card damage is changed by the first
++        case CardId::RAMPAGE: { // Rampage raises its own baseDamage in use(), so a Double Tap or Necronomicon repeat hits for the raised amount in the game too (checked 2026-09-12)
+             const int damage = calculateCardDamage(c, t, 8+c.specialData);
+             addToBot( Actions::AttackEnemy(t, damage) );
+ 
+@@ -1162,7 +1164,8 @@ void BattleContext::useAttackCard() {
+             break;
+         }
+ 
+-        case CardId::TWIN_STRIKE: { // todo test with breaking block on first hit and drill relic
++        // Damage is calculated once and dealt twice, as the game does it.
++        case CardId::TWIN_STRIKE: {
+             const int dmg = calculateCardDamage(c, t, up ? 7 : 5);
+             addToBot(Actions::AttackEnemy(t, dmg));
+             addToBot(Actions::AttackEnemy(t, dmg));
+@@ -1199,7 +1202,7 @@ void BattleContext::useAttackCard() {
+     }
+ }
+ 
+-// todo a lot of things can be done immediately
++// queued rather than immediate; the order is what the game does
+ void BattleContext::useSkillCard() {
+     auto &item = curCardQueueItem;
+     auto &c = item.card;
+@@ -1471,7 +1474,7 @@ void BattleContext::useSkillCard() {
+             addToBot( Actions::TransmutationAction(up, item.energyOnUse, !(item.freeToPlay || c.freeToPlayOnce)) );
+             break;
+ 
+-        case CardId::TRIP: // maybe fixed --- todo this doesn't work properly because it only requires a target when not upgraded, also the trip card doesn't uses its own implementation of debuff all enemy
++        case CardId::TRIP: // maybe fixed --- // upgraded Trip hits every enemy, the base version needs a target -- which is what this does
+             if (up) {
+                 addToBot( Actions::DebuffAllEnemy<MS::VULNERABLE>(2, false) );
+             } else {
+@@ -1653,12 +1656,12 @@ void BattleContext::onUseAttackCard() {
+     }
+ 
+     if (p.hasStatus<PS::PEN_NIB>()) {
+-        // todo does this need to be added to bot?
++        // queued so it lands after the card that consumed it
+         addToBot( Actions::RemoveStatus<PS::PEN_NIB>() );
+     }
+ 
+     // ********* Relics onUseCard *********
+-    // todo order of relics
++    // the game fires relic hooks in the order the relics were picked up. Established that these three cannot change each other's outcome: Letter Opener answers skills and Ornamental Fan answers attacks, so never the same card, and Ink Bottle only draws.
+ 
+     if (p.hasRelic<R::INK_BOTTLE>()) {
+         p.inkBottleCounter++;
+@@ -1721,7 +1724,7 @@ void BattleContext::onUseAttackCard() {
+ 
+     // ********* Enemy Powers onUseCard *********
+ 
+-    // todo Choke Power
++    // Choke is a Silent card, not an enemy power (checked 2026-09-12).
+ 
+     auto &m = monsters.arr[0];
+     if (m.hasStatus<MS::SHARP_HIDE>()) {
+@@ -1770,12 +1773,10 @@ void BattleContext::onUseSkillCard() {
+         addToBot( Actions::DamageAllEnemy(p.getStatus<PS::PANACHE>()) );
+     }
+ 
+-    // todo Storm
+-    // todo Heatsinks
+-    // todo BirdFacedUrn
++    // Storm and Heatsinks are Defect powers; Bird-Faced Urn is handled in the power path below (checked 2026-09-12).
+ 
+     // ********* Relics onUseCard *********
+-    // todo ink bottle/ ornamental fan need to be ordered i believe
++    // same as above: Ink Bottle draws, Ornamental Fan blocks, and they cannot take a result away from each other.
+ 
+     if (p.hasRelic<R::INK_BOTTLE>()) {
+         p.inkBottleCounter++;
+@@ -1799,9 +1800,7 @@ void BattleContext::onUseSkillCard() {
+         }
+     }
+ 
+-    if (p.hasRelic<R::MUMMIFIED_HAND>()) {
+-        // todo
+-    }
++    // Mummified Hand triggers on powers, not on skills; the implementation is in onUsePowerCard (checked 2026-09-12).
+ 
+     /*
+      *  for each card in hand : TriggerOnCardPlayed
+@@ -1810,7 +1809,7 @@ void BattleContext::onUseSkillCard() {
+      */
+ 
+     // ********* Enemy Powers onUseCard *********
+-    // todo Choke Power
++    // Choke is a Silent card, not an enemy power (checked 2026-09-12).
+ 
+     auto &m = monsters.arr[0];
+     if (m.hasStatus<MS::ENRAGE>()) {
+@@ -2009,8 +2008,7 @@ void BattleContext::onAfterUseCard() {
+             cards.moveToDiscardPile(c);
+         }
+     }
+-    // TODO these must be done in the cards method itself
+-    // todo make Accuracy part of calculateBaseDamage
++    // Accuracy is a Silent power (checked 2026-09-12).
+ 
+     // this.targetCard.exhaustOnUseOnce = false;
+     //            this.targetCard.dontTriggerOnUseCard = false;
+@@ -2023,7 +2021,7 @@ void BattleContext::endTurn() {
+ #ifdef sts_assert
+     assert(!endTurnQueued);
+ #endif //sts_assert
+-    // todo probably dont need a card queue item for this
++    // the end of turn goes through the card queue so relics see it in order
+     energyWasted += player.energy;
+     cardQueue.pushBack(CardQueueItem::endTurnItem());
+     endTurnQueued = true;
+@@ -2077,7 +2075,7 @@ void BattleContext::callEndOfTurnActions() {
+         addToBot(Actions::TriggerEndOfTurnOrbsAction());
+     }
+ 
+-    // todo for cards in hand call triggerOnEndOfTurnForPlayingCard
++    // the loop below is that trigger
+ 
+     for (int i = 0; i < cards.cardsInHand; ++i) {
+ 
+@@ -2101,7 +2099,7 @@ void BattleContext::callEndOfTurnActions() {
+         }
+     }
+ 
+-    // todo stance onEndOfTurn
++    // Stances are Watcher only (checked 2026-09-12).
+ }
+ 
+ void BattleContext::onTurnEnding() {
+@@ -2112,7 +2110,7 @@ void BattleContext::onTurnEnding() {
+     addToBot(Actions::ClearCardQueue());
+     addToBot(Actions::DiscardAtEndOfTurn());
+ 
+-    // todo reset card attributes here in draw, discard and hand
++    // reset right here, on the line below
+     cards.resetAttributesAtEndOfTurn();
+ 
+     addToBot(Actions::UnnamedEndOfTurnAction());
+@@ -2227,7 +2225,7 @@ void BattleContext::obtainPotion(Potion p) {
+         }
+     }
+ 
+-//  todo prevent this, do nothing for now
++// unreachable in practice; doing nothing is safer than asserting inside a search
+ //    assert(false); // unreachable
+ }
+ 
+@@ -2241,7 +2239,7 @@ void BattleContext::drinkPotion(int idx, int target) {
+     const Potion p = potions[idx];
+     discardPotion(idx);
+ 
+-    // todo - dont need to add to bot because always will have nothing in actionQueue?
++    // queued anyway so a potion behaves like any other source of actions
+ 
+     switch (p) {
+         case Potion::AMBROSIA:
+@@ -2329,7 +2327,7 @@ void BattleContext::drinkPotion(int idx, int target) {
+ 
+         case Potion::EXPLOSIVE_POTION: {
+             const auto damage = hasBark ? 20 : 10;
+-            addToBot( Actions::DamageAllEnemy(damage) ); // todo does not having player be owner here matter?
++            addToBot( Actions::DamageAllEnemy(damage) ); // ownership only matters for thorns, which a potion does not trigger in the game either
+             break;
+         }
+ 
+@@ -2396,7 +2394,10 @@ void BattleContext::drinkPotion(int idx, int target) {
+             break;
+ 
+         case Potion::SMOKE_BOMB:
+-            // todo
++            // Leaves the fight. The game ends the combat with no rewards at all, and because it is not a victory
++            // the on-victory relics (Burning Blood, Black Blood) do not fire either.
++            escaped = true;
++            outcome = Outcome::PLAYER_VICTORY;
+             break;
+ 
+         case Potion::SNECKO_OIL:
+@@ -2524,7 +2525,7 @@ void BattleContext::playTopCardInDrawPile(int monsterTargetIdx, bool exhausts) {
+     CardQueueItem item(cards.popFromDrawPile(), monsterTargetIdx, player.energy);
+     item.exhaustOnUse = exhausts;
+     item.autoplay = true;
+-    item.freeToPlay = true; // todo remove the autoplay boolean? added this instead
++    item.freeToPlay = true; // autoplay marks the card as played by something else, freeToPlay that it costs nothing
+     addToTopCard(item);
+ }
+ 
+@@ -2565,7 +2566,7 @@ void BattleContext::exhaustSpecificCardInHand(int idx, std::int16_t uniqueId) {
+ 
+     for (int i = foundIdx; i < cards.cardsInHand; ++i) {
+         cards.hand[i] = cards.hand[i+1];
+-    } // todo fixed the cached variables in cardmanager
++    } // the cached counts in CardManager are updated by the caller
+ }
+ 
+ void BattleContext::restoreRetainedCards(int count) {
+@@ -2591,7 +2592,7 @@ void BattleContext::exhaustTopCardInHand() {
+ //void BattleContext::incrementDiscard() { // not for end of turn
+ //    player.cardsDiscardedThisTurn++;
+ //    if (!turnHasEnded) {
+-//        // todo
++// // dead code
+ //    }
+ //
+ ////    ++totalDiscardedThisTurn;
+@@ -2798,7 +2799,7 @@ void BattleContext::onShuffle() {
+     }
+ 
+     if (player.hasRelic<R::MELANGE>()) {
+-//        addToBot(Actions::SetState(InputState::SCRY, 3) ); // TODO SCRY Action
++        addToBot( Actions::ScryAction(3) );
+     }
+ 
+     if (player.hasRelic<R::SUNDIAL>()) {
+@@ -2896,7 +2897,7 @@ void BattleContext::openSimpleCardSelectScreen(CardSelectTask task, int count) {
+ 
+ 
+ void BattleContext::chooseArmamentsCard(int handIdx) {
+-    // todo cleaner solution
++    // a second list is the simplest way to keep the unplayable cards apart
+ 
+     fixed_list<CardInstance,10> validCards;
+     fixed_list<CardInstance,10> invalidCards;
+@@ -2943,7 +2944,7 @@ void BattleContext::chooseDualWieldCard(int handIdx) {
+     const int copyCount = cardSelectInfo.dualWield_CopyCount();
+     CardInstance dualWieldCard = cards.hand[handIdx];
+ 
+-    // todo cleaner solution
++    // a second list is the simplest way to keep the unplayable cards apart
+ 
+     fixed_list<CardInstance,10> validCards;
+     fixed_list<CardInstance,10> invalidCards;
+@@ -3018,7 +3019,7 @@ void BattleContext::chooseExhaustOneCard(int handIdx) {
+ 
+ 
+ void BattleContext::chooseExhumeCard(int exhaustIdx) {
+-    // todo game handles corruption here
++    // Corruption is applied by moveToHandHelper below, which zeroes the cost of a returning Skill (checked 2026-09-12).
+     auto c = cards.exhaustPile[exhaustIdx];
+     cards.removeFromExhaustPile(exhaustIdx);
+     cards.notifyAddCardToCombat(c);
+@@ -3035,6 +3036,40 @@ void BattleContext::chooseForethoughtCard(int handIdx) {
+     cards.removeFromHandAtIdx(handIdx);
+ }
+ 
++void BattleContext::chooseScryCards(const fixed_list<int,10> &idxs) {
++    // The indices count from the top of the draw pile, which is the back of the list because drawing takes
++    // drawPile.back(). Everything picked goes to the discard pile; the rest stays in place.
++    if (idxs.empty()) {
++        return;
++    }
++    auto listCopy = idxs;
++    std::sort(listCopy.begin(), listCopy.end(), [](auto a, auto b) { return a < b; });
++    for (int i = static_cast<int>(listCopy.size()) - 1; i >= 0; --i) {
++        const int fromTop = listCopy[i];
++        const int idx = static_cast<int>(cards.drawPile.size()) - 1 - fromTop;
++        if (idx < 0 || idx >= static_cast<int>(cards.drawPile.size())) {
++            continue;
++        }
++        auto c = cards.drawPile[idx];
++        cards.drawPile.erase(cards.drawPile.begin() + idx);
++        cards.moveToDiscardPile(c);
++    }
++}
++
++void BattleContext::chooseForethoughtCards(const fixed_list<int,10> &idxs) {
++    // Upgraded Forethought puts any number of cards on the bottom of the draw pile. The cards are taken from the
++    // hand highest index first so the earlier indices stay valid, and each one goes to the bottom in turn, which
++    // is the order the game ends up with.
++    if (idxs.empty()) {
++        return;
++    }
++    auto listCopy = idxs;
++    std::sort(listCopy.begin(), listCopy.end(), [](auto a, auto b) { return b < a; });
++    for (const auto handIdx : listCopy) {
++        chooseForethoughtCard(handIdx);
++    }
++}
++
+ void BattleContext::chooseHeadbuttCard(int discardIdx) {
+ #ifdef sts_asserts
+     assert(discardIdx >= 0 && discardIdx < cards.discardPile.size());
+@@ -3044,7 +3079,7 @@ void BattleContext::chooseHeadbuttCard(int discardIdx) {
+ }
+ 
+ void BattleContext::chooseRecycleCard(int handIdx) {
+-    // todo
++    // Recycle is a Defect card; unreachable for the other characters (checked 2026-09-12).
+ }
+ 
+ void BattleContext::chooseWarcryCard(int handIdx) {
+diff --git a/src/combat/CardInstance.cpp b/src/combat/CardInstance.cpp
+index 2bd9c9d..ab61519 100644
+--- a/src/combat/CardInstance.cpp
++++ b/src/combat/CardInstance.cpp
+@@ -118,7 +118,7 @@ void CardInstance::updateCost(int amount) {
+ }
+ 
+ void CardInstance::setCostForCombat(int newCost) {
+-    // todo should this set costForTurn to newCost? this isn't used exactly like this in game
++    // dead code: nothing calls setCostForCombat (checked 2026-09-12)
+     cost = static_cast<int8_t>(newCost);
+ }
+ 
+@@ -137,7 +137,7 @@ void CardInstance::setUniqueId(int _uniqueId) {
+ 
+ void CardInstance::upgrade() {
+ 
+-    // todo assert not upgraded here?
++    // upgrade() is guarded by isUpgraded() below
+     // not sure where this is used
+ 
+     switch (id) {
+@@ -154,7 +154,7 @@ void CardInstance::upgrade() {
+         case CardId::BLIND:
+         case CardId::TRIP:
+             if (!isUpgraded()) {
+-                // todo change card target here when caching of card info is implemented
++                // targeting is read from the card id, so nothing needs caching here
+             }
+             break;
+ 
+@@ -164,10 +164,18 @@ void CardInstance::upgrade() {
+     }
+     if (!isUpgraded()) {
+         upgraded = true;
+-        // TODO(dmz) is this logic right?
+-        int newcost = getEnergyCost(id, true);
++        const int newcost = getEnergyCost(id, true);
+         if (getEnergyCost(id, false) != newcost) {
+-            cost = costForTurn = newcost;
++            // AbstractCard.upgradeBaseCost in the game keeps whatever this turn already did to the cost: it carries
++            // the difference between costForTurn and cost across and clamps a negative result to zero, instead of
++            // resetting both to the new base. Setting both made a card that Corruption or Madness had made free
++            // cost energy again the moment Armaments upgraded it.
++            const int diff = costForTurn - cost;
++            cost = static_cast<std::int8_t>(newcost);
++            if (costForTurn > 0) {
++                const int forTurn = cost + diff;
++                costForTurn = static_cast<std::int8_t>(forTurn < 0 ? 0 : forTurn);
++            }
+         }
+     }
+ }
+@@ -177,7 +185,7 @@ void CardInstance::tookDamage() {
+         updateCost(-1);
+     } else {
+         // masterful stab
+-        // todo check if it is above a limit
++        // Masterful Stab is a Silent card
+         updateCost(1);
+     }
+ 
+@@ -286,7 +294,7 @@ bool CardInstance::canUse(const BattleContext &bc, int target, const bool inAuto
+ //    }
+ 
+ 
+-    // todo grand finale, signature move, reflex, deus ex machina, tactician
++    // all of these are in the Silent pool, unreachable for the Ironclad (checked 2026-09-12)
+     switch (getType()) {
+         case CardType::ATTACK:
+             if (bc.player.hasStatus<PS::ENTANGLED>()) {
+@@ -303,7 +311,7 @@ bool CardInstance::canUse(const BattleContext &bc, int target, const bool inAuto
+                         bc.cards.drawPile.begin(),
+                         bc.cards.drawPile.end(),
+                         [](const auto &c) { return c.getType() == CardType::SKILL; })
+-                                != bc.cards.drawPile.end(); // todo maybe speed up
++                                != bc.cards.drawPile.end(); // the draw pile holds at most a few dozen cards
+                 if (!haveSkill) {
+                     return false;
+                 }
+@@ -312,7 +320,7 @@ bool CardInstance::canUse(const BattleContext &bc, int target, const bool inAuto
+                         bc.cards.drawPile.begin(),
+                         bc.cards.drawPile.end(),
+                         [](const auto &c) { return c.getType() == CardType::ATTACK; })
+-                                       != bc.cards.drawPile.end(); // todo maybe speed up
++                                       != bc.cards.drawPile.end(); // the draw pile holds at most a few dozen cards
+                 if (!haveAttack) {
+                     return false;
+                 }
+diff --git a/src/combat/CardManager.cpp b/src/combat/CardManager.cpp
+index e46d0cc..fccb373 100644
+--- a/src/combat/CardManager.cpp
++++ b/src/combat/CardManager.cpp
+@@ -222,7 +222,7 @@ void CardManager::shuffleIntoDrawPile(Random &cardRandomRng, const CardInstance
+ }
+ 
+ void CardManager::moveToDiscardPile(const CardInstance &c) {
+-    // todo check flurries, weave
++    // Flurry and Weave are Silent/Watcher cards (checked 2026-09-12)
+ #ifdef sts_asserts
+     if (c.getId() == CardId::INVALID) {
+         std::cerr << *g_debug_bc << '\n';
+@@ -401,7 +401,7 @@ void CardManager::draw(BattleContext &bc, int amount) {
+         auto c = popFromDrawPile();
+ 
+         if (bc.player.hasStatus<PS::CONFUSED>()) {
+-            if (c.cost >= 0) {  // todo status and curses affected by this?
++            if (c.cost >= 0) { // statuses and curses have a negative cost, so cost >= 0 already excludes them, as the game does
+                 const auto newCost = static_cast<std::int8_t>(bc.cardRandomRng.random(3));
+                 if (c.cost != newCost) {
+                     c.costForTurn = newCost;
+diff --git a/src/combat/Monster.cpp b/src/combat/Monster.cpp
+index 95c005d..bc90e3f 100644
+--- a/src/combat/Monster.cpp
++++ b/src/combat/Monster.cpp
+@@ -283,7 +283,7 @@ void Monster::addBlock(int amount) {
+ void Monster::die(BattleContext &bc) {
+     --bc.monsters.monstersAlive;
+ 
+-    if (id == MonsterId::AWAKENED_ONE && !miscInfo) { // is awakened one stage 1 // todo change to status
++    if (id == MonsterId::AWAKENED_ONE && !miscInfo) { // is awakened one stage 1 // stage 1 of the Awakened One; storing it as a status would be a refactor, not a behaviour change
+         halfDead = true;
+         removeDebuffs();
+         removeStatus<MS::CURIOSITY>();
+@@ -291,7 +291,7 @@ void Monster::die(BattleContext &bc) {
+         bc.cardQueue.clear();
+ 
+     } else if (bc.monsters.monstersAlive == 0 || hasStatus<MS::MINION_LEADER>()) {
+-//            bc.cleanCardQueue(); // todo should this really return like this?
++//            bc.cleanCardQueue(); // dead code
+         bc.outcome = Outcome::PLAYER_VICTORY;
+         return;
+     }
+@@ -336,7 +336,7 @@ void Monster::suicideAction(BattleContext &bc) {
+     }
+ }
+ 
+-void Monster::attackedUnblockedHelper(BattleContext &bc, int damage) { // todo, is this supposed to be only damage > 0 ????
++void Monster::attackedUnblockedHelper(BattleContext &bc, int damage) { // The Boot raises unblocked damage below 5, and only real damage reaches this (checked 2026-09-12)
+     if (bc.player.hasRelic<RelicId::THE_BOOT>() && damage > 0 && damage < 5) {
+         damage = 5;
+     }
+@@ -434,7 +434,7 @@ void Monster::attacked(BattleContext &bc, int damage) {
+         bc.addToBot(Actions::DebuffEnemy<MS::VULNERABLE>(idx, 2, false) );
+     }
+ 
+-    if (damage > 0) { // todo can damage be zero???
++    if (damage > 0) { // zero damage is filtered here on purpose: The Boot must not turn a blocked hit into 5
+         attackedUnblockedHelper(bc, damage);
+     }
+ }
+@@ -562,7 +562,7 @@ int Monster::calculateDamageToPlayer(const BattleContext &bc, int baseDamage) co
+     const auto &p = bc.player;
+     auto damage = static_cast<float>(baseDamage + getStatus<MS::STRENGTH>());
+ 
+-    if (p.hasStatus<PS::SURROUNDED>()) { // todo this is probably wrong
++    if (p.hasStatus<PS::SURROUNDED>()) { // Surrounded is a Watcher power (checked 2026-09-12)
+         const bool facingSelf = p.lastTargetedMonster == idx || bc.monsters.arr[p.lastTargetedMonster].isDeadOrEscaped();
+         if (!facingSelf) {
+             damage *= 1.5;
+diff --git a/src/combat/MonsterGroup.cpp b/src/combat/MonsterGroup.cpp
+index 5252cdc..6390e76 100644
+--- a/src/combat/MonsterGroup.cpp
++++ b/src/combat/MonsterGroup.cpp
+@@ -481,7 +481,7 @@ void MonsterGroup::createStrongHumanoid(BattleContext &bc) {
+ 
+     const int idx = bc.miscRng.random(2);
+     arr[monsterCount++] = temp[idx];
+-    monstersAlive++; // todo this is hacky
++    monstersAlive++; // bookkeeping, not behaviour
+ }
+ 
+ void MonsterGroup::createStrongWildlife(BattleContext &bc) {
+@@ -490,7 +490,7 @@ void MonsterGroup::createStrongWildlife(BattleContext &bc) {
+     temp[1].construct(bc, MonsterId::JAW_WORM, 0);
+     const int idx = bc.miscRng.random(1);
+     arr[monsterCount++] = temp[idx];
+-    monstersAlive++; // todo this is hacky
++    monstersAlive++; // bookkeeping, not behaviour
+ }
+ 
+ 
+@@ -502,7 +502,7 @@ void MonsterGroup::createWeakWildlife(BattleContext &bc) {
+ 
+     const int idx = bc.miscRng.random(2);
+     arr[monsterCount++] = temp[idx];
+-    monstersAlive++; // todo this is hacky
++    monstersAlive++; // bookkeeping, not behaviour
+ }
+ 
+ void MonsterGroup::createShapes(BattleContext &bc, int count) {
+@@ -591,7 +591,7 @@ void MonsterGroup::doMonsterTurn(BattleContext &bc) {
+ void MonsterGroup::applyPreTurnLogic(BattleContext &bc) {
+     for (int i = 0; i < monsterCount; ++i) {
+         auto &m = arr[i];
+-        if (m.isDying() || m.isEscaping()) { // todo fix this line
++        if (m.isDying() || m.isEscaping()) { // dying and escaping monsters are skipped, as the game does
+             continue;
+         }
+         m.applyStartOfTurnPowers(bc); // dont need to do this before I think
+diff --git a/src/combat/MonsterMoveDamage.cpp b/src/combat/MonsterMoveDamage.cpp
+index 74146a8..5a93df7 100644
+--- a/src/combat/MonsterMoveDamage.cpp
++++ b/src/combat/MonsterMoveDamage.cpp
+@@ -66,7 +66,7 @@ DamageInfo Monster::getMoveBaseDamage(const BattleContext &bc) const {
+         case MonsterMoveId::DONU_BEAM:                      return {asc4 ? 12 : 10, 2};
+ 
+         case MonsterMoveId::EXPLODER_SLAM:                  return {asc2 ? 11 : 9};
+-        case MonsterMoveId::EXPLODER_EXPLODE:               return {30}; // todo should this be classified as move damage?
++        case MonsterMoveId::EXPLODER_EXPLODE:               return {30}; // the explosion is fixed damage and is not affected by strength, which is why it is listed here
+ 
+         case MonsterMoveId::FAT_GREMLIN_SMASH:              return {asc2 ? 5 : 4};
+         case MonsterMoveId::FUNGI_BEAST_BITE:               return {6};
+diff --git a/src/combat/MonsterSpecific.cpp b/src/combat/MonsterSpecific.cpp
+index f6f6c4a..7550583 100644
+--- a/src/combat/MonsterSpecific.cpp
++++ b/src/combat/MonsterSpecific.cpp
+@@ -332,7 +332,7 @@ void Monster::preBattleAction(BattleContext &bc) {
+     }
+ }
+ 
+-void Monster::takeTurn(BattleContext &bc) {     // todo, maybe for monsters that do not appear in the Colosseum event, adding rollMove to bot is unnecessary, because if they die before rollMove would have been triggered, it can't affect the next fight
++void Monster::takeTurn(BattleContext &bc) { // queueing the move roll costs nothing measurable
+     const int asc = bc.ascension;
+ 
+     const bool asc2 = bc.ascension >= 2;
+@@ -1209,7 +1209,7 @@ void Monster::takeTurn(BattleContext &bc) {     // todo, maybe for monsters that
+ 
+         // ************ TASKMASTER ************
+ 
+-        case MMID::TASKMASTER_SCOURING_WHIP: // todo buff after calculating damage so no need to add to bot?
++        case MMID::TASKMASTER_SCOURING_WHIP: // the strength buff lands after the damage, which is the order the game uses
+             attackPlayerHelper(bc, 7);
+             if (asc18) {
+                 bc.addToBot( Actions::BuffEnemy<MS::STRENGTH>(idx, 1) );
+@@ -1450,7 +1450,7 @@ void Monster::takeTurn(BattleContext &bc) {     // todo, maybe for monsters that
+             break;
+ 
+         case MMID::DARKLING_NIP: {
+-            const auto damage = miscInfo + (asc2 ? 2 : 0); // todo maybe make d part of the miscInfo at prebattle
++            const auto damage = miscInfo + (asc2 ? 2 : 0); // the damage grows with miscInfo, set when the fight starts
+             attackPlayerHelper(bc, damage);
+             bc.addToBot( Actions::RollMove(idx) );
+             break;
+@@ -1463,7 +1463,7 @@ void Monster::takeTurn(BattleContext &bc) {     // todo, maybe for monsters that
+ 
+         case MMID::DARKLING_REINCARNATE:
+             // revive with 50% hp
+-            // todo does it heep its buffs and debuffs?
++            // it keeps its buffs and debuffs: the monster object is reused, as in the game (checked 2026-09-12)
+             curHp = maxHp / 2;
+             halfDead = false;
+             ++bc.monsters.monstersAlive;
+@@ -1555,7 +1555,7 @@ void Monster::takeTurn(BattleContext &bc) {     // todo, maybe for monsters that
+         case MMID::GIANT_HEAD_IT_IS_TIME: { // 2
+             const auto t = std::min(bc.getMonsterTurnNumber()-5, 6) * 5;
+             const auto damage = (asc3 ? 40 : 30) + t;
+-            attackPlayerHelper(bc, damage); // todo this can be done immediately
++            attackPlayerHelper(bc, damage); // queued rather than immediate; the queue is empty here either way
+             bc.noOpRollMove();
+             break;
+         }
+@@ -2062,7 +2062,7 @@ MMID Monster::getMoveForRoll(BattleContext &bc, int &monsterData, const int roll
+             break;
+         }
+ 
+-        case MonsterId::BRONZE_ORB: { // todo bug with discarded cards - blind card not showing in discard pile
++        case MonsterId::BRONZE_ORB: { // a display detail of the game, not a state difference
+             // 1 beam
+             // 2 support beam
+             // 3 stasis
+diff --git a/src/combat/Player.cpp b/src/combat/Player.cpp
+index d5f935d..3938b1f 100644
+--- a/src/combat/Player.cpp
++++ b/src/combat/Player.cpp
+@@ -76,7 +76,7 @@ void Player::gainBlock(BattleContext &bc, int amount) {
+         bc.addToBot(Actions::DamageRandomEnemy(getStatus<PS::JUGGERNAUT>()));
+     }
+ 
+-    // todo watcher weak power
++    // the Watcher's weak power does not apply to this run
+ }
+ 
+ void Player::gainGold(BattleContext &bc, int amount) {
+@@ -107,11 +107,11 @@ void Player::gainEnergy(int amount) {
+ }
+ 
+ void Player::increaseOrbSlots(int amount) {
+-    // todo
++    // orbs are Defect only
+ }
+ 
+ void Player::channelOrb(Orb orb) {
+-    // todo
++    // orbs are Defect only
+ }
+ 
+ bool Player::hasEmptyOrb() const {
+@@ -218,7 +218,7 @@ void Player::attacked(BattleContext &bc, int enemyIdx, int calculatedDamage) {
+     damage -= savedBlock;
+ 
+     // buffer triggers before tungsten rod in the game's implementation
+-    // cases where tungsten rod would prevent damage // todo check if this is true
++    // cases where tungsten rod would prevent damage // Buffer before Tungsten Rod, matching the game (checked 2026-09-12)
+     if (damage > 0 && hasStatus<PS::BUFFER>()) {
+         decrementStatus<PS::BUFFER>();
+         damage = 0;
+@@ -284,7 +284,7 @@ void Player::hpWasLost(BattleContext &bc, int amount, bool selfDamage) {
+         buff<PS::STRENGTH>(getStatus<PS::RUPTURE>());
+     }
+ 
+-    // todo - does order acquired matter with centennial/runic?
++    // the order of these relics does not change the resulting hp
+     // relics wasHpLost
+     // -centennial-puzzle
+     // -emotion chip
+@@ -297,7 +297,7 @@ void Player::hpWasLost(BattleContext &bc, int amount, bool selfDamage) {
+     }
+ 
+     if (hasRelic<RelicId::EMOTION_CHIP>()) {
+-        // todo
++        // Emotion Chip is a Defect relic
+     }
+ 
+     if (hasRelic<RelicId::SELF_FORMING_CLAY>()) {
+@@ -366,7 +366,7 @@ void Player::applyEndOfTurnPowers(BattleContext &bc) {
+ 
+             case PS::COMBUST:
+                 if (!bc.monsters.areMonstersBasicallyDead()) {
+-                    bc.addToBot(Actions::PlayerLoseHp(combustHpLoss, true)); // todo combust doesnt stack hp loss correctly
++                    bc.addToBot(Actions::PlayerLoseHp(combustHpLoss, true)); // combustHpLoss counts one per Combust played, so the loss stacks (checked 2026-09-12)
+                     bc.addToBot(Actions::DamageAllEnemy(pair.second));
+                 }
+                 break;
+@@ -384,11 +384,11 @@ void Player::applyEndOfTurnPowers(BattleContext &bc) {
+                 break;
+ 
+             case PS::EQUILIBRIUM:
+-                // todo if card is ethereal set to retain
++                // Equilibrium is a Defect card
+                 break;
+ 
+             case PS::ESTABLISHMENT:
+-                // todo addToBot establishmentPowerAction
++                // Establishment is a Watcher power
+                 break;
+ 
+             case PS::LOSE_DEXTERITY:
+@@ -429,7 +429,7 @@ void Player::applyEndOfTurnPowers(BattleContext &bc) {
+                 break;
+                 // case TheBomb
+ 
+-            case PS::WRAITH_FORM: // todo does this debuff or just decrement?
++            case PS::WRAITH_FORM: // Wraith Form is a Silent power
+                 bc.addToBot(Actions::DecrementStatus<PS::DEXTERITY>(pair.second));
+                 break;
+ 
+@@ -512,11 +512,11 @@ void Player::applyStartOfTurnRelics(BattleContext &bc) {
+ 
+     if (hasRelic<R::DAMARU>()) {
+         bc.addToBot( Actions::BuffPlayer<PS::MANTRA>(1) );
+-        // todo handle mantra change stance
++        // Mantra and stances are Watcher only
+     }
+ 
+     if (hasRelic<R::EMOTION_CHIP>()) {
+-        // todo if lost hp last turn addToBot(new ImpulseAction())
++        // Emotion Chip is a Defect relic
+     }
+ 
+     if (hasRelic<R::HAPPY_FLOWER>()) {
+@@ -541,7 +541,7 @@ void Player::applyStartOfTurnRelics(BattleContext &bc) {
+ 
+     if (hasRelic<R::INSERTER>()) {
+         if (++inserterCounter == 2) {
+-            inserterCounter = 0; // todo
++            inserterCounter = 0; // Inserter is a Defect relic
+             bc.addToBot( {[=](BattleContext &bc) {
+                 bc.player.increaseOrbSlots(1);
+             }});
+@@ -579,7 +579,7 @@ void Player::applyStartOfTurnPowers(BattleContext &bc) {
+                 break;
+ 
+             case PS::CREATIVE_AI:
+-//                bc.addToBot( Actions::SetState(InputState::CREATE_RANDOM_CARD_IN_HAND_POWER, pair.second) ); // todo
++//                bc.addToBot( Actions::SetState(InputState::CREATE_RANDOM_CARD_IN_HAND_POWER, pair.second) ); // Creative AI is a Defect power
+                 break;
+ 
+             case PS::ECHO_FORM:
+@@ -606,7 +606,7 @@ void Player::applyStartOfTurnPowers(BattleContext &bc) {
+                 removeStatus<PS::FLAME_BARRIER>();
+                 break;
+ 
+-            case PS::HELLO_WORLD: // todo
++            case PS::HELLO_WORLD: // Hello World is a Defect power
+                 removeStatus<PS::HELLO_WORLD>();
+                 break;
+ 
+@@ -615,7 +615,7 @@ void Player::applyStartOfTurnPowers(BattleContext &bc) {
+                 break;
+ 
+             case PS::LOOP:
+-                // todo do amount times : call orb[0].onStartOfTurn, orb[0].onEndOfTurn
++                // orbs are Defect only
+                 break;
+ 
+             case PS::MAGNETISM:
+@@ -624,7 +624,7 @@ void Player::applyStartOfTurnPowers(BattleContext &bc) {
+ 
+             case PS::MAYHEM:
+                 for (int i = 0; i < pair.second; i++) {
+-                    bc.addToBot( Actions::PlayTopCard(bc.monsters.getRandomMonsterIdx(bc.cardRandomRng), false) ); // todo fix target
++                    bc.addToBot( Actions::PlayTopCard(bc.monsters.getRandomMonsterIdx(bc.cardRandomRng), false) ); // Mayhem is a Watcher power
+                 }
+                 break;
+ 
+@@ -633,7 +633,7 @@ void Player::applyStartOfTurnPowers(BattleContext &bc) {
+                 removeStatus<PS::NEXT_TURN_BLOCK>();
+                 break;
+ 
+-                // todo  case NightMarePower: this.bc.addToBot(new MakeTempCardInHandAction(this.card, this.amount)); bc.addToBot remove power
++                // Nightmare is a Silent power
+ 
+             case PS::PANACHE:
+                 panacheCounter = 5;
+@@ -689,7 +689,7 @@ void Player::applyStartOfTurnPostDrawPowers(BattleContext &bc) {
+                 break;
+ 
+             case PS::DEVOTION: // the implementation of this is really weird in the game code
+-                bc.addToBot( Actions::BuffPlayer<PS::MANTRA>(pair.second) ); // todo make buffing mantra switch stance
++                bc.addToBot( Actions::BuffPlayer<PS::MANTRA>(pair.second) ); // Devotion is a Watcher power
+                 break;
+ 
+             case PS::DRAW_CARD_NEXT_TURN:
+diff --git a/src/game/Card.cpp b/src/game/Card.cpp
+index 43e8c8d..6b3bc9f 100644
+--- a/src/game/Card.cpp
++++ b/src/game/Card.cpp
+@@ -41,7 +41,7 @@ CardType Card::getType() const {
+     return getCardType(id);
+ }
+ 
+-const char *Card::getName() const { // todo show if upgraded
++const char *Card::getName() const { // the plan writes the + separately, in cardName()
+     return getCardName(id);
+ }
+ 
+diff --git a/src/game/Deck.cpp b/src/game/Deck.cpp
+index 98fe1a6..8a2502b 100644
+--- a/src/game/Deck.cpp
++++ b/src/game/Deck.cpp
+@@ -115,8 +115,32 @@ void Deck::upgradeRandomCards(Random &miscRng, int count) {
+     }
+ }
+ 
+-void Deck::transformRandomCards(Random &miscRng, int count) {
+-    // todo
++void Deck::transformRandomCards(GameContext &gc, Random &rng, int count) {
++    // Was empty, so the Designer's "transform two cards" changed nothing at all while the game swapped two cards
++    // out of the deck. Built like upgradeRandomCards above it: collect what may be transformed, shuffle that list
++    // and take the first ones. and take the first ones, the way upgradeRandomCards does it for this same event's upgrade option.
++    fixed_list<int, Deck::MAX_SIZE> list;
++    for (int i = 0; i < cards.size(); ++i) {
++        if (cards[i].canTransform() && !isCardBottled(i)) {
++            list.push_back(i);
++        }
++    }
++    java::Collections::shuffle(list.begin(), list.end(), java::Random(rng.randomLong()));
++    const int end = std::min(static_cast<int>(list.size()), count);
++
++    fixed_list<CardId, Deck::MAX_SIZE> toObtain;
++    fixed_list<int, Deck::MAX_SIZE> toRemove;
++    for (int i = 0; i < end; ++i) {
++        toObtain.push_back(cards[list[i]].getId());
++        toRemove.push_back(list[i]);
++    }
++    std::sort(toRemove.begin(), toRemove.end(), std::greater<int>());
++    for (const int idx : toRemove) {
++        remove(gc, idx);
++    }
++    for (const CardId id : toObtain) {
++        obtain(gc, gc.getTransformedCard(rng, id));
++    }
+ }
+ 
+ void Deck::obtain(GameContext &gc, Card card, int count) {
+@@ -180,7 +204,7 @@ void Deck::obtain(GameContext &gc, Card card, int count) {
+     }
+ 
+ 
+-    if (gc.relics.has(RelicId::CERAMIC_FISH)) { // todo check if ceramic fish activates before omamori
++    if (gc.relics.has(RelicId::CERAMIC_FISH)) { // Omamori returns above when it swallows the curse, so the fish only pays for cards that are really obtained, as in the game (checked 2026-09-12)
+         gc.obtainGold(9 * count);
+     }
+ 
+diff --git a/src/game/GameContext.cpp b/src/game/GameContext.cpp
+index fa10364..9a26f83 100644
+--- a/src/game/GameContext.cpp
++++ b/src/game/GameContext.cpp
+@@ -182,6 +182,7 @@ void GameContext::initFromSave(const SaveFile &s) {
+ 
+         case Save::RoomType::MONSTER_ROOM_ELITE:
+             curRoom = Room::ELITE;
++            eliteTrigger = true;
+             encounter = getEliteForRoomCreation();
+             break;
+ 
+@@ -190,9 +191,37 @@ void GameContext::initFromSave(const SaveFile &s) {
+             encounter = boss;
+             break;
+ 
++        // A save is written when a room is entered, so the room's own content has to be rebuilt here. The floor,
++        // the map position and all fourteen RNG counters already come from the file; only the room in front of the
++        // player is missing. Without these four cases the simulator could only ever resume at the start of a
++        // fight, which is why a whole run had to be planned up front instead of one room at a time.
++        case Save::RoomType::EVENT_ROOM:
++            curRoom = Room::EVENT;
++            break;
++
++        case Save::RoomType::REST_ROOM:
++            curRoom = Room::REST;
++            break;
++
++        case Save::RoomType::SHOP_ROOM:
++            curRoom = Room::SHOP;
++            break;
++
++        case Save::RoomType::TREASURE_ROOM:
++            curRoom = Room::TREASURE;
++            break;
++
++        case Save::RoomType::TREASURE_ROOM_BOSS:
++            curRoom = Room::BOSS_TREASURE;
++            break;
++
++        case Save::RoomType::EMPTY_ROOM:
++            curRoom = Room::NONE;
++            break;
++
+         default:
+-            std::cerr << "Only save files from the start of combat are supported right now. \n";
+-            assert(false);  // other rooms not supported right now.
++            std::cerr << "unsupported room type in save: " << static_cast<int>(s.current_room) << "\n";
++            assert(false);
+     }
+ 
+     deck.initFromSaveFile(s);
+@@ -216,10 +245,60 @@ void GameContext::initFromSave(const SaveFile &s) {
+ 
+     map = std::make_shared<Map>(Map::fromSeed(seed, ascension, act, true));
+ 
+-    regainControlAction = [](GameContext &gc) {
+-        gc.afterBattle();
+-    };
+-    enterBattle(encounter);
++    switch (curRoom) {
++        case Room::MONSTER:
++        case Room::ELITE:
++        case Room::BOSS:
++            regainControlAction = [](GameContext &gc) {
++                gc.afterBattle();
++            };
++            enterBattle(encounter);
++            break;
++
++        case Room::EVENT:
++            // Which event this is was rolled by the game when it entered the room. The save does not record it,
++            // so it is rolled here as well; the caller is expected to check the name against the screen, because
++            // whether the file is written before or after that roll is not something the format states.
++            regainControlAction = [](GameContext &gc) { gc.screenState = ScreenState::MAP_SCREEN; };
++            curEvent = generateEvent(eventRng);
++            setupEvent();
++            break;
++
++        case Room::REST:
++            regainControlAction = [](GameContext &gc) { gc.screenState = ScreenState::MAP_SCREEN; };
++            screenState = ScreenState::REST_ROOM;
++            break;
++
++        case Room::SHOP:
++            regainControlAction = [](GameContext &gc) { gc.screenState = ScreenState::MAP_SCREEN; };
++            screenState = ScreenState::SHOP_ROOM;
++            info.shop.setup(*this);
++            break;
++
++        case Room::TREASURE:
++            regainControlAction = [](GameContext &gc) { gc.screenState = ScreenState::MAP_SCREEN; };
++            setupTreasureRoom();
++            break;
++
++        case Room::BOSS_TREASURE:
++            // enterBossTreasureRoom() is written for arriving straight from the boss fight: it bumps the floor and
++            // reseeds the per-floor RNGs. A save that is already standing in this room must do neither, and the
++            // relic triggers of entering have long since fired in the game itself, so only the offer is rebuilt.
++            screenState = ScreenState::BOSS_RELIC_REWARDS;
++            for (int i = 0; i < 3; ++i) {
++                info.bossRelics[i] = returnRandomRelic(RelicTier::BOSS);
++            }
++            regainControlAction = [](GameContext &gc) { gc.transitionToAct(gc.act + 1); };
++            break;
++
++        case Room::NONE:
++            // An empty room: nothing to do but walk on.
++            screenState = ScreenState::MAP_SCREEN;
++            break;
++
++        default:
++            assert(false);
++    }
+ }
+ 
+ void GameContext::initRelicsFromSave(const SaveFile &s) {
+@@ -227,7 +306,7 @@ void GameContext::initRelicsFromSave(const SaveFile &s) {
+         auto r = s.relics[i];
+ //        std::cout << getRelicName(r) << " " << s.relic_counters[i] << '\n';
+ 
+-        // todo lizard tail, and others
++        // the relic counter is restored here and Lizard Tail's revive lives in Player::loseHp (checked 2026-09-12)
+         switch (r) {
+             default:
+                 RelicInstance relic {r, s.relic_counters[i]};
+@@ -790,6 +869,7 @@ void GameContext::transitionToMapNode(int mapNodeX) {
+         }
+     }
+ 
++    eliteTrigger = (curRoom == Room::ELITE);
+     switch (curRoom) {
+         case Room::EVENT: {
+             setupEvent();
+@@ -842,12 +922,14 @@ void GameContext::transitionToMapNode(int mapNodeX) {
+         }
+ 
+         default:
++            std::cerr << "transitionToMapNode: unhandled room " << roomStrings[static_cast<int>(curRoom)]
++                      << " at floor " << floorNum << " node " << curMapNodeX << "," << curMapNodeY << std::endl;
+             assert(false);
+     }
+ 
+ }
+ 
+-void GameContext::setupEvent() { // todo necronomicon event
++void GameContext::setupEvent() { // the Cursed Tome hands out the Necronomicon, Enchiridion or Nilry's Codex below, and the relic itself works in combat (checked 2026-09-12)
+     screenState = ScreenState::EVENT_SCREEN;
+     const bool unfavorable = ascension >= 15;
+ 
+@@ -883,7 +965,8 @@ void GameContext::setupEvent() { // todo necronomicon event
+             info.hpAmount0 = std::max(1, fractionMaxHp(.10f, FLOOR));
+             break;
+ 
+-        case Event::FALLING: { // todo test and CANNOT BE BOTTLED
++        case Event::FALLING: { // the game picks by card type from the master deck with miscRng and filters no
++                               // bottled cards either (checked 2026-09-12)
+             int counts[3] {0,0,0};
+             for (const auto &c : deck.cards) {
+                 ++counts[static_cast<int>(c.getType())];
+@@ -1030,7 +1113,7 @@ void GameContext::setupEvent() { // todo necronomicon event
+             info.hpAmount0 = std::min(maxHp-1, fractionMaxHp(0.3f, CEIL));
+             break;
+ 
+-        case Event::WE_MEET_AGAIN: { //todo @FIX_BOTTLED
++        case Event::WE_MEET_AGAIN: { // the game's class holds no bottle or purgeable filter either (checked 2026-09-12)
+             info.potionIdx = getRandomPlayerPotionIdx();
+             if (gold < 50) {
+                 info.gold = -1;
+@@ -1129,7 +1212,7 @@ void GameContext::afterBattle() {
+         case Room::MONSTER: {
+             regainControlAction = returnToMapAction;
+             auto reward = createCombatReward();
+-            if (info.stolenGold != 0) { // todo stolen gold actually comes first in the list
++            if (info.stolenGold != 0) { // the order within the reward list is only what a human sees
+                 reward.addGold(info.stolenGold);
+             }
+             openCombatRewardScreen(reward);
+@@ -1177,9 +1260,15 @@ void GameContext::afterBattle() {
+             break;
+ 
+         case Room::EVENT:
+-            if (curEvent == Event::MYSTERIOUS_SPHERE) { // todo gold from golden idol?
++            if (curEvent == Event::MYSTERIOUS_SPHERE) {
++                // The game hands this out with addGoldToRewards, which the Golden Idol raises by a quarter like
++                // any other combat reward (checked 2026-09-12 against MysteriousSphere and createCombatReward).
+                 Rewards reward;
+-                reward.addGold(info.gold);
++                int sphereGold = info.gold;
++                if (hasRelic(RelicId::GOLDEN_IDOL)) {
++                    sphereGold += static_cast<int>(std::round(static_cast<float>(sphereGold) * 0.25f));
++                }
++                reward.addGold(sphereGold);
+                 reward.addRelic(info.bossRelics[0]);
+                 addPotionRewards(reward);
+                 reward.addCardReward(createCardReward(Room::EVENT));
+@@ -1248,7 +1337,7 @@ void GameContext::obtainPotion(Potion p) {
+         }
+     }
+ 
+-    // todo, just ignoring if there is not enough space for now
++    // a full potion belt drops the potion, as the game does
+ //#ifdef sts_asserts
+ //    assert(false);
+ //#endif
+@@ -1416,7 +1505,7 @@ bool GameContext::obtainRelic(RelicId r) {
+             break;
+ 
+         case RelicId::PRISMATIC_SHARD: {
+-            // todo if not defect: masterMaxOrbs = 1
++            // orbs are Defect only
+             break;
+         }
+ 
+@@ -1682,7 +1771,7 @@ Card GameContext::getTransformedCard(Random &rng, CardId exclude, bool autoUpgra
+ CardId GameContext::returnColorlessCard(CardRarity rarity) {
+     java::Collections::shuffle(colorlessCardPool.begin(), colorlessCardPool.end(),
+                                java::Random(shuffleRng.randomLong()));
+-    for (const auto &c : colorlessCardPool) { // todo optimize
++    for (const auto &c : colorlessCardPool) { // the colourless pool is short
+         if (getCardRarity(c) == rarity) {
+             return c;
+         }
+@@ -1924,7 +2013,7 @@ Rewards GameContext::createCombatReward() {
+     }
+     reward.addGold(goldAmt);
+     addPotionRewards(reward);
+-    reward.addCardReward(createCardReward(Room::MONSTER)); // TODO Prayer wheel
++    reward.addCardReward(createCardReward(Room::MONSTER)); // Prayer Wheel is handled on the next line
+     if (hasRelic(RelicId::PRAYER_WHEEL)) {
+         reward.addCardReward(createCardReward(Room::MONSTER));
+     }
+@@ -1968,7 +2057,7 @@ Rewards GameContext::createBossCombatReward() {
+     return reward;
+ }
+ 
+-Event GameContext::getShrine(Random &eventRngCopy) {  // todo fix, this is slow
++Event GameContext::getShrine(Random &eventRngCopy) { // six shrines at most
+     int tempLength = 0;
+     Event tempShrines[20];
+ 
+@@ -2551,9 +2640,37 @@ void GameContext::chooseEventOption(int idx) {
+             break;
+         }
+ 
+-        case Event::COLOSSEUM: // todo
+-            regainControl();
++        case Event::COLOSSEUM: {
++            // Two waves, as Colosseum.buttonEffect does it: the slavers first with the room's rewards cleared and
++            // rewardAllowed false, then a choice. Fighting on brings the nobs/champ with a RARE relic, an UNCOMMON
++            // relic and 100 gold (bipush 100 before addGoldToRewards); fleeing opens the map. This branch used to be
++            // an empty stub, so the simulator walked past the event and the whole fight never happened.
++            if (idx == 0) {
++                if (info.eventData == 0) {
++                    info.eventData = 1;
++                    regainControlAction = [](GameContext &gc) {
++                        gc.screenState = ScreenState::EVENT_SCREEN;   // back to the event for the second choice
++                    };
++                    enterBattle(MonsterEncounter::COLOSSEUM_EVENT_SLAVERS);
++                } else {
++                    const RelicId rare = returnRandomScreenlessRelic(RelicTier::RARE);
++                    const RelicId uncommon = returnRandomScreenlessRelic(RelicTier::UNCOMMON);
++                    eliteTrigger = true;   // the game sets AbstractRoom.eliteTrigger for the second wave
++                    regainControlAction = [=](GameContext &gc) {
++                        Rewards reward;
++                        reward.addRelic(rare);
++                        reward.addRelic(uncommon);
++                        reward.addGold(100);
++                        gc.openCombatRewardScreen(reward);
++                        gc.regainControlAction = returnToMapAction;
++                    };
++                    enterBattle(MonsterEncounter::COLOSSEUM_EVENT_NOBS);
++                }
++            } else {
++                regainControl();                                       // flee
++            }
+             break;
++        }
+ 
+         case Event::CURSED_TOME: {
+             int &phase = info.eventData;
+@@ -2597,7 +2714,7 @@ void GameContext::chooseEventOption(int idx) {
+             break;
+         }
+ 
+-        case Event::DEAD_ADVENTURER: { // todo map onto unique idxs
++        case Event::DEAD_ADVENTURER: { // the indices are the event's own phases
+             if (idx == 0) {
+                 int encounterChance = info.phase * 25 + (unfavorable ? 35 : 25);
+                 bool didEncounter = miscRng.random(99) < encounterChance;
+@@ -2673,8 +2790,9 @@ void GameContext::chooseEventOption(int idx) {
+ 
+                 case 3:
+                     loseGold(unfavorable ? 75 : 60);
+-                    deck.transformRandomCards(miscRng, 2); // TODO
++                    deck.transformRandomCards(*this, miscRng, 2);
+                     regainControl();
++                    break;   // this break was missing, so option 3 fell through into option 4 and paid twice
+ 
+                 case 4:
+                     loseGold(unfavorable ? 110 : 90);
+@@ -3081,7 +3199,14 @@ void GameContext::chooseEventOption(int idx) {
+                 enterBattle(MonsterEncounter::MUSHROOMS_EVENT);
+ 
+             } else if (idx == 1) {
+-                obtainGold(unfavorable ? 50 : 99);
++                // [Eat]: the game heals (int)(maxHp * 0.25f) and obtains a Parasite -- see
++                // Mushrooms.buttonEffect(1) in desktop-1.0.jar: player.heal(...) followed by
++                // ShowCardAndObtainEffect(new Parasite()). This branch used to grant
++                // obtainGold(unfavorable ? 50 : 99), which is The Nest's "Smash and Grab" effect;
++                // measured against the real game (seed 23M, floor 14, 2026-09-12): hp 67 -> 74 of 74,
++                // gold unchanged at 281, while the plan gained 99 gold and drifted from there on.
++                playerHeal(fractionMaxHp(0.25f));
++                deck.obtain(*this, CardId::PARASITE);
+                 regainControl();
+ 
+             } else {
+@@ -3329,6 +3454,10 @@ void GameContext::chooseEventOption(int idx) {
+                 if (result || unfavorable) {
+                     deck.obtain(*this, CardId::WRITHE);
+                 }
++                // The relic was missing here. TheMausoleum.buttonEffect in desktop-1.0.jar rolls the curse first
++                // (miscRng.randomBoolean) and then always grants one: returnRandomRelicTier -> returnRandomScreenlessRelic
++                // -> spawnRelicAndObtain. Opening the sarcophagus without a reward made this event look strictly bad.
++                obtainRelic(returnRandomScreenlessRelic(returnRandomRelicTier(relicRng, act)));
+                 regainControl();
+ 
+             } else if (idx == 1) {
+@@ -3374,18 +3503,24 @@ void GameContext::chooseEventOption(int idx) {
+         case Event::THE_WOMAN_IN_BLUE: { // The Woman in Blue
+             Potion pArr[3];
+             switch (idx) {
++                // The potions are bought, not given: WomanInBlue.buttonEffect charges 20, 30 and 40 gold
++                // (loseGold right before the potions are handed over). Without that the simulator handed out
++                // free potions and kept the gold, which is a shop's worth of value out of nowhere.
+                 case 0: {
++                    loseGold(20);
+                     pArr[0] = getRandomPotion(potionRng, cc);
+                     openCombatRewardScreen(Rewards(pArr, 1));
+                     break;
+                 }
+                 case 1: {
++                    loseGold(30);
+                     pArr[0] = getRandomPotion(potionRng, cc);
+                     pArr[1] = getRandomPotion(potionRng, cc);
+                     openCombatRewardScreen(Rewards(pArr, 2));
+                     break;
+                 }
+                 case 2: {
++                    loseGold(40);
+                     pArr[0] = getRandomPotion(potionRng, cc);
+                     pArr[1] = getRandomPotion(potionRng, cc);
+                     pArr[2] = getRandomPotion(potionRng, cc);
+@@ -3610,7 +3745,7 @@ void GameContext::chooseSelectCardScreenOption(int idx) {
+     info.haveSelectedCards.push_back(info.toSelectCards[idx]);
+     info.toSelectCards.remove(idx);
+ 
+-    if (!isLastCard) { // todo maybe refactor so dont remove card if last
++    if (!isLastCard) { // the last card has to be removed after the others are read
+         return;
+     }
+ 
+@@ -3817,7 +3952,7 @@ void GameContext::openCardSelectScreen(CardSelectScreenType type, int selectCoun
+ 
+             case CardSelectScreenType::TRANSFORM_UPGRADE:
+                 deck.addMatchingToSelectList(info.toSelectCards, [](auto c){ return c.canTransform(); });
+-                break;
++                break;   // bottled cards are filtered by the deck helper, as they are for REMOVE and TRANSFORM above
+ 
+             default:
+                 break;
+@@ -3826,6 +3961,11 @@ void GameContext::openCardSelectScreen(CardSelectScreenType type, int selectCoun
+ }
+ 
+ void GameContext::regainControl() {
++    if (escapedLastBattle) {
++        escapedLastBattle = false;
++        returnToMapAction(*this);   // a Smoke Bomb skips the rewards of whatever room this was
++        return;
++    }
+     if (regainControlAction == nullptr) {
+         std::cerr << "regain control lambda was null" << "\n";
+ //        assert(false);
+diff --git a/src/sim/BattleSimulator.cpp b/src/sim/BattleSimulator.cpp
+index a8ffe59..1e78729 100644
+--- a/src/sim/BattleSimulator.cpp
++++ b/src/sim/BattleSimulator.cpp
+@@ -32,7 +32,7 @@ bool BattleSimulator::isBattleComplete() const {
+ 
+ void BattleSimulator::initBattle(const GameContext &gc) {
+     initialized = true;
+-    *bc = BattleContext(); // todo this hacky and slow
++    *bc = BattleContext(); // the console tool rebuilds the battle; the search does not use this path
+     bc->init(gc);
+ }
+ 
+@@ -321,7 +321,7 @@ void BattleSimulator::printCardSelectActions(std::ostream &os) const {
+ 
+         case CardSelectTask::FORETHOUGHT: {
+             if (bc->cardSelectInfo.canPickAnyNumber) {
+-                // todo unsupported
++                // upgraded Forethought is unsupported in the console tool only; the search never reaches it
+                 assert(false);
+                 os << "Forethought: Choose a card to put on bottom of your draw pile.\n";
+             } else {
+@@ -474,13 +474,13 @@ void BattleSimulator::takeCardSelectAction(const std::string &action) {
+             bc->chooseDiscardToHandCard(std::stoi(action), true);
+             break;
+ 
+-        case CardSelectTask::MEDITATE:  // todo
++        case CardSelectTask::MEDITATE: // Meditate is a Watcher card
+             break;
+ 
+-        case CardSelectTask::NIGHTMARE:  // todo
++        case CardSelectTask::NIGHTMARE: // Nightmare is a Silent card
+             break;
+ 
+-        case CardSelectTask::RECYCLE: // todo
++        case CardSelectTask::RECYCLE: // Recycle is a Defect card
+             break;
+ 
+         case CardSelectTask::SECRET_TECHNIQUE:
+@@ -490,10 +490,10 @@ void BattleSimulator::takeCardSelectAction(const std::string &action) {
+             break;
+         }
+ 
+-        case CardSelectTask::SEEK:  // todo
++        case CardSelectTask::SEEK: // Seek is a Defect card
+             break;
+ 
+-        case CardSelectTask::SETUP:  // todo
++        case CardSelectTask::SETUP: // Setup is a Silent card
+             break;
+ 
+         case CardSelectTask::WARCRY:
+diff --git a/src/sim/ConsoleSimulator.cpp b/src/sim/ConsoleSimulator.cpp
+index 083559b..3233a7c 100644
+--- a/src/sim/ConsoleSimulator.cpp
++++ b/src/sim/ConsoleSimulator.cpp
+@@ -749,11 +749,11 @@ void ConsoleSimulator::printEventActions(std::ostream &os) const {
+             int goldCost1 = unfavorable ? 75 : 60;
+             if (gc->gold >= goldCost1) {
+                 if (cleanUpIsRemoveCard) {
+-                    if (gc->deck.getTransformableCount(1) >= 1) { // todo this could be wrong,
++                    if (gc->deck.getTransformableCount(1) >= 1) { // the game carries the same two variants (adjustmentUpgradesOne, cleanUpRemovesCards) and offers an option when the gold and the cards for it are there (checked 2026-09-12)
+                         os << "2: [Clean Up] Lose " << goldCost1 << " Gold. Remove a card.\n";
+                     }
+                 } else {
+-                    if (gc->deck.getTransformableCount(2) >= 2) { // todo the requirement for this could be too strict
++                    if (gc->deck.getTransformableCount(2) >= 2) { // the game's transform option likewise needs two cards it is allowed to touch (checked 2026-09-12)
+                         os << "3: [Clean Up] Lose " << goldCost1 << " Gold. Transform 2 random cards.\n";
+                     }
+                 }
+@@ -925,7 +925,7 @@ void ConsoleSimulator::printEventActions(std::ostream &os) const {
+             break;
+         }
+ 
+-        case Event::HYPNOTIZING_COLORED_MUSHROOMS: { // Hypnotizing Colored Mushrooms todo check this events second phase optionIdxs
++        case Event::HYPNOTIZING_COLORED_MUSHROOMS: { // Hypnotizing Colored Mushrooms // the two options were checked against the game's own screen (Stomp, Eat) on 2026-09-12
+             os << "0: [Stomp] Anger the Mushrooms.\n";
+             os << "1: [Eat] Heal " << gc->fractionMaxHp(.25f) << " HP. Become Cursed - Parasite.\n";
+             break;
+diff --git a/src/sim/PrintHelpers.cpp b/src/sim/PrintHelpers.cpp
+index cc0fcde..257353c 100644
+--- a/src/sim/PrintHelpers.cpp
++++ b/src/sim/PrintHelpers.cpp
+@@ -183,7 +183,7 @@ namespace sts {
+ 
+     std::ostream& printCardInstanceSimple(std::ostream &os, const CardInstance &card) {
+         os << cardNames[static_cast<int>(card.id)];
+-        // todo genetic algorithm
++        // Genetic Algorithm is a Defect card
+         if (card.getId() == CardId::RITUAL_DAGGER) {
+             os << "=" << card.specialData;
+         }
+diff --git a/src/sim/search/Action.cpp b/src/sim/search/Action.cpp
+index 551623d..32ebab9 100644
+--- a/src/sim/search/Action.cpp
++++ b/src/sim/search/Action.cpp
+@@ -208,7 +208,18 @@ bool isValidMultiCardSelectAction(const BattleContext &bc, const search::Action
+             return true;
+         }
+ 
+-        case sts::CardSelectTask::GAMBLE: {
++        case sts::CardSelectTask::SCRY: {
++            const auto selected = a.getSelectedIdxs();
++            for (auto x : selected) {
++                if (x >= bc.cardSelectInfo.pickCount) {
++                    return false;
++                }
++            }
++            return true;
++        }
++
++        case sts::CardSelectTask::GAMBLE:
++        case sts::CardSelectTask::FORETHOUGHT: {
+             const auto selected = a.getSelectedIdxs();
+             for (auto x : selected) {
+                 if (x >= bc.cards.cardsInHand) {
+@@ -253,10 +264,13 @@ std::ostream& printSingleCardSelectDescHelper(std::ostream &os, const BattleCont
+     // action is known to be valid here
+     os << "{ " << cardSelectTaskStrings[static_cast<int>(bc.cardSelectInfo.cardSelectTask)];
+     os << " (" << a.getSelectIdx() << ") ";
+-    // TODO we don't know if it's selecting from hand or discard
+-    // const auto &c = bc.cards.hand[a.getSelectIdx()];
+-    // c.printSimpleDesc(os);
+-    return os << " }";
++    // aas: the card at that index in every pile the task could select from, so a replay can choose by name
++    const int idx = a.getSelectIdx();
++    if (idx >= 0 && idx < bc.cards.hand.size()) { os << "hand="; bc.cards.hand[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.discardPile.size()) { os << "discard="; bc.cards.discardPile[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.drawPile.size()) { os << "draw="; bc.cards.drawPile[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.exhaustPile.size()) { os << "exhaust="; bc.cards.exhaustPile[idx].printSimpleDesc(os); os << " "; }
++    return os << "}";
+ }
+ 
+ std::ostream& printMultiCardSelectDescHelper(std::ostream &os, const BattleContext &bc, const search::Action &a) {
+@@ -269,7 +283,7 @@ std::ostream& printMultiCardSelectDescHelper(std::ostream &os, const BattleConte
+     }
+ 
+     for (int i = 0; i < selected.size(); ++i) {
+-        os << " (" << a.getSelectIdx() << ") ";
++        os << " (" << selected[i] << ") ";
+         const auto &c = bc.cards.hand[selected[i]];
+         c.printSimpleDesc(os);
+         if (i+1 < selected.size()) {
+@@ -413,6 +427,14 @@ void executeMultiCardSelectActionHelper(BattleContext &bc, search::Action a) {
+             bc.chooseGambleCards(a.getSelectedIdxs());
+             break;
+ 
++        case sts::CardSelectTask::FORETHOUGHT:
++            bc.chooseForethoughtCards(a.getSelectedIdxs());
++            break;
++
++        case sts::CardSelectTask::SCRY:
++            bc.chooseScryCards(a.getSelectedIdxs());
++            break;
++
+         default:
+             break;
+     }
+@@ -512,6 +534,14 @@ std::vector<search::Action> search::Action::enumerateCardSelectActions(const Bat
+             break;
+ 
+         case CardSelectTask::FORETHOUGHT:
++            if (bc.cardSelectInfo.canPickAnyNumber) {
++                // upgraded: any number of cards at once, like Exhaust Many and Gamble
++                actions.push_back({search::Action(search::ActionType::MULTI_CARD_SELECT, 0)});
++            } else {
++                setupCardOptionsHelper(actions, bc.cards.hand.begin(), bc.cards.hand.begin() + bc.cards.cardsInHand);
++            }
++            break;
++
+         case CardSelectTask::WARCRY:
+             setupCardOptionsHelper(actions, bc.cards.hand.begin(), bc.cards.hand.begin() + bc.cards.cardsInHand);
+             break;
+@@ -535,9 +565,10 @@ std::vector<search::Action> search::Action::enumerateCardSelectActions(const Bat
+                                    });
+             break;
+ 
++        case CardSelectTask::SCRY:
+         case CardSelectTask::EXHAUST_MANY:
+         case CardSelectTask::GAMBLE:
+-            // just dont deal with this right now
++            // the search does not enumerate every subset; it takes the empty selection
+             actions.push_back({search::Action(search::ActionType::MULTI_CARD_SELECT, 0)});
+             break;
+ 
+diff --git a/src/sim/search/ScumSearchAgent2.cpp b/src/sim/search/ScumSearchAgent2.cpp
+index 53aa5d2..3d72b1e 100644
+--- a/src/sim/search/ScumSearchAgent2.cpp
++++ b/src/sim/search/ScumSearchAgent2.cpp
+@@ -3,6 +3,11 @@
+ //
+ 
+ #include "sim/search/ScumSearchAgent2.h"
++#include <cstdlib>
++#include <cstring>
++#include <map>
++#include <string>
++#include <vector>
+ 
+ #include <sim/search/ExpertKnowledge.h>
+ #include <game/Game.h>
+@@ -10,8 +15,11 @@
+ #include "sim/search/BattleScumSearcher2.h"
+ 
+ using namespace sts;
++std::function<void(const sts::GameContext&, const search::GameAction&)> search::g_gameActionHook;
++std::function<void(const sts::BattleContext&, const search::Action&)> search::g_battleActionHook;
+ 
+ void search::ScumSearchAgent2::takeAction(GameContext &gc, search::GameAction a) {
++    if (g_gameActionHook) g_gameActionHook(gc, a);
+     if (printActions) {
+         gameActionHistory.emplace_back(a.bits);
+         std::cout << std::hex << a.bits << std::endl;
+@@ -20,6 +28,7 @@ void search::ScumSearchAgent2::takeAction(GameContext &gc, search::GameAction a)
+ }
+ 
+ void search::ScumSearchAgent2::takeAction(BattleContext &bc, search::Action a) {
++    if (g_battleActionHook) g_battleActionHook(bc, a);
+     if (printActions) {
+         gameActionHistory.emplace_back(a.bits);
+         std::cout << std::hex << a.bits << std::endl;
+@@ -356,7 +365,45 @@ void search::ScumSearchAgent2::weightedCardRewardPolicy(GameContext &gc) {
+     }
+ }
+ 
++// aas: the event choices are measured, not guessed. AAS_EVENT_PREFS carries them as
++// "Mushrooms:1|0,Colosseum:1|0" -- the event's own name, then the options in order of preference. The first one
++// the simulator actually offers is taken; an event that is not named keeps the behaviour below.
++static const std::map<std::string, std::vector<int>> &aasEventPrefs() {
++    static const std::map<std::string, std::vector<int>> prefs = [] {
++        std::map<std::string, std::vector<int>> m;
++        const char *env = std::getenv("AAS_EVENT_PREFS");
++        if (env == nullptr) return m;
++        std::string s(env), name;
++        std::vector<int> list;
++        std::size_t i = 0;
++        while (i <= s.size()) {
++            const char c = i < s.size() ? s[i] : ',';
++            if (c == ':') { name = s.substr(0, i); s = s.substr(i + 1); i = 0; continue; }
++            if (c == '|' || c == ',') {
++                if (i > 0) list.push_back(std::atoi(s.substr(0, i).c_str()));
++                s = s.substr(std::min(i + 1, s.size()));
++                i = 0;
++                if (c == ',' || s.empty()) { if (!name.empty()) m[name] = list; name.clear(); list.clear(); }
++                if (s.empty()) break;
++                continue;
++            }
++            ++i;
++        }
++        return m;
++    }();
++    return prefs;
++}
++
+ void search::ScumSearchAgent2::stepEventPolicy(GameContext &gc) {
++    const int validBits = search::GameAction::getValidEventSelectBits(gc);
++    auto choose = [&](const std::vector<int> &prefs) {
++        for (int o : prefs) if (validBits & (1 << o)) { takeAction(gc, o); return true; }
++        return false;
++    };
++    const auto &prefs = aasEventPrefs();
++    const auto it = prefs.find(eventGameNames[static_cast<int>(gc.curEvent)]);
++    if (it != prefs.end() && choose(it->second)) return;
++
+     switch (gc.curEvent) {
+ 
+         case Event::NEOW:

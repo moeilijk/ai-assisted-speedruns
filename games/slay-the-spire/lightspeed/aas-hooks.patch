@@ -1,0 +1,78 @@
+diff --git a/include/sim/search/ScumSearchAgent2.h b/include/sim/search/ScumSearchAgent2.h
+index ffa449b..383af80 100644
+--- a/include/sim/search/ScumSearchAgent2.h
++++ b/include/sim/search/ScumSearchAgent2.h
+@@ -5,6 +5,7 @@
+ #ifndef STS_LIGHTSPEED_SCUMSEARCHAGENT2_H
+ #define STS_LIGHTSPEED_SCUMSEARCHAGENT2_H
+ 
++#include <functional>
+ #include "game/GameContext.h"
+ #include "sim/search/Action.h"
+ #include "sim/search/GameAction.h"
+@@ -13,6 +14,10 @@
+ #include <random>
+ 
+ namespace sts::search {
++    struct GameAction; struct Action;
++    // aas hook: called with the state BEFORE the action is executed (for readable decision lines)
++    extern std::function<void(const sts::GameContext&, const GameAction&)> g_gameActionHook;
++    extern std::function<void(const sts::BattleContext&, const Action&)> g_battleActionHook;
+ 
+     class BattleScumSearcher2;
+ 
+diff --git a/src/sim/search/Action.cpp b/src/sim/search/Action.cpp
+index 551623d..9478530 100644
+--- a/src/sim/search/Action.cpp
++++ b/src/sim/search/Action.cpp
+@@ -253,10 +253,13 @@ std::ostream& printSingleCardSelectDescHelper(std::ostream &os, const BattleCont
+     // action is known to be valid here
+     os << "{ " << cardSelectTaskStrings[static_cast<int>(bc.cardSelectInfo.cardSelectTask)];
+     os << " (" << a.getSelectIdx() << ") ";
+-    // TODO we don't know if it's selecting from hand or discard
+-    // const auto &c = bc.cards.hand[a.getSelectIdx()];
+-    // c.printSimpleDesc(os);
+-    return os << " }";
++    // aas: the card at that index in every pile the task could select from, so a replay can choose by name
++    const int idx = a.getSelectIdx();
++    if (idx >= 0 && idx < bc.cards.hand.size()) { os << "hand="; bc.cards.hand[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.discardPile.size()) { os << "discard="; bc.cards.discardPile[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.drawPile.size()) { os << "draw="; bc.cards.drawPile[idx].printSimpleDesc(os); os << " "; }
++    if (idx >= 0 && idx < bc.cards.exhaustPile.size()) { os << "exhaust="; bc.cards.exhaustPile[idx].printSimpleDesc(os); os << " "; }
++    return os << "}";
+ }
+ 
+ std::ostream& printMultiCardSelectDescHelper(std::ostream &os, const BattleContext &bc, const search::Action &a) {
+@@ -269,7 +272,7 @@ std::ostream& printMultiCardSelectDescHelper(std::ostream &os, const BattleConte
+     }
+ 
+     for (int i = 0; i < selected.size(); ++i) {
+-        os << " (" << a.getSelectIdx() << ") ";
++        os << " (" << selected[i] << ") ";
+         const auto &c = bc.cards.hand[selected[i]];
+         c.printSimpleDesc(os);
+         if (i+1 < selected.size()) {
+diff --git a/src/sim/search/ScumSearchAgent2.cpp b/src/sim/search/ScumSearchAgent2.cpp
+index 53aa5d2..538c008 100644
+--- a/src/sim/search/ScumSearchAgent2.cpp
++++ b/src/sim/search/ScumSearchAgent2.cpp
+@@ -10,8 +10,11 @@
+ #include "sim/search/BattleScumSearcher2.h"
+ 
+ using namespace sts;
++std::function<void(const sts::GameContext&, const search::GameAction&)> search::g_gameActionHook;
++std::function<void(const sts::BattleContext&, const search::Action&)> search::g_battleActionHook;
+ 
+ void search::ScumSearchAgent2::takeAction(GameContext &gc, search::GameAction a) {
++    if (g_gameActionHook) g_gameActionHook(gc, a);
+     if (printActions) {
+         gameActionHistory.emplace_back(a.bits);
+         std::cout << std::hex << a.bits << std::endl;
+@@ -20,6 +23,7 @@ void search::ScumSearchAgent2::takeAction(GameContext &gc, search::GameAction a)
+ }
+ 
+ void search::ScumSearchAgent2::takeAction(BattleContext &bc, search::Action a) {
++    if (g_battleActionHook) g_battleActionHook(bc, a);
+     if (printActions) {
+         gameActionHistory.emplace_back(a.bits);
+         std::cout << std::hex << a.bits << std::endl;

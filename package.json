@@ -1,0 +1,61 @@
+{
+  "name": "ai-assisted-speedruns",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Plugin framework and open standard for AI Assisted Speedruns",
+  "license": "MIT",
+  "homepage": "https://ai-assisted-speedruns.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/moeilijk/ai-assisted-speedruns.git"
+  },
+  "bugs": {
+    "url": "https://github.com/moeilijk/ai-assisted-speedruns/issues"
+  },
+  "keywords": [
+    "speedrun",
+    "llm",
+    "agent",
+    "mcp",
+    "obs",
+    "livesplit",
+    "ai-assisted-speedrun"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/core",
+    "packages/runtime-codex",
+    "packages/runtime-claude-code",
+    "packages/recorder-obs",
+    "packages/recorder-source-demo",
+    "packages/recorder-null",
+    "packages/timer-livesplit"
+  ],
+  "scripts": {
+    "check": "for f in packages/core/src/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/index.mjs games/portal/*.mjs; do node --check \"$f\" || exit 1; done",
+    "test": "node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
+    "portal:fetch": "node --env-file-if-exists=.env games/portal/fetch-portal-agent.mjs",
+    "portal:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/portal/plugin.mjs --run-dir runs/portal-check --exercise",
+    "portal:install": "node --env-file-if-exists=.env games/portal/install-game-files.mjs",
+    "portal:run": "node --env-file-if-exists=.env packages/core/src/cli.mjs run --runtime claude-code --game games/portal/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
+    "claude:smoke": "node --env-file-if-exists=.env packages/runtime-claude-code/smoke.mjs --game games/portal/plugin.mjs --run-dir runs/claude-smoke --fake-spt",
+    "portal:doctor": "node --env-file-if-exists=.env packages/core/src/cli.mjs doctor --game games/portal/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
+    "portal:launch": "node --env-file-if-exists=.env games/portal/launch-game.mjs",
+    "portal:stop": "node --env-file-if-exists=.env games/portal/stop-all.mjs",
+    "obs:launch": "node --env-file-if-exists=.env packages/recorder-obs/launch-obs.mjs",
+    "portal:audio": "node --env-file-if-exists=.env games/portal/audio-route.mjs",
+    "sts:install": "node --env-file-if-exists=.env games/slay-the-spire/install-mod.mjs",
+    "sts:launch": "node --env-file-if-exists=.env games/slay-the-spire/launch-game.mjs",
+    "sts:stop": "node --env-file-if-exists=.env games/slay-the-spire/stop-all.mjs",
+    "sts:doctor": "node --env-file-if-exists=.env packages/core/src/cli.mjs doctor --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
+    "sts:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/slay-the-spire/plugin.mjs",
+    "sts:scripted": "node --env-file-if-exists=.env packages/core/src/cli.mjs run --runtime scripted --game games/slay-the-spire/plugin.mjs --bot games/slay-the-spire/bot.mjs --recorder null --run-dir",
+    "sts:run": "node --env-file-if-exists=.env packages/core/src/cli.mjs run --runtime claude-code --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir"
+  },
+  "bin": {
+    "aas": "./packages/core/src/cli.mjs"
+  }
+}

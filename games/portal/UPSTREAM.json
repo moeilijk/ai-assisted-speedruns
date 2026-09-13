@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/cozyblaze/portal-agent.git",
+  "commit": "31311b8fde8f242cc403bd51d45cb615ed645e4b",
+  "commit_date": "2026-09-06T22:04:56-07:00",
+  "license": "MIT (controller/LICENSE); the SPT patch carries SourcePauseTool's license (spt/LICENSE)",
+  "used": [
+    "controller/index.mjs",
+    "controller/mcp/portal-documentation.md",
+    "run/AGENTS.md",
+    "game-config/",
+    "spt/portal-agent.patch",
+    "tools/prepare-spt.ps1",
+    "tools/build-spt.ps1",
+    "evidence/"
+  ]
+}

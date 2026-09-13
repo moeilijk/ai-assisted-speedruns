@@ -1,0 +1,121 @@
+# `aas` reference
+
+What the tooling in this repository does, command by command, and what it leaves behind. Everything here is taken from the code as it is (`packages/core/src/cli.mjs` and the modules it calls); where a detail is game-specific the game plugin's README has it. For the standard itself (what a published run must contain) see [../packages/spec/SPEC.md](../packages/spec/SPEC.md); for the architecture and the decisions behind it, [design.md](design.md); for writing a plugin, [plugins.md](plugins.md).
+
+## The pieces
+
+- **Core** (`packages/core`): the broker (the MCP server with the three tools the agent gets), the process hardening around it, the run log, and the `aas` commands.
+- **Plugins**, four kinds, loaded by id from `packages/<kind>-<id>/index.mjs` or from a module path:
+  - **game** (`--game games/<id>/plugin.mjs`): the controller object the agent's code runs against, the API documentation, and the game side (launch, prepare, save, close).
+  - **runtime** (`--runtime codex|claude-code|scripted`, or a module path): writes the agent's hardened configuration into the run directory and starts the agent.
+  - **recorder** (`--recorder obs|source-demo|null`): records the run and reacts to run events (scenes, chapters).
+  - **timer** (`--timer livesplit`): the speedrun timer on screen and the splits.
+- **The agent** sees exactly three tools: `<game>_documentation`, `<game>_screenshot`, `<game>_exec`. Everything else (shell, web, files outside the run directory) is denied by the runtime's configuration.
+
+## Settings
+
+Machine settings live in `.env` in the repository root, copied from [`.env.example`](../.env.example). The CLI and every `npm run` script load it themselves (Node's `--env-file-if-exists`); a variable already set in the shell wins. Nothing else is read from the machine.
+
+| Variable | Used by | Meaning |
+|---|---|---|
+| `AAS_OBS_URL`, `AAS_OBS_PASSWORD`, `AAS_OBS_EXE` | recorder obs, `npm run obs:launch`, doctor | obs-websocket address and password; OBS executable for the launcher |
+| `AAS_LIVESPLIT_HOST`, `AAS_LIVESPLIT_PORT`, `AAS_LIVESPLIT_EXE`, `AAS_LIVESPLIT_POS` | timer livesplit, `select-splits.mjs`, `place-windows.mjs` | LiveSplit Server address; the executable (its `settings.cfg` is next to it); window position |
+| `AAS_BUDGET_WEEKLY_MAX` | `aas budget`, run, resume, doctor | share of the weekly Claude plan that runs may use (default 50) |
+| `AAS_CODEX_BUDGET_MAX` | `aas budget`, run, resume, doctor, the Codex runtime | share of the ChatGPT plan's window that Codex runs may use (default 50); the stand comes from the `rate_limits` Codex writes into its rollouts after every turn, no endpoint is asked |
+| `AAS_TIME_ZONE` | broker, publish | time zone of the run log (default the machine's) |
+| `AAS_STEAM_EXE` | launchers, close | Steam executable, when not at its default path |
+| `AAS_QUIET_AUDIO_DEVICE`, `AAS_SOUNDVOLUMEVIEW`, `AAS_KEEP_DISPLAYS_AWAKE` | launchers | optional: route the game's audio to another device while it starts; keep the displays awake |
+| `AAS_PORTAL_*` | Portal plugin and scripts | see [../games/portal/README.md](../games/portal/README.md) |
+| `AAS_STS_*`, `AAS_BOT_*` | Slay the Spire plugin, scripts and the scripted bot | see [../games/slay-the-spire/README.md](../games/slay-the-spire/README.md) |
+
+Variables the harness sets for the broker process itself (`AAS_RUN_DIR`, `AAS_GAME_MODULE`, `AAS_ALLOWED_ENDPOINTS`, `AAS_TIME_ZONE`) are not settings. The broker's environment holds those and the variables the game plugin declares in its `env` list, nothing else of the machine's environment; the published copy of the configuration shows the plugin's variables as `__ENV__`.
+
+## Commands
+
+All commands: `node packages/core/src/cli.mjs <command> ...` (the `aas` bin of the package). The npm scripts in `package.json` are the same commands with the plugins of one game filled in.
+
+### Before a run
+
+| Command | What it does |
+|---|---|
+| `aas doctor --game <plugin.mjs> [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]` | Read-only checks: Node version, the game plugin loads and has documentation, its endpoints are reachable, OBS reachable and authenticated and not already recording, LiveSplit Server reachable, the Claude plan budget, and for the Claude Code runtime: `claude` on the PATH, its config file writable, and (for an existing run directory) that Claude Code trusts it. Exit code 1 when a check fails. |
+| `aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]` | Starts the real broker against the game, does the MCP handshake, calls the three tools, and with `--exercise` runs the plugin's own exercise list. Writes into the run directory (screenshots, a short `run.jsonl`). |
+| `aas budget [--max <percent>]` | The Claude plan usage (5-hour window and week, from Claude's own usage endpoint) under `AAS_BUDGET_WEEKLY_MAX`, and the ChatGPT plan's window as Codex last recorded it under `AAS_CODEX_BUDGET_MAX`. Exit code 1 when the Claude plan is over. |
+| `aas configure --runtime <id> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--id name]` | Creates the run directory: `brief.json` (the run's identity, category, model, instructions, goal prompt), the runtime's hardened configuration, `AGENTS.md`, `runtime-config/` with machine paths replaced for publication. Refuses to overwrite. The goal is one of the game's ends (the plugin's `ends` list): no `--goal` means the game's own end; `--goal act1` picks an earlier or alternative end, checked against the list, and the harness declares the victory when that end's milestone goes by. `--seed` is the run's seed for games that have one (`brief.seed`, handed to the plugin). `aas run` calls this itself when the run directory is new. |
+
+### The run
+
+| Command | What it does |
+|---|---|
+| `aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder obs|source-demo|null] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--autosave-minutes 10 | --no-autosave] [--ignore-budget] [--keep-open] [configure options]` | The whole chain, in this order: configure (when new) → budget check (Claude Code runtime) → overlay server → recorder preflight and timer preflight → recorder start (t0) → the plugin's `prepareRun` (new game, ready for the agent) → timer start → `run.started` → the runtime starts the agent and waits → the agent stops (done, turn or time budget, weekly budget, `game.over` with victory) → final save state → `run.ended` → the plugin's `endRun` → timer stop → recorder stop, the recording copied into `<run>/recording/` → `outcome.json` → close: the game, LiveSplit and OBS when used, Steam when a launcher of this harness started it, then a measurement of what is still running. When the game fails to come up the recording is stopped and discarded, `run.error` is logged, everything is closed, and the command fails. `--keep-open` skips the close step. |
+| `aas resume --run-dir <dir> [--save name] [--goal <later end>] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--prompt text] [--keep-open]` | Continues a stopped run in the same directory: the runtime's configuration is rewritten (paths may have moved), the game is restored to the last save (or `--save`), the agent's own session is resumed with a short notice, a new recording segment is added to `recording.json`, and `run.human` is logged, which makes the category `restart-only`. A run that reached its goal is over, unless `--goal` extends the goal to a later end of the game (act 1 to the game's own end): that is logged as `run.human` and `game.goal`, the earlier victory no longer ends the attempt, and the agent is told the larger goal. The goal is never shortened. Closes everything at the end like `aas run`. |
+| `aas start --runtime <id> --run-dir <dir>` | Only the agent, against an already configured run directory, without recorder, timer or game preparation. For development. |
+
+Budgets in a headless run: `--max-turns` (the runtime's own turn limit), `--max-minutes` (wall clock; the session is interrupted), the plan budget (Claude: the usage endpoint polled every 3 minutes; Codex: the stand in the thread's rollout read every 3 minutes; the session is interrupted). All end the run as `stopped`, which can be resumed. The victory ends it as `completed`.
+
+### After the run
+
+| Command | What it does |
+|---|---|
+| `aas timeline <run-dir> [--margin-before s] [--margin-after s] [--attempt last|N]` | From `run.jsonl` and `recording.json`: RTA, IGT (sum of the playbacks), thinking time, sections (chapter milestones), attempts (one per `game.attempt`, ended by `game.over`), the cut list (only the playbacks, with margins). Writes `<run>/timeline/`: `timeline.json`, `chapters.txt`, `chapters.cut.txt`, `cut.sh`, `timers.srt`, `inputs.srt`. |
+| `aas render <run-dir> [--video f] [--out f] [--burn timers,inputs] [--no-cut] [--crf 18] [--attempt last|N]` | ffmpeg: the recording with the thinking pauses cut out (`<name>.cut.mp4` next to it), segments of a resumed run concatenated, optional burned-in subtitles. No chapters and no data streams in the cut. |
+| `aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign <key>] [--session <log>] [--completion-marker <text>]` | **The bundle for the archive**, made from the private run directory: the runtime's private session log exported and sanitised into `session.sanitized.jsonl` with the harness events of `run.jsonl` merged in on the same clock (not `budget.checked`; file paths and session ids dropped), `summary.json` (schema 3, with the black intervals measured in the recording), `tools.json`, `AGENTS.md`, `documentation.md`, `runtime-config/` (regenerated: paths as placeholders, the game plugin's variables as `__ENV__`), `game-config/`, `chapters.txt`, `timeline.json`, `splits.lss`, `manifest.json` with sha256 per file. The recording is not in the bundle: publish it where video is published and give the link with `--video-url`; the bundle carries the link, the recording's length, and a fingerprint (the sha256 of the published timeline) that the publisher puts in the recording's description, which is what ties the two together. `--sign <key>` signs the bundle with an ed25519 key (an OpenSSH `id_ed25519` without a passphrase, or a PKCS#8 key): the signature covers `manifest.json` and therefore the whole bundle, and lands in `signature.json`. Signing is optional and an unsigned bundle stays valid. It also carries what it takes to play the same thing again: the game's own build, the mods with their pins and the run's settings, reported by the game plugin. Then the scan (home and WSL mount paths, e-mail addresses, credentials, a password or token in a config, identifiers, images) and the conformance check. A bundle with a finding is removed again and the command fails; a bundle the scan cleared is also packed as `<out-dir>.zip`, the upload file: everything except `recording/`, under one directory named after the run. |
+| `aas check [--strict] [--core] <run-dir>` | The conformance check of a bundle: the public-bundle marker, required files, timeline format, summary schema, manifest hashes, models used versus requested, whether the run reached its declared goal, and whether the recording shows a picture. `--core` is accepted and does nothing: it used to mean a bundle without its recording files, which is now every bundle. Exit code 1 when invalid (with `--strict` also when a should-requirement is unmet). |
+| `aas scan <dir>` | Only the privacy scan. |
+
+## Run directories, bundles and the upload
+
+Three things, and they are kept apart:
+
+| What | Where | For |
+|---|---|---|
+| **run directory** | `<recording drive>/<Game>/<run-id>/` | private: the complete log, the saves, the game's own records, the recording as OBS wrote it. It never leaves the machine. |
+| **bundle** | `<recording drive>/<Game>/public/<run-id>/` | the sanitised, checkable copy `aas publish` writes. **"public" means made for upload to an archive**, and that is the only form a run is shared in. |
+| **upload file** | `<recording drive>/<Game>/public/<run-id>.zip` | the bundle in one file: what you attach to the archive's submission form. It is small, because the recording is not in it. |
+
+A bundle is written to be read by a program as much as by a person: identifiers are stable (`run_uid`, written once per run and surviving every rename; `run_id`, the name it was published under; `bundle.revision`, counting the publications of that run), versions are separate (`spec_version` for the standard, `schema_version` for the summary's shape, `bundle.bundle_version` for the packaging), times are ISO 8601, numbers are numbers, and anything that can be a list of objects is one (`recordings`, `attempts`, `models`, `game.mods`).
+
+`manifest.json` in a bundle carries `"bundle": "aas-public"`, the `bundle_version`, the `spec_version`, the `run_id` and the `revision`; an archive checks that marker (and the absence of `run.jsonl`) before it accepts an upload as an AAS bundle. `summary.recording.url` says where the recording can be watched and `summary.game` what was played, down to the mods and their pins.
+
+**Run id.** `<game>-<runtime>-NN`, sequential per game: `sts-claude-code-01`, `sts-codex-01`, `portal-claude-code-03`. The id is the name of the run directory, of the bundle and of the zip, and the archive uses it as the run's identity. What a run was about (seed, goal, model, category) lives in `brief.json` and `summary.json`, never in the name: not every game has a seed, and a name cannot be checked.
+
+### Inside the run directory
+
+Created by `aas run` (or `aas configure`), private; only `aas publish` makes the public bundle.
+
+| Path | Written by | Content |
+|---|---|---|
+| `brief.json` | configure, resume | run id, category, model, effort, instructions, goal prompt, runtime and game plugin, budgets, resume info |
+| `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.claude/settings.json`, `.codex/config.toml` | runtime configure | the agent's instructions and hardened configuration (which files depends on the runtime) |
+| `runtime-config/` | runtime configure | the same configuration with machine paths replaced (`__RUN_DIR__`, `__REPO__`, `__HOME__`), published |
+| `run.jsonl` | broker, harness, plugins | the private, complete log: tool calls and results, agent messages, events (`game.playback`, `game.milestone`, `game.over`, `game.saved`, `run.started`, `run.ended`, `recording.*`, ...), all on one clock |
+| `tools.json`, `documentation.md` | broker | the tool definitions the agent received and what `<game>_documentation` returned |
+| `screenshots/` | broker | every image returned to the agent, referenced from the log |
+| `saves/` | harness (autosave, every 10 minutes and at chapter milestones and the end) | the game's save states copied through the plugin's `saveState`; `aas resume` restores the last one |
+| `recording/`, `recording.json` | recorder, harness | the recording file(s), one segment per run or resume, with t0, chapters and the timer's result |
+| `outcome.json` | harness | status (`completed`, `stopped`, `failed`), notes, the runtime's session id, deaths |
+| `claude-result.json`, `session.jsonl` | runtime | the runtime's own result and, for runtimes that keep it here, the private session log (Claude Code keeps its log under `~/.claude/projects/<run dir>/`) |
+| `timeline/` | timeline, render | see `aas timeline` |
+| `history/`, `rooms/`, `conformance.jsonl`, `oracle/` | Slay the Spire plugin and bot | game-specific ground truth (never published) |
+
+## Events on the timeline
+
+Every writer (broker, harness, plugins) appends to `run.jsonl`; `kind: "event"` records carry the run's structure. The names the core and the plugins use:
+
+| Event | Written by | Meaning and who reacts |
+|---|---|---|
+| `run.started`, `run.ended` | harness | the agent session's start and end; recorder and timer react |
+| `budget.checked` | harness | the Claude plan usage at the start |
+| `game.ready` | harness (from `prepareRun`) | the game is ready for the agent; seed when the game has one |
+| `game.playback` (`phase: start` with the steps, `phase: end` with what was played) | game plugin, inside the broker | the only intervals in which game time advances (`paused-think`); the timer runs game time, the timeline sums IGT and builds the cut list |
+| `game.milestone` (`chapter: true` for a split) | game plugin | a section boundary: recorder chapter, timer split |
+| `game.over` (`victory: true|false`) | game plugin (the game's own end or a death), harness (the goal's end) | the attempt ended; a victory ends the session (`completed`), a death does not |
+| `game.goal` (`from`, `to`) | harness (resume) | the goal was extended to a later end; the victory before it no longer ends the attempt |
+| `game.attempt` (`phase: start`) | game plugin | the next attempt after a death (same seed); the timer resets |
+| `game.saved` | harness | a save state was copied into `saves/` |
+| `game.phase`, `game.highlight`, `game.turn` | game plugin (optional) | scene changes, replay-buffer highlights, turn markers |
+| `run.human` | harness (resume) | a human intervened; the category becomes `restart-only` |
+| `run.error` | harness | the run failed to start or the runtime failed |
+| `recording.started`, `recording.stopped`, `recording.chapter` | recorder, harness | the recording's t0, files and chapters |
+
+`aas timeline` derives everything from these; `aas publish` sanitises the log into the public timeline (`session.sanitized.jsonl`) and counts what it removed.

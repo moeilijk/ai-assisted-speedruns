@@ -1,0 +1,8 @@
+{
+  "name": "@aas/timer-livesplit",
+  "version": "0.1.0",
+  "description": "AAS timer plugin: LiveSplit Server (RTA + game time on screen, splits per milestone, .lss export)",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./index.mjs" }
+}

@@ -1,0 +1,23 @@
+{
+  "_comment": "Draft for ForgottenArbiter's SeedSearch (searchConfig.json), from seed-criteria.md. The mod picks the route with the LOWEST summed room weight (Dijkstra): a high elite weight avoids elites unless forced, rest 0 = always rest. Filters: maximumElites counts the elites on that route.",
+  "playerClass": "IRONCLAD",
+  "ascensionLevel": 0,
+  "ironcladUnlocks": 5,
+  "startSeed": 0,
+  "endSeed": 30000,
+  "highestFloor": 51,
+  "act4": false,
+  "speedrunPace": true,
+  "forceNeowLament": true,
+  "eliteRoomWeight": 3.0,
+  "monsterRoomWeight": 1.0,
+  "restRoomWeight": 0.0,
+  "shopRoomWeight": 0.6,
+  "eventRoomWeight": 0.9,
+  "maximumElites": 1,
+  "requiredAct1Cards": [],
+  "requiredAct1Relics": [],
+  "bannedAct1Cards": [],
+  "verbose": true,
+  "exitAfterSearch": true
+}

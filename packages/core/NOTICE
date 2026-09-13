@@ -1,0 +1,16 @@
+This package contains code derived from cozyblaze/portal-agent
+(https://github.com/cozyblaze/portal-agent), commit 31311b8fde8f242cc403bd51d45cb615ed645e4b
+(2026-09-06), licensed under the MIT License. The original license text is in
+vendor/portal-agent/LICENSE.
+
+Derived files:
+  src/broker.mjs               from controller/mcp/portal-mcp-server.mjs
+  src/hardening.mjs            from controller/mcp/hardening.mjs
+  src/runtime-codex/export-rollout.mjs from tools/export-session.mjs
+  src/timestamp.mjs            from tools/pacific-time.mjs
+
+Changes: parameterised on a game plugin module and endpoint list instead of the
+Portal controller and SPT port; tool names derived from the game id; optional
+run.jsonl logging with screenshots saved to disk; time zone configurable.
+
+The repository itself is MIT licensed (see ../../LICENSE); this NOTICE lists what was taken from portal-agent and from where.

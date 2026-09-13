@@ -1,0 +1,8 @@
+{
+  "name": "@aas/runtime-codex",
+  "version": "0.1.0",
+  "description": "AAS runtime plugin: codex",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "exports": { ".": "./index.mjs" }
+}

@@ -1,0 +1,343 @@
+{
+  "generated_from": "Portal map entity lumps (Source Unpack 2.6)",
+  "maps": [
+    {
+      "map": "testchmb_a_00",
+      "chambers": [
+        {
+          "id": "00",
+          "sign": {
+            "x": -736,
+            "y": -414,
+            "z": 256.098
+          }
+        },
+        {
+          "id": "01",
+          "sign": {
+            "x": -1026,
+            "y": -800,
+            "z": 832
+          }
+        }
+      ],
+      "middleElevatorTop": {
+        "at": {
+          "x": -1472,
+          "y": -864,
+          "z": 792
+        },
+        "name": "track_elevator_p4_middle",
+        "target": "01"
+      },
+      "next": "testchmb_a_01"
+    },
+    {
+      "map": "testchmb_a_01",
+      "chambers": [
+        {
+          "id": "02",
+          "sign": {
+            "x": 448,
+            "y": 2,
+            "z": 120
+          }
+        },
+        {
+          "id": "03",
+          "sign": {
+            "x": -702,
+            "y": 64,
+            "z": 703.789
+          }
+        }
+      ],
+      "middleElevatorTop": {
+        "at": {
+          "x": -256,
+          "y": -384,
+          "z": 664
+        },
+        "name": "a01-middletrack_elevator_p4",
+        "target": "03"
+      },
+      "next": "testchmb_a_02"
+    },
+    {
+      "map": "testchmb_a_02",
+      "chambers": [
+        {
+          "id": "04",
+          "sign": {
+            "x": -767.569,
+            "y": 66,
+            "z": 127.278
+          }
+        },
+        {
+          "id": "05",
+          "sign": {
+            "x": 322,
+            "y": 256,
+            "z": 704
+          }
+        }
+      ],
+      "middleElevatorTop": {
+        "at": {
+          "x": 896,
+          "y": 192,
+          "z": 664
+        },
+        "name": "a02-middle_track_elevator_p4",
+        "target": "05"
+      },
+      "next": "testchmb_a_03"
+    },
+    {
+      "map": "testchmb_a_03",
+      "chambers": [
+        {
+          "id": "06",
+          "sign": {
+            "x": -480,
+            "y": -94,
+            "z": 0
+          }
+        },
+        {
+          "id": "07",
+          "sign": {
+            "x": 254.645,
+            "y": 254.645,
+            "z": 1344
+          }
+        }
+      ],
+      "middleElevatorTop": {
+        "at": {
+          "x": 704,
+          "y": 0,
+          "z": 1432
+        },
+        "name": "a03-middle_track_elevator_p4",
+        "target": "07"
+      },
+      "next": "testchmb_a_04"
+    },
+    {
+      "map": "testchmb_a_04",
+      "chambers": [
+        {
+          "id": "08",
+          "sign": {
+            "x": -640,
+            "y": 254,
+            "z": 112
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_05"
+    },
+    {
+      "map": "testchmb_a_05",
+      "chambers": [
+        {
+          "id": "09",
+          "sign": {
+            "x": 512,
+            "y": 62,
+            "z": 120
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_06"
+    },
+    {
+      "map": "testchmb_a_06",
+      "chambers": [
+        {
+          "id": "10",
+          "sign": {
+            "x": -1343.75,
+            "y": 2.25001,
+            "z": 191.75
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_07"
+    },
+    {
+      "map": "testchmb_a_07",
+      "chambers": [
+        {
+          "id": "11",
+          "sign": {
+            "x": 382.709,
+            "y": -575.145,
+            "z": 496.25
+          }
+        },
+        {
+          "id": "12",
+          "sign": {
+            "x": -255.75,
+            "y": -1213.75,
+            "z": 880.25
+          }
+        }
+      ],
+      "middleElevatorTop": {
+        "at": {
+          "x": -768,
+          "y": -1120,
+          "z": 856
+        },
+        "name": "07a_07b_track_elevator_p4",
+        "target": "12"
+      },
+      "next": "testchmb_a_08"
+    },
+    {
+      "map": "testchmb_a_08",
+      "chambers": [
+        {
+          "id": "13",
+          "sign": {
+            "x": -415.92,
+            "y": -253.75,
+            "z": 239.873
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_09"
+    },
+    {
+      "map": "testchmb_a_09",
+      "chambers": [
+        {
+          "id": "14",
+          "sign": {
+            "x": 896.053,
+            "y": 386.25,
+            "z": 112.354
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_10"
+    },
+    {
+      "map": "testchmb_a_10",
+      "chambers": [
+        {
+          "id": "15",
+          "sign": {
+            "x": -1538.25,
+            "y": -2879.95,
+            "z": -271.646
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_11"
+    },
+    {
+      "map": "testchmb_a_11",
+      "chambers": [
+        {
+          "id": "16",
+          "sign": {
+            "x": 574,
+            "y": -992,
+            "z": 111.643
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_13"
+    },
+    {
+      "map": "testchmb_a_13",
+      "chambers": [
+        {
+          "id": "17",
+          "sign": {
+            "x": 2096,
+            "y": 317.75,
+            "z": 128
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_14"
+    },
+    {
+      "map": "testchmb_a_14",
+      "chambers": [
+        {
+          "id": "18",
+          "sign": {
+            "x": 832,
+            "y": -253.75,
+            "z": 368
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "testchmb_a_15"
+    },
+    {
+      "map": "testchmb_a_15",
+      "chambers": [
+        {
+          "id": "19",
+          "sign": {
+            "x": -386,
+            "y": 799.75,
+            "z": 111.936
+          }
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "escape_00"
+    },
+    {
+      "map": "escape_00",
+      "chambers": [
+        {
+          "id": "e00",
+          "sign": null
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "escape_01"
+    },
+    {
+      "map": "escape_01",
+      "chambers": [
+        {
+          "id": "e01",
+          "sign": null
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": "escape_02"
+    },
+    {
+      "map": "escape_02",
+      "chambers": [
+        {
+          "id": "e02",
+          "sign": null
+        }
+      ],
+      "middleElevatorTop": null,
+      "next": null
+    }
+  ]
+}

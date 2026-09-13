@@ -1,0 +1,27 @@
+{
+  "name": "@aas/core",
+  "version": "0.1.0",
+  "description": "AAS core: hardened MCP broker, run log, export",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    "./broker": "./src/broker.mjs",
+    "./timestamp": "./src/timestamp.mjs",
+    "./mcp-client": "./src/mcp-client.mjs",
+    "./check-run": "./src/check-run.mjs",
+    "./cli": "./src/cli.mjs",
+    "./plugins": "./src/plugins.mjs",
+    "./events": "./src/events.mjs",
+    "./timeline": "./src/timeline.mjs",
+    "./publish": "./src/publish.mjs",
+    "./sanitize": "./src/sanitize.mjs",
+    "./export-claude-session": "./src/export-claude-session.mjs"
+  },
+  "types": "./src/types.d.ts",
+  "bin": {
+    "aas": "./src/cli.mjs",
+    "aas-broker": "./src/broker.mjs"
+  }
+}
