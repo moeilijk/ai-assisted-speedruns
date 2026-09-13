@@ -8,6 +8,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readKey, signBundle, verifyBundle } from "../src/sign.mjs";
 import { checkRun } from "../src/check-run.mjs";
+import { resolveSignKey } from "../src/publish.mjs";
+import { generateKeyPairSync } from "node:crypto";
 import { writeManifest } from "../src/publish.mjs";
 
 const hasSshKeygen = (() => { try { execFileSync("ssh-keygen", ["-A", "-h"], { stdio: "ignore" }); return true; } catch { return true; } })();
@@ -66,4 +68,19 @@ test("an unsigned bundle is readable but not an entry: aas check reports the sig
   const signed = row(out);
   assert.equal(signed.status, "met");
   assert.match(signed.detail, /^valid for SHA256:/);
+});
+
+test("--sign without a path signs with the key the publisher already pushes with", () => {
+  const home = mkdtempSync(join(tmpdir(), "aas-home-"));
+  const old = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    assert.throws(() => resolveSignKey(true), /does not exist/, "no key yet: say so, do not sign with nothing");
+    mkdirSync(join(home, ".ssh"));
+    writeFileSync(join(home, ".ssh", "id_ed25519"), generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
+    assert.equal(resolveSignKey(true), join(home, ".ssh", "id_ed25519"));
+    assert.equal(resolveSignKey("/elsewhere/key"), "/elsewhere/key", "a path still wins");
+  } finally {
+    process.env.HOME = old;
+  }
 });

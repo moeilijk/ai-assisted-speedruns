@@ -229,40 +229,45 @@ bundle: that is what an archive's submission form takes.
 ## 10. The publisher key (and what it is not)
 
 **It is not an upload credential.** Uploading is the zip through the archive's submission form; no key is
-asked for and none is needed. The key is what says *who published this*, and it is the same kind of key your
-code-hosting account already publishes: ed25519, whose public half is the one-line OpenSSH string GitHub
-serves at `https://github.com/<user>.keys`. Because that list is public, an archive can check that the key
-which signed a bundle is a key your account publishes, without any key-registration step of its own — and
-your consecutive publications are tied to each other and to that account.
+asked for and none is needed. The key is what says *who published this*, and in the common case you already
+have it:
 
 ```bash
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing -C "aas"    # no passphrase: the signer cannot unlock one
-cat ~/.ssh/aas_signing.pub                                    # add this line on GitHub: Settings → SSH and GPG
-                                                              # keys → New SSH key, type "Authentication key"
+aas publish <run-dir> <public-dir> --sign          # signs with ~/.ssh/id_ed25519
+```
+
+`--sign` without a path uses `~/.ssh/id_ed25519`, the key you already push to GitHub with. That is deliberate
+reuse of one key for two purposes, and it is what makes the whole thing cheap: GitHub publishes that key's
+public half at `https://github.com/<user>.keys`, so an archive can check that the key which signed a bundle
+is one your account publishes — no key to generate, nothing to register, no list to choose. Signing never
+sends the private key anywhere; it writes a signature over `manifest.json` and nothing else.
+
+If you would rather keep the two apart, or your usual key has a passphrase (the signer cannot unlock one),
+make a key for this and publish it:
+
+```bash
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing -C "aas"    # no passphrase
+cat ~/.ssh/aas_signing.pub                                    # add on GitHub: Settings → SSH and GPG keys →
+                                                              # New SSH key, type "Authentication key"
 curl -s https://github.com/<user>.keys | grep -F "$(cut -d' ' -f2 ~/.ssh/aas_signing.pub)"   # it is published
 aas publish <run-dir> <public-dir> --sign ~/.ssh/aas_signing
 ```
 
-Use your existing `~/.ssh/id_ed25519` if it is ed25519 and has no passphrase; otherwise make the separate key
-above, because `--sign` cannot decrypt a protected key. An account usually publishes several keys, one per
-machine, and that is fine: a verifier asks whether the signing key is *in* that list, not whether the list has
-one entry. A key that is not in it — a repository deploy key, or a fresh key you have not added — cannot be
-matched to the account, however valid its signature is. GitHub's key form offers two types, and the choice matters: **add it as an
-Authentication key**. That is the list served at `/<user>.keys`, the one a verifier can read without an API
-call. A key added as a *Signing key* is served only by the API
-(`https://api.github.com/users/<user>/ssh_signing_keys`) and does not appear at `/<user>.keys` at all, so an
-archive that reads only that URL cannot match it. Check with the `curl` line above that yours is in the list
-before you rely on it. An OpenSSH private key and a PKCS#8 key both work.
-The signature lands in `signature.json` with the public key and its `SHA256:` fingerprint; `aas check`
-verifies it, and so does the archive in your browser. Keep using the same key: changing it makes you a new
-publisher as far as any verifier can tell, and losing it costs you nothing published so far, only the ability
-to prove new bundles are from the same hand.
+GitHub's key form offers two types, and the choice matters: **add it as an Authentication key**. That is the
+list served at `/<user>.keys`, the one a verifier can read without an API call. A key added as a *Signing key*
+is served only by the API (`https://api.github.com/users/<user>/ssh_signing_keys`) and does not appear at
+`/<user>.keys` at all. An account usually publishes several keys, one per machine, and that is fine: a
+verifier asks whether the signing key is *in* the list, not whether the list has one entry. A key that is in
+no list — a repository deploy key, or a fresh key you have not added — cannot be matched to the account,
+however valid its signature is.
 
-An entry says who published it, so `aas check` reports an unsigned bundle as a requirement not met and
-`--strict` fails on it. Unsigned is still a readable bundle — a fixture, a local copy, a run someone archives
-on another's behalf — it is just not an entry. What a verifier can say is that a signature is valid **for the
-key in the file**; whose key that is comes from the published key list, which is the archive's business to
-record, not the bundle's to claim.
+An OpenSSH private key without a passphrase and a PKCS#8 key both work. The signature lands in
+`signature.json` with the public key and its `SHA256:` fingerprint; `aas check` verifies it, and so does the
+archive in your browser. An entry says who published it, so `aas check` reports an unsigned bundle as a
+requirement not met and `--strict` fails on it. Unsigned is still a readable bundle — a fixture, a local copy,
+a run someone archives on another's behalf — it is just not an entry. What a verifier can say is that a
+signature is valid **for the key in the file**; whose key that is comes from the published key list, which is
+the archive's business to record, not the bundle's to claim.
 
 ## 11. Setting up for someone else
 

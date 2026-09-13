@@ -5,6 +5,7 @@
 // Then scans the result for private data and runs the conformance check.
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
 import { CORE_DIR } from "./mcp-client.mjs";
@@ -250,9 +251,10 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // a requirement not met. Who a key belongs to is the archive's question, not the checker's.
   let signature = null;
   if (signKey) {
-    try { signature = signBundle(outDir, signKey); log(`signed with ${signature.key_fingerprint}`); }
+    const key = resolveSignKey(signKey);
+    try { signature = signBundle(outDir, key); log(`signed with ${signature.key_fingerprint} (${key})`); }
     catch (e) { throw new Error(`signing failed: ${e.message}`); }
-  } else log("not signed: an entry says who published it, so sign it with --sign <key> (a key your account publishes)");
+  } else log("not signed: an entry says who published it, so sign it with --sign (a key your account publishes)");
   const scan = scanPublication(outDir);
   const check = checkRun(outDir);
   log(`${files.length} files in manifest; scan: ${scan.findings.length} finding(s)`);
@@ -353,4 +355,19 @@ export function packBundle(outDir, { zipFile = `${outDir}.zip` } = {}) {
 export function descriptionLine(summary) {
   const id = summary.run_id ?? summary.category?.game ?? "run";
   return `AAS ${id} · fingerprint ${String(summary.recording?.fingerprint ?? "").slice(0, 16)} · ${summary.recording?.duration_seconds ?? "?"} s`;
+}
+
+/** The key the publisher signs with, when `--sign` is given without a path. */
+export const DEFAULT_SIGN_KEY = () => path.join(os.homedir(), ".ssh", "id_ed25519");
+
+/**
+ * `--sign` with a path signs with that key; `--sign` on its own signs with the publisher's usual SSH key.
+ * That is deliberate reuse: the key you push to a code host with is already published by that account, which
+ * is what lets an archive match a signature to a publisher, so the common case needs no key and no extra step.
+ */
+export function resolveSignKey(signKey) {
+  if (typeof signKey === "string" && signKey.trim()) return signKey;
+  const fallback = DEFAULT_SIGN_KEY();
+  if (fs.existsSync(fallback)) return fallback;
+  throw new Error(`--sign needs a key: ${fallback} does not exist. Give a path (--sign <key>), or make one: ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing`);
 }

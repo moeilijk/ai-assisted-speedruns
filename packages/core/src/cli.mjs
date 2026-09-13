@@ -116,7 +116,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       case "publish": {
         const { publish } = await import("./publish.mjs");
         const [src, out] = opts._;
-        if (!src || !out) throw new Error("Usage: aas publish <run-dir> <out-dir> [--video-url <url>] [--session <log>] [--completion-marker <text>]");
+        if (!src || !out) throw new Error("Usage: aas publish <run-dir> <out-dir> [--video-url <url>] [--sign [key]] [--session <log>] [--completion-marker <text>]");
         const r = await publish(src, out, { session: opts.session, completionMarker: opts["completion-marker"], videoUrl: opts["video-url"], signKey: opts.sign });
         process.exitCode = r.scan.findings.length || r.check.results.some((x) => x.status === "invalid") ? 1 : 0;
         break;
@@ -160,7 +160,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]",
             "  aas timeline <run-dir>                       timers, sections, cut list, timers.srt, inputs.srt",
             "  aas render <run-dir> [--burn timers,inputs]  ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",
-            "  aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign <key>] [--session <log>] [--completion-marker <text>]",
+            "  aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign [key]] [--session <log>] [--completion-marker <text>]",
+            "                                           --sign without a path uses ~/.ssh/id_ed25519, the key your code-hosting account already publishes",
             "  aas check [--strict] <run-dir>",
             "  aas scan <dir>",
           ].join("\n"),
