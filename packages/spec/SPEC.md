@@ -184,7 +184,16 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 Every file in the bundle except `manifest.json` itself and `run.jsonl` is listed. A verifier recomputes the hashes.
 
+Two files are deliberately absent from `files[]`: the manifest cannot list its own hash, and `signature.json`
+(§7b) signs the manifest's bytes and so cannot be inside what it signs. A verifier that also checks the other
+direction — every file in the bundle is in the manifest — must exempt both, or it reports a correctly signed
+bundle as carrying a stray file.
+
 `bundle: "aas-public"` is the marker that this directory is a published bundle and not a run directory or some other folder: a reader that accepts uploads checks it first, together with the absence of `run.jsonl`. `run_id` is the run's identity and the name of its directory.
+
+## 7a. The upload
+
+A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was; `summary.recording.url` says where it can be watched.
 
 ## 7b. `signature.json` (optional)
 
@@ -214,10 +223,6 @@ it just says nothing about who made it.
 The signature covers the bundle, not where the recording is published. Publication links are mutable by design
 (a VOD expires, a run may be re-uploaded), so they stay outside what is signed; the recording is bound to the
 bundle by the fingerprint in its description instead.
-
-## 7a. The upload
-
-A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was; `summary.recording.url` says where it can be watched.
 
 ## 8. Verifiability
 

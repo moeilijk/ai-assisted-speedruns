@@ -108,8 +108,12 @@ the duration, and a few tool calls spot-checked at their `elapsed_seconds` all h
 
 `--sign <key>` signs the bundle with an ed25519 key (an OpenSSH key without a passphrase, or PKCS#8): the
 signature covers `manifest.json`, which carries a hash of every file, and lands in `signature.json` together
-with the public key and its `SHA256:` fingerprint. It says that the same key published these bundles, not who
-that key belongs to; whose key it is, is for an archive to record. Unsigned bundles stay valid.
+with the public key and its `SHA256:` fingerprint. That public half is the one-line OpenSSH string a
+code-hosting account publishes — GitHub serves it at `https://github.com/<user>.keys` — so an archive can
+match the signing key to an account without a registration step of its own. It is not an upload credential:
+the upload is the zip through a submission form. The signature says that the same key published these
+bundles; whose key it is, is for an archive to record. Unsigned bundles stay valid. Setting a key up:
+[install.md](install.md#10-the-publisher-key-and-what-it-is-not).
 
 Every publication of the same run raises `bundle.revision` in the run directory's counter, while `run_uid`
 stays what it was: an archive keys the run on `run_uid` and the publication on `(run_uid, revision)`.

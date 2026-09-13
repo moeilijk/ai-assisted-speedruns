@@ -10,30 +10,49 @@ Three levels, and you only install what your level needs:
 |---|---|---|
 | **A. Read and develop** | run the test suite, write or change a plugin | Node only (§1, §2) |
 | **B. Do a run** | drive a real game with a real agent, recorded | A + an agent CLI, OBS, the game (§3 – §8) |
-| **C. Publish a run** | put a bundle in an archive | B + ffmpeg, a video platform account, optionally a signing key (§9 – §11) |
+| **C. Publish a run** | put a bundle in an archive | B + ffmpeg, a video platform account, and the publisher key that ties a bundle to you (§9 – §11) |
 
 ## 1. Prerequisites
 
-| What | Version | Needed for | Check |
-|---|---|---|---|
-| Node.js | 22 or newer (24 recommended) | everything; the broker runs under `node --permission` | `node -v` |
-| git | any | cloning this repository and the pinned upstreams | `git --version` |
-| An agent CLI | Claude Code 2.1.207+, **or** Codex | a run with an agent; both must be logged in | `claude --version`, `codex --version` |
-| ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length and its black intervals | `ffmpeg -version` |
-| OBS Studio | 30+ (tested on 32.2.2), obs-websocket v5 enabled | the recording; **a run without a recording is not a valid run** | OBS → Tools → WebSocket Server Settings |
-| LiveSplit | 1.8.37 with the Server component | optional: the timer on screen and the splits | its `settings.cfg` has `ServerStartup=1` |
-| The game | bought and installed legally, no anti-cheat, no online component | a run | see the game's README |
-| Disk | the run directory on the drive OBS records to | OBS then records straight into `<run>/recording/` | — |
+| What | Version | Needed for | Where to get it | Check |
+|---|---|---|---|---|
+| Node.js | 22 or newer (24 recommended) | everything; the broker runs under `node --permission` | [nodejs.org/en/download](https://nodejs.org/en/download) | `node -v` |
+| git | any | cloning this repository and the pinned upstreams | your package manager | `git --version` |
+| WSL 2 | current | **on Windows**: the harness itself runs in a Linux shell (see §1a) | [learn.microsoft.com — `wsl --install`](https://learn.microsoft.com/en-us/windows/wsl/install) | `wsl -l -v` |
+| An agent CLI | Claude Code 2.1.207+ **or** Codex, logged in | a run with an agent | [Claude Code setup](https://code.claude.com/docs/en/setup) · [Codex CLI](https://github.com/openai/codex) | `claude --version`, `codex --version` |
+| ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length and its black intervals | [ffmpeg.org/download](https://ffmpeg.org/download.html) | `ffmpeg -version` |
+| OBS Studio | 30+ (tested on 32.2.2), obs-websocket v5 enabled | the recording; **a run without a recording is not a valid run** | [obsproject.com/download](https://obsproject.com/download) | OBS → Tools → WebSocket Server Settings |
+| LiveSplit | 1.8.37 with the Server component | optional: the timer on screen and the splits | [livesplit.org/downloads](https://livesplit.org/downloads/) | its `settings.cfg` has `ServerStartup=1` |
+| The game | bought and installed legally, no anti-cheat, no online component | a run | the store you bought it from | see the game's README |
+| Disk | the run directory on the drive OBS records to | OBS then records straight into `<run>/recording/` | — | — |
 
 No `npm install` is needed: the core has no dependencies. The workspaces exist for versioning, not for packages.
 
-**Windows and WSL.** The usual setup is the harness in WSL and the game, OBS and LiveSplit on Windows.
-Windows paths coming back from OBS are translated with `wslpath`, so `wslpath` must be on the PATH (it is,
-in a standard WSL). The game plugins' launch and install scripts call Windows executables from WSL; that is
-what `AAS_*_EXE` and the game roots in `.env` are for. Everything also runs entirely on Windows or on Linux,
-as long as the game, OBS and the harness see the same paths.
-
 **Anti-cheat.** Read the disclaimer in the [README](../README.md) before you connect anything to a game.
+
+## 1a. Where each part runs (Windows, WSL, Linux)
+
+The harness is a Node program and runs wherever Node runs; the game, OBS and LiveSplit run where that game
+runs. Three layouts work, and the middle one is what this repository is developed and tested on:
+
+| Layout | Harness | Game, OBS, LiveSplit | Notes |
+|---|---|---|---|
+| **Windows + WSL** (tested) | in WSL 2 | on Windows | the harness reaches the game over `127.0.0.1` (WSL forwards it) and calls Windows executables from WSL; paths OBS reports are translated with `wslpath` |
+| **Windows only** | in PowerShell or CMD | on Windows | no path translation at all; the game plugins' scripts assume Windows executables, which are then simply local |
+| **Linux only** | on Linux | on Linux | works when the game itself runs on Linux; the Windows-only helpers (window placement, audio routing) stay off |
+
+**WSL is a prerequisite on Windows only if you want the tested layout.** In it:
+
+- Install it once from an administrator PowerShell: `wsl --install`, then reboot. Everything below runs inside
+  the WSL shell, not in PowerShell: the clone, `npm test`, `aas`, and the agent CLI.
+- `wslpath` must be on the PATH (it is, in a standard WSL): the recorder translates the Windows path OBS
+  reports into a path the harness can copy from.
+- Put the run directories on the drive OBS records to — a Windows drive, reached as `/mnt/<letter>/…`. OBS then
+  records straight into `<run>/recording/` and nothing has to be moved across the boundary afterwards.
+- The game roots and the `AAS_*_EXE` settings in `.env` are WSL paths to Windows programs
+  (`/mnt/c/Program Files/…`); the launch and install scripts call those executables from WSL.
+- Install the agent CLI **inside WSL** (Claude Code's Linux installer, or npm), not the Windows build: the
+  harness starts it as a child process from the same shell.
 
 ## 2. The harness
 
@@ -78,7 +97,10 @@ rules are ignored is not a valid run.
 
 ### Claude Code
 
-1. Install Claude Code and start it once interactively, anywhere: that creates `~/.claude.json`.
+1. Install Claude Code ([setup and installers](https://code.claude.com/docs/en/setup): `curl -fsSL
+   https://claude.ai/install.sh | bash` on macOS, Linux and WSL, `irm https://claude.ai/install.ps1 | iex` in
+   PowerShell, or `npm install -g @anthropic-ai/claude-code`) and start it once interactively, anywhere: that
+   creates `~/.claude.json`.
 2. Nothing else to configure. `aas run` marks each new run directory as trusted in that file
    (`projects["<run dir>"].hasTrustDialogAccepted`), because Claude Code applies a directory's
    `permissions.allow` rules only in a directory it trusts.
@@ -89,12 +111,13 @@ npm run claude:smoke     # a real headless session against a fake game
 ```
 
 It costs a little of your plan (one short session). PASS means: the trust flag works, the agent got exactly
-the three broker tools, and shell and file access were refused. A run in which Claude Code reports `Ignoring N permissions.allow entries …` is stopped and
-ends `failed`. Details: [packages/runtime-claude-code/README.md](../packages/runtime-claude-code/README.md).
+the three broker tools, and shell and file access were refused. A run in which Claude Code reports
+`Ignoring N permissions.allow entries …` is stopped and ends `failed`. Details: [packages/runtime-claude-code/README.md](../packages/runtime-claude-code/README.md).
 
 ### Codex
 
-1. Install Codex and log in (`codex login`).
+1. Install Codex ([openai/codex](https://github.com/openai/codex): `npm install -g @openai/codex`, or
+   `brew install --cask codex`) and log in (`codex login`).
 2. `aas configure`/`aas run` write the project trust entry (`[projects."<run dir>"] trust_level = "trusted"`
    in `~/.codex/config.toml`) themselves; without it Codex loads no MCP server at all.
 3. Verify: `aas doctor --runtime codex` (and `--run-dir <an existing run>` to see the trust row).
@@ -203,19 +226,33 @@ and what the bundle contains: [reference.md](reference.md#after-the-run) and the
 [packages/spec/SPEC.md](../packages/spec/SPEC.md). The upload file is `<public-dir>.zip`, written next to the
 bundle: that is what an archive's submission form takes.
 
-## 10. Optional: a signing key
+## 10. The publisher key (and what it is not)
 
-A bundle can carry an ed25519 signature over `manifest.json`, and therefore over every file's hash:
+**It is not an upload credential.** Uploading is the zip through the archive's submission form; no key is
+asked for and none is needed. The key is what says *who published this*, and it is the same kind of key your
+code-hosting account already publishes: ed25519, whose public half is the one-line OpenSSH string GitHub
+serves at `https://github.com/<user>.keys`. Because that list is public, an archive can check that the key
+which signed a bundle is a key your account publishes, without any key-registration step of its own — and
+your consecutive publications are tied to each other and to that account.
 
 ```bash
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing -C "aas"   # a key without a passphrase, only for this
+ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing -C "aas"    # no passphrase: the signer cannot unlock one
+cat ~/.ssh/aas_signing.pub                                    # add this line on GitHub: Settings → SSH and GPG
+                                                              # keys → New SSH key, type "Authentication key"
+curl -s https://github.com/<user>.keys | grep -F "$(cut -d' ' -f2 ~/.ssh/aas_signing.pub)"   # it is published
 aas publish <run-dir> <public-dir> --sign ~/.ssh/aas_signing
 ```
 
-An OpenSSH private key without a passphrase or a PKCS#8 key both work. The signature lands in
-`signature.json` with the public key and its `SHA256:` fingerprint; `aas check` verifies it. Signing is
-optional and an unsigned bundle stays valid: the signature says "the same key published both of these", not
-who that key belongs to. Whose key it is, is for an archive to record.
+Use your existing `~/.ssh/id_ed25519` if it is ed25519 and has no passphrase; otherwise make the separate key
+above, because `--sign` cannot decrypt a protected key. An OpenSSH private key and a PKCS#8 key both work.
+The signature lands in `signature.json` with the public key and its `SHA256:` fingerprint; `aas check`
+verifies it, and so does the archive in your browser. Keep using the same key: changing it makes you a new
+publisher as far as any verifier can tell, and losing it costs you nothing published so far, only the ability
+to prove new bundles are from the same hand.
+
+Signing is optional and an unsigned bundle stays valid. What a verifier can say is that a signature is valid
+**for the key in the file**; whose key that is comes from the published key list, which is the archive's
+business to record, not the bundle's to claim.
 
 ## 11. Setting up for someone else
 
@@ -237,4 +274,5 @@ No file has to be edited by hand beyond `.env`.
 | `aas budget` says STOP | your plan is at or above the configured share. Wait for the window to reset, raise `AAS_BUDGET_WEEKLY_MAX` / `AAS_CODEX_BUDGET_MAX`, or use `--ignore-budget` deliberately. |
 | `aas render`: `ffmpeg failed` / no duration in the bundle | ffmpeg or ffprobe is not on the PATH. |
 | `aas publish` deleted the output directory | the privacy scan found something (a home path, a mount path, an e-mail address, a credential). The findings are printed; fix the source, then publish again. |
+| `--sign`: the key cannot be read, or "is not ed25519" | the key has a passphrase (the signer cannot unlock one) or is RSA. Make a passphrase-free ed25519 key as in §10. |
 | `aas check`: `recording published: unmet` | the bundle has no `--video-url` yet. Upload the recording and publish again with the link. |
