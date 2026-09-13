@@ -1,5 +1,5 @@
 // Signing a bundle: the signature covers manifest.json and therefore the whole bundle; the key is read in the
-// form a code-hosting account publishes; tampering is caught; an unsigned bundle stays valid.
+// form a code-hosting account publishes; tampering is caught; an unsigned bundle is readable but not an entry.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
@@ -7,6 +7,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { readKey, signBundle, verifyBundle } from "../src/sign.mjs";
+import { checkRun } from "../src/check-run.mjs";
 import { writeManifest } from "../src/publish.mjs";
 
 const hasSshKeygen = (() => { try { execFileSync("ssh-keygen", ["-A", "-h"], { stdio: "ignore" }); return true; } catch { return true; } })();
@@ -55,4 +56,14 @@ test("a signature from another key is refused, and an unsigned bundle is simply 
   const v = verifyBundle(a.out);
   assert.equal(v.valid, false);
   assert.deepEqual(verifyBundle(b.out), { signed: false, valid: false, fingerprint: null, problem: null });
+});
+
+test("an unsigned bundle is readable but not an entry: aas check reports the signature as unmet", { skip: !hasSshKeygen && "ssh-keygen not installed" }, () => {
+  const { out, key } = bundleWithKey();
+  const row = (dir) => checkRun(dir).results.find((r) => r.requirement === "signature");
+  assert.equal(row(out).status, "unmet");
+  signBundle(out, key);
+  const signed = row(out);
+  assert.equal(signed.status, "met");
+  assert.match(signed.detail, /^valid for SHA256:/);
 });

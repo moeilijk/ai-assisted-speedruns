@@ -195,9 +195,9 @@ bundle as carrying a stray file.
 
 A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was; `summary.recording.url` says where it can be watched.
 
-## 7b. `signature.json` (optional)
+## 7b. `signature.json`
 
-A bundle may be signed. What is signed is the exact bytes of `manifest.json` and nothing else: the manifest
+A bundle says who published it, and it says so by being signed. What is signed is the exact bytes of `manifest.json` and nothing else: the manifest
 carries a sha256 of every other file, so one signature covers the whole bundle, and it keeps covering it in the
 upload zip, which carries the same manifest. The signature sits next to it in `signature.json`, which the
 manifest therefore does not list, the way it does not list itself or `run.jsonl`.
@@ -220,8 +220,13 @@ out by which kind they registered.
 
 A verifier can say that the signature is valid for the key in the file. It cannot say whose key that is: that
 binding belongs to whoever keeps the accounts, and an archive records which key signed and when it last matched
-which account, because a published key list changes over time. Signing is optional: an unsigned bundle is valid,
-it just says nothing about who made it.
+which account, because a published key list changes over time. A signature only means something together with
+that binding: anyone can make a key and sign anything, so an archive that requires a signature must also require
+that the key is one the submitting account publishes, or the requirement is decoration.
+
+An unsigned bundle is still a well-formed bundle and a reader can check everything else in it — a fixture, a
+local copy, a bundle someone archives on another's behalf. It is not an entry: §8 asks an entry to say who
+published it.
 
 The signature covers the bundle, not where the recording is published. Publication links are mutable by design
 (a VOD expires, a run may be re-uploaded), so they stay outside what is signed; the recording is bound to the
@@ -238,7 +243,8 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
+8. The bundle says who published it: `signature.json` verifies against the bytes of `manifest.json`, and the key it names is one the publisher's account publishes. A key that belongs to no account leaves this point unmet, however valid the signature is.
+9. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
 

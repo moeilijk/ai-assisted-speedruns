@@ -246,13 +246,13 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // The run id in the manifest is the bundle's own directory name: that is what an archive uses as the run's identity.
   const files = writeManifest(outDir, { runId: summary.run_id, runUid: brief.run_uid ?? null, revision });
   // The signature covers the manifest's bytes, so it covers the bundle; it is written after the manifest and is
-  // itself not listed in it. Signing is optional: an unsigned bundle stays valid, it just says nothing about who
-  // made it. Who a key belongs to is the archive's question, not the checker's.
+  // itself not listed in it. An entry says who published it, so an unsigned bundle is published but reported as
+  // a requirement not met. Who a key belongs to is the archive's question, not the checker's.
   let signature = null;
   if (signKey) {
     try { signature = signBundle(outDir, signKey); log(`signed with ${signature.key_fingerprint}`); }
     catch (e) { throw new Error(`signing failed: ${e.message}`); }
-  }
+  } else log("not signed: an entry says who published it, so sign it with --sign <key> (a key your account publishes)");
   const scan = scanPublication(outDir);
   const check = checkRun(outDir);
   log(`${files.length} files in manifest; scan: ${scan.findings.length} finding(s)`);

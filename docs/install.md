@@ -258,9 +258,11 @@ verifies it, and so does the archive in your browser. Keep using the same key: c
 publisher as far as any verifier can tell, and losing it costs you nothing published so far, only the ability
 to prove new bundles are from the same hand.
 
-Signing is optional and an unsigned bundle stays valid. What a verifier can say is that a signature is valid
-**for the key in the file**; whose key that is comes from the published key list, which is the archive's
-business to record, not the bundle's to claim.
+An entry says who published it, so `aas check` reports an unsigned bundle as a requirement not met and
+`--strict` fails on it. Unsigned is still a readable bundle — a fixture, a local copy, a run someone archives
+on another's behalf — it is just not an entry. What a verifier can say is that a signature is valid **for the
+key in the file**; whose key that is comes from the published key list, which is the archive's business to
+record, not the bundle's to claim.
 
 ## 11. Setting up for someone else
 

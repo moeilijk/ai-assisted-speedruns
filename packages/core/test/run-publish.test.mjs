@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import net from "node:net";
+import { generateKeyPairSync } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
@@ -111,7 +112,10 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
 
   // Publish → conforming.
   const outDir = join(dirname(runDir), "public");
-  const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", videoUrl: "https://www.youtube.com/watch?v=aaaaaaaaaaa, https://example.invalid/vod", log: () => {} });
+  // Signed, because an entry says who published it; a generated PKCS#8 key needs no ssh-keygen here.
+  const signKey = join(dirname(runDir), "publisher.pem");
+  writeFileSync(signKey, generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
+  const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", videoUrl: "https://www.youtube.com/watch?v=aaaaaaaaaaa, https://example.invalid/vod", signKey, log: () => {} });
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
   assert.equal(p.summary.schema_version, 4);
