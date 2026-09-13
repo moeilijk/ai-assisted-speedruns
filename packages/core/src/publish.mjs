@@ -272,8 +272,18 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // The upload file: only a bundle the scan cleared is packed.
   const zip = packBundle(outDir);
   log(`${path.basename(zip.file)}: ${zip.files} files, ${Math.round(zip.bytes / 1024)} kB (the recording is published separately, not packed)`);
-  if (fingerprint) log(`put this line in the description of the uploaded recording: ${descriptionLine(summary)}`);
-  if (!videoUrl) log("no --video-url yet: publish the recording, then run aas publish again with the link");
+  // The publisher's only real chore in the whole binding: one paste. So the line is printed on its own, exactly
+  // as it must be pasted, at the moment the bundle is written — never described, never abbreviated.
+  if (fingerprint) {
+    log("");
+    log("Paste this line into the description of the recording you upload:");
+    log("");
+    log(`    ${descriptionLine(summary)}`);
+    log("");
+    log(`Then: aas publish ${runDir} ${outDir} --video-url <link>`);
+    if (videoUrl) log(`(this bundle already links ${urls.length} recording${urls.length === 1 ? "" : "s"}; re-run only when a link changes)`);
+    log("");
+  }
   log(formatReport(outDir, check));
   return { outDir, summary, scan, check, timeline, zip, signature };
 }
