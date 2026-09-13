@@ -19,7 +19,7 @@ One run, from an empty directory to something an archive can check:
 | | `aas render` | the video with the thinking pauses cut out, optionally with burned-in timers |
 | | `aas publish` | the public bundle + the upload zip, scanned, checked and signed |
 | | `aas check` | the conformance check of a bundle, including goal, recording and signature |
-| keys | `aas key` | the publisher's signing key: makes one if there is none, prints the public line to register |
+| keys | `aas key [file]` | the publisher's signing key: makes one if there is none, prints the public line and fingerprint to register with an archive. Safe to call unconditionally — it never overwrites, so `aas key && aas publish … --sign` needs no guard |
 | | `aas scan` | only the privacy scan |
 
 Every command works the same whatever game, runtime, recorder or timer is loaded: the core calls the plugin

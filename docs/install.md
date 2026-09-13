@@ -237,7 +237,9 @@ aas publish <run-dir> <public-dir> --sign           # signs with it
 ```
 
 `aas key` makes an ed25519 key if you have none, never overwrites one, and prints the public half as a single
-line plus its `SHA256:` fingerprint. That line is public: register it once with the archive you publish to
+line plus its `SHA256:` fingerprint. It is safe to call unconditionally, so a script can simply run
+`aas key && aas publish <run-dir> <public-dir> --sign` with no check of its own: the second run prints the
+same key and creates nothing. That line is public: register it once with the archive you publish to
 (your profile there), and every bundle you sign from then on is yours. The private half never leaves the
 machine — signing writes a signature over `manifest.json`, nothing more.
 
