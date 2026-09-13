@@ -113,6 +113,19 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         process.exitCode = r.outcome.status === "failed" ? 1 : 0;
         break;
       }
+      case "key": {
+        // The publisher's own signing key: made here when they have none, because this tooling can be
+        // downloaded without an account anywhere and most people who play a game have no SSH key.
+        const { createKey } = await import("./sign.mjs");
+        const { AAS_KEY_FILE } = await import("./publish.mjs");
+        const file = opts._[0] ? path.resolve(opts._[0]) : AAS_KEY_FILE();
+        const k = createKey(file);
+        console.log(`${k.created ? "created" : "already there"}: ${k.file}`);
+        console.log(k.publicLine);
+        console.log(k.fingerprint);
+        console.log("Register that public line with the archive you publish to; it is what ties your publications together.");
+        break;
+      }
       case "publish": {
         const { publish } = await import("./publish.mjs");
         const [src, out] = opts._;
@@ -160,8 +173,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]",
             "  aas timeline <run-dir>                       timers, sections, cut list, timers.srt, inputs.srt",
             "  aas render <run-dir> [--burn timers,inputs]  ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",
+            "  aas key [file]                           the publisher's signing key: makes one if there is none, prints the public line to register",
             "  aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign [key]] [--session <log>] [--completion-marker <text>]",
-            "                                           --sign without a path uses ~/.ssh/id_ed25519, the key your code-hosting account already publishes",
+            "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
             "  aas check [--strict] <run-dir>",
             "  aas scan <dir>",
           ].join("\n"),

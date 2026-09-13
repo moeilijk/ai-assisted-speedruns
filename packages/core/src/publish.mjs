@@ -357,17 +357,20 @@ export function descriptionLine(summary) {
   return `AAS ${id} · fingerprint ${String(summary.recording?.fingerprint ?? "").slice(0, 16)} · ${summary.recording?.duration_seconds ?? "?"} s`;
 }
 
-/** The key the publisher signs with, when `--sign` is given without a path. */
-export const DEFAULT_SIGN_KEY = () => path.join(os.homedir(), ".ssh", "id_ed25519");
+/** Where the publisher's own signing key lives when they let the tooling make one. */
+export const AAS_KEY_FILE = () => path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "aas", "signing.pem");
+/** An SSH key the publisher may already have; used only when it is there. */
+export const SSH_KEY_FILE = () => path.join(os.homedir(), ".ssh", "id_ed25519");
 
 /**
- * `--sign` with a path signs with that key; `--sign` on its own signs with the publisher's usual SSH key.
- * That is deliberate reuse: the key you push to a code host with is already published by that account, which
- * is what lets an archive match a signature to a publisher, so the common case needs no key and no extra step.
+ * `--sign` with a path signs with that key. `--sign` on its own looks for the publisher's own key: the one
+ * `aas key` writes, then an SSH key if they happen to have one. Nothing here assumes an account anywhere: this
+ * tooling can be downloaded without one, and most people who play a game have no SSH key at all. The key says
+ * "the same hand published these"; an archive says whose hand, from its own accounts.
  */
 export function resolveSignKey(signKey) {
   if (typeof signKey === "string" && signKey.trim()) return signKey;
-  const fallback = DEFAULT_SIGN_KEY();
-  if (fs.existsSync(fallback)) return fallback;
-  throw new Error(`--sign needs a key: ${fallback} does not exist. Give a path (--sign <key>), or make one: ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing`);
+  if (process.env.AAS_SIGN_KEY) return process.env.AAS_SIGN_KEY;
+  for (const candidate of [AAS_KEY_FILE(), SSH_KEY_FILE()]) if (fs.existsSync(candidate)) return candidate;
+  throw new Error(`--sign needs a key and there is none yet: run \`aas key\` to make one (it lands in ${AAS_KEY_FILE()}), or give a path with --sign <key>`);
 }

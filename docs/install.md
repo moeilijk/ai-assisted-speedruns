@@ -10,7 +10,7 @@ Three levels, and you only install what your level needs:
 |---|---|---|
 | **A. Read and develop** | run the test suite, write or change a plugin | Node only (§1, §2) |
 | **B. Do a run** | drive a real game with a real agent, recorded | A + an agent CLI, OBS, the game (§3 – §8) |
-| **C. Publish a run** | put a bundle in an archive | B + ffmpeg, a video platform account, and the publisher key that ties a bundle to you (§9 – §11) |
+| **C. Publish a run** | put a bundle in an archive | B + ffmpeg, a video platform account, and one `aas key` (§9 – §11) |
 
 ## 1. Prerequisites
 
@@ -228,46 +228,42 @@ bundle: that is what an archive's submission form takes.
 
 ## 10. The publisher key (and what it is not)
 
-**It is not an upload credential.** Uploading is the zip through the archive's submission form; no key is
-asked for and none is needed. The key is what says *who published this*, and in the common case you already
-have it:
+**It is not an upload credential, and it is not an account.** Uploading is the zip through the archive's
+submission form; no key is asked for there. The key is what says *who published this*, and you make it here:
 
 ```bash
-aas publish <run-dir> <public-dir> --sign          # signs with ~/.ssh/id_ed25519
+aas key                                             # writes ~/.config/aas/signing.pem and prints its public line
+aas publish <run-dir> <public-dir> --sign           # signs with it
 ```
 
-`--sign` without a path uses `~/.ssh/id_ed25519`, the key you already push to GitHub with. That is deliberate
-reuse of one key for two purposes, and it is what makes the whole thing cheap: GitHub publishes that key's
-public half at `https://github.com/<user>.keys`, so an archive can check that the key which signed a bundle
-is one your account publishes — no key to generate, nothing to register, no list to choose. Signing never
-sends the private key anywhere; it writes a signature over `manifest.json` and nothing else.
+`aas key` makes an ed25519 key if you have none, never overwrites one, and prints the public half as a single
+line plus its `SHA256:` fingerprint. That line is public: register it once with the archive you publish to
+(your profile there), and every bundle you sign from then on is yours. The private half never leaves the
+machine — signing writes a signature over `manifest.json`, nothing more.
 
-If you would rather keep the two apart, or your usual key has a passphrase (the signer cannot unlock one),
-make a key for this and publish it:
+**If you already have an SSH key**, `--sign` without a path uses `~/.config/aas/signing.pem` first and
+`~/.ssh/id_ed25519` after it, so a developer signing on their own machine needs no second key. Where a code
+host publishes an account's keys — GitHub serves them at `https://github.com/<user>.keys` — an archive can
+match that key to your account there without you registering anything. That is a convenience for people who
+have such an account, not a requirement: nothing in this tooling needs a code-hosting account, and you can
+download it without one.
 
-```bash
-ssh-keygen -t ed25519 -N "" -f ~/.ssh/aas_signing -C "aas"    # no passphrase
-cat ~/.ssh/aas_signing.pub                                    # add on GitHub: Settings → SSH and GPG keys →
-                                                              # New SSH key, type "Authentication key"
-curl -s https://github.com/<user>.keys | grep -F "$(cut -d' ' -f2 ~/.ssh/aas_signing.pub)"   # it is published
-aas publish <run-dir> <public-dir> --sign ~/.ssh/aas_signing
-```
+If you do rely on that shortcut, add the key on GitHub as an **Authentication key**: that is the list served
+at `/<user>.keys`. A key added as a *Signing key* is served only by the API
+(`https://api.github.com/users/<user>/ssh_signing_keys`). An account usually publishes several keys, one per
+machine, which is fine — a verifier asks whether the signing key is in the list, not whether the list has one
+entry. A repository deploy key is published nowhere and can never be matched.
 
-GitHub's key form offers two types, and the choice matters: **add it as an Authentication key**. That is the
-list served at `/<user>.keys`, the one a verifier can read without an API call. A key added as a *Signing key*
-is served only by the API (`https://api.github.com/users/<user>/ssh_signing_keys`) and does not appear at
-`/<user>.keys` at all. An account usually publishes several keys, one per machine, and that is fine: a
-verifier asks whether the signing key is *in* the list, not whether the list has one entry. A key that is in
-no list — a repository deploy key, or a fresh key you have not added — cannot be matched to the account,
-however valid its signature is.
+An OpenSSH private key without a passphrase and a PKCS#8 key both work (`aas key` writes PKCS#8); `--sign
+<path>` takes either, and `AAS_SIGN_KEY` sets the default path for a machine. The signature lands in
+`signature.json` with the public key and its fingerprint; `aas check` verifies it, and so does an archive in
+your browser.
 
-An OpenSSH private key without a passphrase and a PKCS#8 key both work. The signature lands in
-`signature.json` with the public key and its `SHA256:` fingerprint; `aas check` verifies it, and so does the
-archive in your browser. An entry says who published it, so `aas check` reports an unsigned bundle as a
+**Keep the same key.** Changing it makes you a new publisher as far as any verifier can tell; that is why
+`aas key` refuses to overwrite. An entry says who published it, so `aas check` reports an unsigned bundle as a
 requirement not met and `--strict` fails on it. Unsigned is still a readable bundle — a fixture, a local copy,
 a run someone archives on another's behalf — it is just not an entry. What a verifier can say is that a
-signature is valid **for the key in the file**; whose key that is comes from the published key list, which is
-the archive's business to record, not the bundle's to claim.
+signature is valid **for the key in the file**; whose key that is, is what an archive's accounts record.
 
 ## 11. Setting up for someone else
 

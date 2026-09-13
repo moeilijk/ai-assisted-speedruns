@@ -24,7 +24,7 @@ The agent only ever sees three tools per game: `<game>_documentation`, `<game>_s
 - **Stays inside a budget.** Every runtime reports its own plan's stand; a run refuses to start above the limit and a running session is interrupted with a save when it crosses it.
 - **Closes what it opened.** At the end of a run the game, the timer, the recorder and a Steam the launcher started are closed the way a user would, and what stays open is reported.
 - **Cuts the video.** `aas render` removes the thinking pauses with ffmpeg, concatenates the segments of a resumed run, and can burn in the timers and the keys being played.
-- **Publishes a checkable bundle.** `aas publish` turns the private run directory into the public bundle: the sanitised timeline with the harness's events merged in, a machine-readable summary (identifiers, versions, category, the game's build and mods, the recording's platform and fingerprint), the agent's instructions and tool definitions, the hardened configuration with machine paths replaced, chapters, splits, and a manifest with a hash per file — plus one zip to upload. It refuses to publish anything the privacy scan flags, and signs the bundle with an ed25519 key — the same one-line OpenSSH key a code-hosting account publishes, so an archive can match a publication to its publisher; an entry says who published it, and an unsigned bundle is reported as not meeting that.
+- **Publishes a checkable bundle.** `aas publish` turns the private run directory into the public bundle: the sanitised timeline with the harness's events merged in, a machine-readable summary (identifiers, versions, category, the game's build and mods, the recording's platform and fingerprint), the agent's instructions and tool definitions, the hardened configuration with machine paths replaced, chapters, splits, and a manifest with a hash per file — plus one zip to upload. It refuses to publish anything the privacy scan flags, and signs the bundle with the publisher's own ed25519 key (`aas key` makes one; no account anywhere is needed), so an archive can tie a publication to its publisher; an entry says who published it, and an unsigned bundle is reported as not meeting that.
 - **Checks it, and lets anyone else check it.** `aas check` verifies the bundle marker, the files, the timeline format, the summary schema, every hash, the signature, whether the run reached its declared goal, whether the recording is published and bound to this bundle, and whether it shows a picture.
 
 ## Disclaimer: anti-cheat, bans, your own risk
@@ -55,7 +55,7 @@ aas publish  <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01 --video-
 aas check --strict <runs>/public/sts-claude-code-01
 ```
 
-`aas` commands: `configure`, `run`, `resume`, `start`, `doctor`, `check-connection`, `budget`, `timeline`, `render`, `publish`, `check`, `scan`. Every command works the same whatever game, agent, recorder or timer is loaded; what each one does and leaves behind is in [docs/reference.md](docs/reference.md).
+`aas` commands: `configure`, `run`, `resume`, `start`, `doctor`, `check-connection`, `budget`, `timeline`, `render`, `publish`, `check`, `scan`, `key`. Every command works the same whatever game, agent, recorder or timer is loaded; what each one does and leaves behind is in [docs/reference.md](docs/reference.md).
 
 ## Documentation
 

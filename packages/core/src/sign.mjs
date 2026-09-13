@@ -3,9 +3,11 @@
 // zip, which carries the same manifest. The signature lives next to it in signature.json, which the manifest
 // therefore cannot list (a file cannot hash the thing that signs it).
 //
-// The key is ed25519 in OpenSSH form, because that is the string a code-hosting account publishes: an archive
-// with sign-in can confirm that the key which signed a bundle is a key that account publishes, without a
-// registration flow. Verification needs no dependency: ed25519 is in Node's crypto and in a browser's WebCrypto.
+// The key is ed25519, and its public half is written in the one-line OpenSSH form because that form is short
+// enough to paste into a profile and is what some hosts already publish for an account. Neither is a
+// requirement: the key here is the publisher's, made by this tooling if they have none, and an archive learns
+// whose it is from its own accounts. Verification needs no dependency: ed25519 is in Node's crypto and in a
+// browser's WebCrypto.
 //
 // A checker can say the signature is valid for the key in the file. It cannot say the key belongs to anyone;
 // that binding belongs to whoever holds the accounts.
@@ -107,4 +109,17 @@ export function verifyBundle(dir) {
   } catch (e) {
     return { signed: true, valid: false, fingerprint: null, problem: e.message };
   }
+}
+
+/**
+ * The publisher's own signing key, made here when they have none. Not everyone who runs a speedrun has an SSH
+ * key or a code-hosting account, so the tooling does not borrow one: it writes an ed25519 key in PKCS#8 form,
+ * readable by `readKey`, and prints the public line to register with an archive. Never overwrites.
+ */
+export function createKey(file) {
+  if (fs.existsSync(file)) return { created: false, file, ...publicInfo(crypto.createPublicKey(readKey(file).privateKey)) };
+  fs.mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
+  const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
+  fs.writeFileSync(file, privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
+  return { created: true, file, ...publicInfo(publicKey) };
 }

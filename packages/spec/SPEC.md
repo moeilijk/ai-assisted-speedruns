@@ -211,12 +211,18 @@ manifest therefore does not list, the way it does not list itself or `run.jsonl`
  "signed_at": "..."}
 ```
 
-The key is ed25519 in the one-line OpenSSH form, which is the string a code-hosting account publishes: an archive
-with sign-in can confirm that the key which signed a bundle is one that account publishes, without a registration
-flow of its own, and ed25519 verifies in a browser and in a plain runtime without any dependency. Where a host
-keeps more than one list — GitHub serves authentication keys at `/<user>.keys` and SSH signing keys only through
-its API — an archive that matches keys to accounts reads every list the host offers, so a publisher is not caught
-out by which kind they registered.
+The key is ed25519 and its public half is written in the one-line OpenSSH form: short enough to paste into a
+profile, and already published for an account by some code hosts. ed25519 verifies in a browser and in a plain
+runtime without any dependency.
+
+**The key is the publisher's, not an account's.** A publisher makes one with their tooling; they need no account
+anywhere to produce a signed bundle, and this standard requires none. How an archive learns whose key it is, is
+the archive's own business, and there are two ways that do not exclude anyone: the publisher registers the public
+line with their account there once, or — where a host publishes an account's keys, as GitHub does at
+`/<user>.keys` and through its SSH-signing-key API — the archive reads that and matches without a registration
+step. An archive that uses the second way reads every list the host offers, so a publisher is not caught out by
+which kind they registered; and an archive that offers sign-in through several providers cannot rely on the
+second way at all, because only some hosts publish keys.
 
 A verifier can say that the signature is valid for the key in the file. It cannot say whose key that is: that
 binding belongs to whoever keeps the accounts, and an archive records which key signed and when it last matched
@@ -243,7 +249,7 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The bundle says who published it: `signature.json` verifies against the bytes of `manifest.json`, and the key it names is one the publisher's account publishes. A key that belongs to no account leaves this point unmet, however valid the signature is. "Could not be checked" is a third answer and not the same one: a key list that is unreachable, rate-limited or temporarily missing is recorded as such and asked again, never written down as a verdict about the publisher.
+8. The bundle says who published it: `signature.json` verifies against the bytes of `manifest.json`, and the key it names is one the archive knows to be that publisher's — registered with their account there, or published for it by their host. A key that belongs to no account leaves this point unmet, however valid the signature is. "Could not be checked" is a third answer and not the same one: a key list that is unreachable, rate-limited or temporarily missing is recorded as such and asked again, never written down as a verdict about the publisher.
 9. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
