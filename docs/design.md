@@ -123,6 +123,7 @@ ai-assisted-speedruns/
     portal/                     adapter around portal-agent's controller
     slay-the-spire/             through Communication Mod: bridge, install, launch, splits, scripted bot
   docs/
+    install.md                  prerequisites and the installation, step by step
     design.md                   this document
     reference.md                every command, the run directory, the bundle, the events
     plugins.md                  how to write a game, runtime, recorder or timer plugin

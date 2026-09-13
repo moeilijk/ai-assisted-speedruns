@@ -1,6 +1,28 @@
 # `aas` reference
 
-What the tooling in this repository does, command by command, and what it leaves behind. Everything here is taken from the code as it is (`packages/core/src/cli.mjs` and the modules it calls); where a detail is game-specific the game plugin's README has it. For the standard itself (what a published run must contain) see [../packages/spec/SPEC.md](../packages/spec/SPEC.md); for the architecture and the decisions behind it, [design.md](design.md); for writing a plugin, [plugins.md](plugins.md).
+What the tooling in this repository does, command by command, and what it leaves behind. Everything here is taken from the code as it is (`packages/core/src/cli.mjs` and the modules it calls); where a detail is game-specific the game plugin's README has it. For installing it, [install.md](install.md); for the standard itself (what a published run must contain) see [../packages/spec/SPEC.md](../packages/spec/SPEC.md); for the architecture and the decisions behind it, [design.md](design.md); for writing a plugin, [plugins.md](plugins.md).
+
+## At a glance
+
+One run, from an empty directory to something an archive can check:
+
+| | Command | |
+|---|---|---|
+| before | `aas doctor` | is everything this run needs there and reachable |
+| | `aas check-connection` | the real broker against the real game, the three tools the agent will get |
+| | `aas budget` | how much of each plan is left |
+| | `aas configure` | the run directory: identity, category, goal, the agent's hardened configuration |
+| the run | `aas run` | the whole chain: record, prepare, time, play, save, stop, close |
+| | `aas resume` | continue a stopped run: restore the save, resume the session, a new segment |
+| | `aas start` | only the agent, against a configured directory (development) |
+| after | `aas timeline` | RTA, IGT, thinking time, sections, attempts, cut list, subtitles |
+| | `aas render` | the video with the thinking pauses cut out, optionally with burned-in timers |
+| | `aas publish` | the public bundle + the upload zip, scanned, checked and optionally signed |
+| | `aas check` | the conformance check of a bundle, including goal, recording and signature |
+| | `aas scan` | only the privacy scan |
+
+Every command works the same whatever game, runtime, recorder or timer is loaded: the core calls the plugin
+contracts and knows no game, model or recorder by name.
 
 ## The pieces
 
@@ -41,7 +63,7 @@ All commands: `node packages/core/src/cli.mjs <command> ...` (the `aas` bin of t
 | `aas doctor --game <plugin.mjs> [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]` | Read-only checks: Node version, the game plugin loads and has documentation, its endpoints are reachable, OBS reachable and authenticated and not already recording, LiveSplit Server reachable, the Claude plan budget, and for the Claude Code runtime: `claude` on the PATH, its config file writable, and (for an existing run directory) that Claude Code trusts it. Exit code 1 when a check fails. |
 | `aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]` | Starts the real broker against the game, does the MCP handshake, calls the three tools, and with `--exercise` runs the plugin's own exercise list. Writes into the run directory (screenshots, a short `run.jsonl`). |
 | `aas budget [--max <percent>]` | The Claude plan usage (5-hour window and week, from Claude's own usage endpoint) under `AAS_BUDGET_WEEKLY_MAX`, and the ChatGPT plan's window as Codex last recorded it under `AAS_CODEX_BUDGET_MAX`. Exit code 1 when the Claude plan is over. |
-| `aas configure --runtime <id> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--id name]` | Creates the run directory: `brief.json` (the run's identity, category, model, instructions, goal prompt), the runtime's hardened configuration, `AGENTS.md`, `runtime-config/` with machine paths replaced for publication. Refuses to overwrite. The goal is one of the game's ends (the plugin's `ends` list): no `--goal` means the game's own end; `--goal act1` picks an earlier or alternative end, checked against the list, and the harness declares the victory when that end's milestone goes by. `--seed` is the run's seed for games that have one (`brief.seed`, handed to the plugin). `aas run` calls this itself when the run directory is new. |
+| `aas configure --runtime <id> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--id name]` | Creates the run directory: `brief.json` (the run's identity, category, model, instructions, goal prompt), the runtime's hardened configuration, `AGENTS.md`, `runtime-config/` with machine paths replaced for publication. Refuses to overwrite. The goal is one of the game's ends (the plugin's `ends` list): no `--goal` means the game's own end; `--goal act1` picks an earlier or alternative end, checked against the list, and the harness declares the victory when that end's milestone goes by. `--seed` is the run's seed for games that have one (`brief.seed`, handed to the plugin), `--build` overrides the category's build string, `--id` the run's id when it should differ from the directory's name, and `--bot <module>` is the bot the `scripted` runtime plays with. `aas run` calls this itself when the run directory is new. |
 
 ### The run
 
@@ -59,9 +81,38 @@ Budgets in a headless run: `--max-turns` (the runtime's own turn limit), `--max-
 |---|---|
 | `aas timeline <run-dir> [--margin-before s] [--margin-after s] [--attempt last|N]` | From `run.jsonl` and `recording.json`: RTA, IGT (sum of the playbacks), thinking time, sections (chapter milestones), attempts (one per `game.attempt`, ended by `game.over`), the cut list (only the playbacks, with margins). Writes `<run>/timeline/`: `timeline.json`, `chapters.txt`, `chapters.cut.txt`, `cut.sh`, `timers.srt`, `inputs.srt`. |
 | `aas render <run-dir> [--video f] [--out f] [--burn timers,inputs] [--no-cut] [--crf 18] [--attempt last|N]` | ffmpeg: the recording with the thinking pauses cut out (`<name>.cut.mp4` next to it), segments of a resumed run concatenated, optional burned-in subtitles. No chapters and no data streams in the cut. |
-| `aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign <key>] [--session <log>] [--completion-marker <text>]` | **The bundle for the archive**, made from the private run directory: the runtime's private session log exported and sanitised into `session.sanitized.jsonl` with the harness events of `run.jsonl` merged in on the same clock (not `budget.checked`; file paths and session ids dropped), `summary.json` (schema 3, with the black intervals measured in the recording), `tools.json`, `AGENTS.md`, `documentation.md`, `runtime-config/` (regenerated: paths as placeholders, the game plugin's variables as `__ENV__`), `game-config/`, `chapters.txt`, `timeline.json`, `splits.lss`, `manifest.json` with sha256 per file. The recording is not in the bundle: publish it where video is published and give the link with `--video-url`; the bundle carries the link, the recording's length, and a fingerprint (the sha256 of the published timeline) that the publisher puts in the recording's description, which is what ties the two together. `--sign <key>` signs the bundle with an ed25519 key (an OpenSSH `id_ed25519` without a passphrase, or a PKCS#8 key): the signature covers `manifest.json` and therefore the whole bundle, and lands in `signature.json`. Signing is optional and an unsigned bundle stays valid. It also carries what it takes to play the same thing again: the game's own build, the mods with their pins and the run's settings, reported by the game plugin. Then the scan (home and WSL mount paths, e-mail addresses, credentials, a password or token in a config, identifiers, images) and the conformance check. A bundle with a finding is removed again and the command fails; a bundle the scan cleared is also packed as `<out-dir>.zip`, the upload file: everything except `recording/`, under one directory named after the run. |
+| `aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign <key>] [--session <log>] [--completion-marker <text>]` | **The bundle for the archive**, made from the private run directory: the runtime's private session log exported and sanitised into `session.sanitized.jsonl` with the harness events of `run.jsonl` merged in on the same clock (not `budget.checked`; file paths and session ids dropped), `summary.json` (schema 3, with the black intervals measured in the recording), `tools.json`, `AGENTS.md`, `documentation.md`, `runtime-config/` (regenerated: paths as placeholders, the game plugin's variables as `__ENV__`), `game-config/`, `chapters.txt`, `timeline.json`, `splits.lss`, `manifest.json` with sha256 per file. The recording is not in the bundle: publish it where video is published and give the link with `--video-url`; the bundle carries the link, the recording's length, and a fingerprint (the sha256 of `session.sanitized.jsonl`, this bundle's own published timeline) that the publisher puts in the recording's description, which is what ties the two together. `--sign <key>` signs the bundle with an ed25519 key (an OpenSSH `id_ed25519` without a passphrase, or a PKCS#8 key): the signature covers `manifest.json` and therefore the whole bundle, and lands in `signature.json`. Signing is optional and an unsigned bundle stays valid. It also carries what it takes to play the same thing again: the game's own build, the mods with their pins and the run's settings, reported by the game plugin. Then the scan (home and WSL mount paths, e-mail addresses, credentials, a password or token in a config, identifiers, images) and the conformance check. A bundle with a finding is removed again and the command fails; a bundle the scan cleared is also packed as `<out-dir>.zip`, the upload file: everything except `recording/`, under one directory named after the run. |
 | `aas check [--strict] [--core] <run-dir>` | The conformance check of a bundle: the public-bundle marker, required files, timeline format, summary schema, manifest hashes, models used versus requested, whether the run reached its declared goal, and whether the recording shows a picture. `--core` is accepted and does nothing: it used to mean a bundle without its recording files, which is now every bundle. Exit code 1 when invalid (with `--strict` also when a should-requirement is unmet). |
 | `aas scan <dir>` | Only the privacy scan. |
+
+## Publishing a run, step by step
+
+The recording is published where video is published, and the bundle carries the link. Binding the two is the
+publisher's job and takes three commands:
+
+1. `aas publish <run-dir> <out-dir>` writes the bundle and prints one line:
+   `AAS <run-id> · fingerprint <16 hex> · <n> s`. It also says that no `--video-url` was given yet.
+2. Upload the recording (`<run>/recording/…`, or the cut `aas render` made) and put that line in the field a
+   viewer can read on that platform: the description, or the title where a platform has none. The platforms
+   the bundle names by id are YouTube, Twitch, Kick, Vimeo, Bilibili, Odysee, Rumble, Dailymotion, Niconico,
+   archive.org and PeerTube; anything else is accepted as `other` with its host kept, so an unlisted platform
+   does not block a submission. Each is recorded with its `kind` (an upload keeps, a VOD expires, an archive
+   item is an archive) and the `binding_field` the fingerprint is in.
+3. `aas publish <run-dir> <out-dir> --video-url <url>[,<url>]` again, with the link or links (mirrors, or a
+   VOD plus a later upload). Every entry gets the duration, the fingerprint and `confirmed_at`: the moment
+   the publisher last said this link resolves.
+
+What that buys a reader: the video cannot be swapped for another one. A platform re-encodes what you upload,
+so a hash of the file proves nothing about the video anyone can watch; the fingerprint in the description,
+the duration, and a few tool calls spot-checked at their `elapsed_seconds` all have to match the same bundle.
+
+`--sign <key>` signs the bundle with an ed25519 key (an OpenSSH key without a passphrase, or PKCS#8): the
+signature covers `manifest.json`, which carries a hash of every file, and lands in `signature.json` together
+with the public key and its `SHA256:` fingerprint. It says that the same key published these bundles, not who
+that key belongs to; whose key it is, is for an archive to record. Unsigned bundles stay valid.
+
+Every publication of the same run raises `bundle.revision` in the run directory's counter, while `run_uid`
+stays what it was: an archive keys the run on `run_uid` and the publication on `(run_uid, revision)`.
 
 ## Run directories, bundles and the upload
 
