@@ -6,7 +6,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createKey, readKey, signBundle, verifyBundle } from "../src/sign.mjs";
+import { createKey, makeClaim, readKey, signBundle, verifyBundle, verifyClaim } from "../src/sign.mjs";
 import { checkRun } from "../src/check-run.mjs";
 import { AAS_KEY_FILE, resolveSignKey } from "../src/publish.mjs";
 import { generateKeyPairSync } from "node:crypto";
@@ -106,4 +106,27 @@ test("--sign without a path finds the publisher's own key, and says so when ther
   } finally {
     for (const [k, v] of Object.entries(env)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
+});
+
+test("a key claim is the publisher's own statement, readable and verifiable wherever it ends up", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-claim-"));
+  const key = join(dir, "signing.pem");
+  createKey(key);
+  const claim = makeClaim(key, { identities: ["https://ai-assisted-speedruns.org/u/example", "mailto:someone@example.org"] });
+  assert.match(claim.text, /^aas-key-claim v1\n/);
+  const ok = verifyClaim(claim.text);
+  assert.equal(ok.valid, true);
+  assert.deepEqual(ok.identities, ["https://ai-assisted-speedruns.org/u/example", "mailto:someone@example.org"]);
+  assert.equal(ok.fingerprint, claim.fingerprint);
+  // However it was published: inside a clearsigned block, a web page, a mail. The claim is found and checked.
+  assert.equal(verifyClaim(`-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n${claim.text}\n-----END PGP SIGNATURE-----`).valid, true);
+  // Changing what it claims breaks it: the identities are inside what was signed.
+  assert.equal(verifyClaim(claim.text.replace("someone@example.org", "someone-else@example.org")).valid, false);
+  assert.equal(verifyClaim(claim.text.replace(/^identity: .*\n/m, "")).valid, false);
+  // A claim signed by another key does not become true by naming the first one.
+  const other = makeClaim((createKey(join(dir, "other.pem")), join(dir, "other.pem")), { identities: ["https://example.org/u/me"] });
+  assert.notEqual(other.fingerprint, claim.fingerprint);
+  assert.equal(verifyClaim(other.text.replace(other.publicLine, claim.publicLine)).valid, false);
+  assert.match(verifyClaim("nothing here").problem, /not a claim/);
+  assert.throws(() => makeClaim(key, { identities: ["me@example.org"] }), /must be a URI/);
 });

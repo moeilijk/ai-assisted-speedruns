@@ -248,10 +248,24 @@ the machine: signing writes a signature over `manifest.json`, and because the ma
 other file, that one signature covers the whole bundle.
 
 For the marker to say anything about *you* rather than about a key, whoever reads it has to know the key is
-yours. The public line is one line of text, so that is wherever you and they can both reach: your profile at
-the archive, a file on a domain you control, a key directory, an account list your host happens to serve. A
-bundle signed with a key nobody has seen is still published — it is simply a signature whose publisher is not
-established — and it gains the match whenever you record the line somewhere the archive reads.
+yours. **The archive you publish to is where that lives**: paste the public line into your profile there, and
+it keeps the key list for your account — several keys over the years, a new machine, a replacement, each with
+the date it was added. A bundle signed with a key nobody has seen is still published; it is simply a signature
+whose publisher is not established, and it gains the match whenever you record the line.
+
+Nothing stops you from recording it elsewhere as well, and `aas key --claim` writes what you would publish:
+
+```bash
+aas key --claim --identity https://ai-assisted-speedruns.org/u/<you> --identity mailto:<you>@example.org
+```
+
+That prints a few lines of plain text — the key, its fingerprint, the identities you claim, the date — signed
+with the key itself. Put it anywhere you are already known: a profile, a page on your own domain, a post, or
+wrapped in another signature (`gpg --clearsign` leaves the text readable, so a keyserver works too). `aas key
+--verify <file|->` reads one back out of whatever it was published in and says whether it holds. What the
+claim proves on its own is that the holder of the key says it belongs to those identities; that they agree
+comes from the place it was published, somewhere only their owner can write. Two keys and one archive is the
+normal case, and this is for the publisher who wants their key to mean something beyond a single site.
 
 `--sign <path>` takes any ed25519 key — an OpenSSH key without a passphrase (the signer cannot unlock one) or
 PKCS#8 — and `AAS_SIGN_KEY` sets a default path for a machine. Without a path, `--sign` uses the `aas key` key,

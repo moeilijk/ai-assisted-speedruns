@@ -123,3 +123,52 @@ export function createKey(file) {
   fs.writeFileSync(file, privateKey.export({ type: "pkcs8", format: "pem" }), { mode: 0o600 });
   return { created: true, file, ...publicInfo(publicKey) };
 }
+
+// --- Key claims -------------------------------------------------------------
+//
+// A signing key on its own says "these bundles came from one hand". A claim says which hand, and it is the
+// publisher's own statement: a few lines of text naming the key and the identities it belongs to, signed with
+// that key. It is deliberately plain text and not tied to any archive, because a publisher may publish in more
+// than one place and outlive any of them: paste it in a profile, put it on a domain you control, wrap it in
+// another signature (`gpg --clearsign` leaves the body readable) and put it wherever such things are kept.
+//
+// What it proves by itself: whoever holds the key says it belongs to these identities. What it does not prove:
+// that the identities agree. That second half comes from where the claim is published — a place only the owner
+// of an identity can write to — which is why the format does not care where that is.
+export const CLAIM_KIND = "aas-key-claim v1";
+
+const claimBody = ({ publicLine, fingerprint, identities, issued }) =>
+  [CLAIM_KIND, `key: ${publicLine}`, `fingerprint: ${fingerprint}`, ...identities.map((i) => `identity: ${i}`), `issued: ${issued}`].join("\n");
+
+/** The publisher's signed statement about their own key. `identities` are URIs (https:, mailto:, or an archive's profile). */
+export function makeClaim(keyFile, { identities = [], issued = new Date().toISOString() } = {}) {
+  const { privateKey, publicLine, fingerprint } = readKey(keyFile);
+  for (const id of identities) if (!/^[a-z][a-z0-9+.-]*:/i.test(id)) throw new Error(`identity must be a URI (https://…, mailto:…): ${id}`);
+  const body = claimBody({ publicLine, fingerprint, identities, issued });
+  const signature = crypto.sign(null, Buffer.from(body, "utf8"), privateKey).toString("base64");
+  return { text: `${body}\nsignature: ${signature}\n`, publicLine, fingerprint, identities, issued };
+}
+
+/** Reads a claim as published (any wrapper around it is ignored) and says whether it verifies against its own key. */
+export function verifyClaim(text) {
+  const lines = String(text).split("\n").map((l) => l.replace(/\r$/, ""));
+  const start = lines.findIndex((l) => l.trim() === CLAIM_KIND);
+  if (start < 0) return { valid: false, problem: `not a claim: no "${CLAIM_KIND}" line` };
+  const value = (name) => lines.slice(start).find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2).trim() ?? null;
+  const publicLine = value("key");
+  const fingerprint = value("fingerprint");
+  const issued = value("issued");
+  const identities = lines.slice(start).filter((l) => l.startsWith("identity: ")).map((l) => l.slice("identity: ".length).trim());
+  const signature = value("signature");
+  if (!publicLine || !signature || !issued) return { valid: false, problem: "a claim needs key, issued and signature lines" };
+  try {
+    const publicKey = publicKeyFromLine(publicLine);
+    const info = publicInfo(publicKey);
+    if (fingerprint && fingerprint !== info.fingerprint) return { valid: false, fingerprint: info.fingerprint, problem: "the fingerprint line does not match the key" };
+    const body = claimBody({ publicLine, fingerprint: info.fingerprint, identities, issued });
+    const valid = crypto.verify(null, Buffer.from(body, "utf8"), publicKey, Buffer.from(signature, "base64"));
+    return { valid, fingerprint: info.fingerprint, publicLine, identities, issued, problem: valid ? null : "the signature does not verify against the claim" };
+  } catch (e) {
+    return { valid: false, problem: e.message };
+  }
+}

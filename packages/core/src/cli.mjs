@@ -26,8 +26,10 @@ function parse(argv) {
     if (a.startsWith("--")) {
       const key = a.slice(2);
       const next = argv[i + 1];
-      if (BOOLEAN_FLAGS.has(key) || next === undefined || next.startsWith("--")) opts[key] = true;
-      else opts[key] = argv[++i];
+      const value = BOOLEAN_FLAGS.has(key) || next === undefined || next.startsWith("--") ? true : argv[++i];
+      // A flag given more than once collects its values (`--identity a --identity b`).
+      if (key in opts) opts[key] = [].concat(opts[key], value);
+      else opts[key] = value;
     } else opts._.push(a);
   }
   return opts;
@@ -116,14 +118,34 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       case "key": {
         // The publisher's own signing key: made here when they have none, because this tooling can be
         // downloaded without an account anywhere and most people who play a game have no SSH key.
-        const { createKey } = await import("./sign.mjs");
-        const { AAS_KEY_FILE } = await import("./publish.mjs");
-        const file = opts._[0] ? path.resolve(opts._[0]) : AAS_KEY_FILE();
+        const { createKey, makeClaim, verifyClaim } = await import("./sign.mjs");
+        const { AAS_KEY_FILE, resolveSignKey } = await import("./publish.mjs");
+        if (opts.verify) {
+          // A claim as published: any wrapper around it (a clearsigned block, a page, a mail) is ignored.
+          const text = opts.verify === true || opts.verify === "-" ? fs.readFileSync(0, "utf8") : fs.readFileSync(String(opts.verify), "utf8");
+          const r = verifyClaim(text);
+          console.log(r.valid ? `valid claim by ${r.fingerprint}` : `NOT a valid claim: ${r.problem}`);
+          for (const id of r.identities ?? []) console.log(`  identity: ${id}`);
+          if (r.valid) console.log(`  issued: ${r.issued}\n  key: ${r.publicLine}\nIt says this key claims those identities. Whether they agree is what the place you found it in says.`);
+          process.exitCode = r.valid ? 0 : 1;
+          break;
+        }
+        const file = opts._[0] ? path.resolve(opts._[0]) : (typeof opts.key === "string" ? path.resolve(opts.key) : AAS_KEY_FILE());
         const k = createKey(file);
         console.log(`${k.created ? "created" : "already there"}: ${k.file}`);
         console.log(k.publicLine);
         console.log(k.fingerprint);
-        console.log("Register that public line with the archive you publish to; it is what ties your publications together.");
+        if (!opts.claim) {
+          console.log("That public line is what identifies you as a publisher: give it to the archive you publish to.");
+          console.log("To publish it anywhere instead: aas key --claim --identity <uri> [--identity <uri>]");
+          break;
+        }
+        // A claim: the publisher's own signed statement about their key, plain text, tied to no archive.
+        const identities = [].concat(opts.identity ?? []).filter((x) => typeof x === "string").flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
+        if (!identities.length) throw new Error("--claim needs at least one --identity <uri> (https://…, mailto:…, or your profile at an archive)");
+        const claim = makeClaim(resolveSignKey(file), { identities });
+        if (opts.out) { fs.writeFileSync(String(opts.out), claim.text); console.log(`claim written to ${opts.out}`); }
+        else { console.log(""); console.log(claim.text.trimEnd()); }
         break;
       }
       case "publish": {
@@ -174,6 +196,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas timeline <run-dir>                       timers, sections, cut list, timers.srt, inputs.srt",
             "  aas render <run-dir> [--burn timers,inputs]  ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",
             "  aas key [file]                           the publisher's signing key: makes one if there is none, prints the public line to register",
+            "  aas key --claim --identity <uri> [--out f]   a signed statement that this key is yours, to publish anywhere",
+            "  aas key --verify <file|->                a claim as published: does it verify, and which identities does it name",
             "  aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign [key]] [--session <log>] [--completion-marker <text>]",
             "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
             "  aas check [--strict] <run-dir>",

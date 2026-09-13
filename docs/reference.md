@@ -20,6 +20,8 @@ One run, from an empty directory to something an archive can check:
 | | `aas publish` | the public bundle + the upload zip, scanned and checked (signing optional) |
 | | `aas check` | the conformance check of a bundle, including goal, recording and signature |
 | keys | `aas key [file]` | the publisher's signing key: makes one if there is none, prints the public line and fingerprint to register with an archive. Safe to call unconditionally — it never overwrites, so `aas key && aas publish … --sign` needs no guard |
+| | `aas key --claim --identity <uri> [--identity <uri>] [--out <file>]` | the publisher's own signed statement that this key is theirs, as plain text to publish wherever they are known (a profile, their own domain, inside a `gpg --clearsign` block) |
+| | `aas key --verify <file\|->` | reads a claim back out of whatever it was published in and says whether it verifies, and which identities it names |
 | | `aas scan` | only the privacy scan |
 
 Every command works the same whatever game, runtime, recorder or timer is loaded: the core calls the plugin

@@ -235,10 +235,13 @@ gone. A key an archive has not seen before does not make a bundle less publishab
 publisher is not established, and it gains its match if that publisher registers the line later.
 
 This standard names no place to record a key. The public line is one line of text, so anywhere a publisher can
-publish text and an archive can read it will do: the archive's own profile, a file at a location the publisher
-controls, a key directory, an account list some hosts serve for their users. Which of those an archive accepts is
-its own policy, and an archive that offers several ways to sign in cannot lean on any single host's list, because
-most identity providers publish no keys at all.
+publish text and an archive can read it will do, and the ordinary place is the archive itself: a key list per
+account, kept where the publisher is already signed in. A publisher who wants their key to mean something beyond
+one archive can also publish a claim — the key, the identities it claims and a date, signed with that key, in
+plain text so it survives being wrapped in a profile, a page or another signature. A claim says what the holder
+of the key asserts; the place it is published is what makes the identities agree. Which of these an archive
+accepts is its own policy, and an archive that offers several ways to sign in cannot lean on any single host's
+key list, because most identity providers publish no keys at all.
 
 The signature covers the bundle, not where the recording is published. Publication links are mutable by design
 (a VOD expires, a run may be re-uploaded), so they stay outside what is signed; the recording is bound to the
