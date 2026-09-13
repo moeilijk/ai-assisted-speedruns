@@ -60,14 +60,21 @@ test("a signature from another key is refused, and an unsigned bundle is simply 
   assert.deepEqual(verifyBundle(b.out), { signed: false, valid: false, fingerprint: null, problem: null });
 });
 
-test("an unsigned bundle is readable but not an entry: aas check reports the signature as unmet", { skip: !hasSshKeygen && "ssh-keygen not installed" }, () => {
+test("signing is a marker, not a gate: unsigned passes the check, a signature that is there must verify", { skip: !hasSshKeygen && "ssh-keygen not installed" }, () => {
   const { out, key } = bundleWithKey();
   const row = (dir) => checkRun(dir).results.find((r) => r.requirement === "signature");
-  assert.equal(row(out).status, "unmet");
+  // Unsigned is a complete bundle: the publisher is the archive's account, not a key in a file.
+  assert.equal(row(out).status, "met");
+  assert.match(row(out).detail, /optional/);
+  assert.equal(checkRun(out).results.some((r) => r.status === "unmet" && r.requirement === "signature"), false);
   signBundle(out, key);
-  const signed = row(out);
-  assert.equal(signed.status, "met");
-  assert.match(signed.detail, /^valid for SHA256:/);
+  assert.equal(row(out).status, "met");
+  assert.match(row(out).detail, /^valid for SHA256:/);
+  // What is not free: a signature that is there and does not verify. Worse than none, so it fails the check.
+  const sig = JSON.parse(readFileSync(join(out, "signature.json"), "utf8"));
+  sig.signature = Buffer.alloc(64).toString("base64");
+  writeFileSync(join(out, "signature.json"), JSON.stringify(sig));
+  assert.equal(row(out).status, "invalid");
 });
 
 test("--sign without a path finds the publisher's own key, and says so when there is none", () => {

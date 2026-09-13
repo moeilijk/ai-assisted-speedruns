@@ -197,9 +197,9 @@ bundle as carrying a stray file.
 
 A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was; `summary.recording.url` says where it can be watched.
 
-## 7b. `signature.json`
+## 7b. `signature.json` (optional)
 
-A bundle says who published it, and it says so by being signed. What is signed is the exact bytes of `manifest.json` and nothing else: the manifest
+A bundle may be signed. What is signed is the exact bytes of `manifest.json` and nothing else: the manifest
 carries a sha256 of every other file, so one signature covers the whole bundle, and it keeps covering it in the
 upload zip, which carries the same manifest. The signature sits next to it in `signature.json`, which the
 manifest therefore does not list, the way it does not list itself or `run.jsonl`.
@@ -215,29 +215,26 @@ manifest therefore does not list, the way it does not list itself or `run.jsonl`
 
 The key is ed25519 and its public half is written in the one-line OpenSSH form: short enough to paste into a
 profile, and already published for an account by some code hosts. ed25519 verifies in a browser and in a plain
-runtime without any dependency.
+runtime without any dependency. The key is the publisher's own — made by their tooling, needing no account
+anywhere — and this standard requires no account to produce a bundle, signed or not.
 
-**The key is the publisher's, not an account's.** A publisher makes one with their tooling; they need no account
-anywhere to produce a signed bundle, and this standard requires none. How an archive learns whose key it is, is
-the archive's own business, and there are two ways that do not exclude anyone: the publisher registers the public
-line with their account there once, or — where a host publishes an account's keys, as GitHub does at
-`/<user>.keys` and through its SSH-signing-key API — the archive reads that and matches without a registration
-step. An archive that uses the second way reads every list the host offers, so a publisher is not caught out by
-which kind they registered; and an archive that offers sign-in through several providers cannot rely on the
-second way at all, because only some hosts publish keys.
+**Signing is optional, and this standard does not require it.** A verifier can say that a signature is valid for
+the key in the file, and no more: a signature says that two bundles came from one key, and nothing about whose
+key that is. Who published a run is a question an archive answers from its own accounts, where the publisher is
+already signed in. A key that gates nothing and authorises nothing would be one more thing to install, run and
+register for no effect the publisher can see — a barrier without a benefit, and the first run somebody publishes
+is exactly the one that must not have those. What a signature does earn, for a publisher who wants it: their
+publications are tied to one key, inside an archive and outside it, which is worth having in a dispute and
+little before there is one. A signature that is present must verify: a broken one is worse than none.
 
-A verifier can say that the signature is valid for the key in the file. It cannot say whose key that is: that
-binding belongs to whoever keeps the accounts, and an archive records which key signed and when it last matched
-which account, because a published key list changes over time. A publisher has more than one key over a lifetime
-— a second machine, a replacement — so an archive keeps a list per account rather than one key, and retiring a
-key means "accept no new publications signed with this one", never "the older ones become doubtful". Which key
-signed a publication is a fact about that publication and stays true after the key is gone. A signature only means something together with
-that binding: anyone can make a key and sign anything, so an archive that requires a signature must also require
-that the key is one the submitting account publishes, or the requirement is decoration.
-
-An unsigned bundle is still a well-formed bundle and a reader can check everything else in it — a fixture, a
-local copy, a bundle someone archives on another's behalf. It is not an entry: §8 asks an entry to say who
-published it.
+**An archive that records keys records them per account.** A publisher has more than one key over a lifetime — a
+second machine, a replacement — so the account is the identity and a key is only evidence, and nothing is keyed
+on a fingerprint. Retiring a key means "accept no new publications signed with this one", never "the older ones
+become doubtful": which key signed a publication is a fact about that publication and stays true after the key is
+gone. A key an archive has not seen before does not make a bundle less publishable; it is simply a signature whose
+publisher is not established, and it gains its match if that publisher registers the line later. Where a host
+publishes an account's keys (GitHub at `/<user>.keys`, and its SSH signing keys through its API) an archive may
+read those instead of asking for a paste, but only some hosts do, so that route can never be the only one.
 
 The signature covers the bundle, not where the recording is published. Publication links are mutable by design
 (a VOD expires, a run may be re-uploaded), so they stay outside what is signed; the recording is bound to the
@@ -254,8 +251,7 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The bundle says who published it: `signature.json` verifies against the bytes of `manifest.json`, and the key it names is one the archive knows to be that publisher's — registered with their account there, or published for it by their host. A key that belongs to no account leaves this point unmet, however valid the signature is. "Could not be checked" is a third answer and not the same one: a key list that is unreachable, rate-limited or temporarily missing is recorded as such and asked again, never written down as a verdict about the publisher.
-9. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
+8. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
 

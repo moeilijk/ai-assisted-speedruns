@@ -177,13 +177,13 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   }
   // Where the recording is published: a bundle carries the link, not the video (a run is hours of 1080p60).
   // With the chapters and `elapsed_seconds` that link is what makes a tool call locatable in the recording.
-  // Who made this bundle: the signature covers manifest.json and therefore the whole bundle. An entry says who
-  // published it, so an unsigned bundle is a requirement not met, not a free choice; it stays a readable bundle
-  // (the status is `unmet`, not `invalid`) because a fixture or a local copy has no publisher to speak of.
-  // A checker can only say the signature is valid for its own key; whose key it is belongs to an archive.
+  // Who made this bundle, when it says so. A signature proves that two bundles came from one key and nothing
+  // about whose key it is until someone registers it with an archive, so it is not required: a publisher's
+  // identity is the archive's account, and an extra key that gates nothing would be a barrier without a
+  // benefit. A signature that is present must still be valid — a broken one is worse than none.
   const sig = verifyBundle(runDir);
   if (sig.signed) add("signature", sig.valid ? "met" : "invalid", sig.valid ? `valid for ${sig.fingerprint} (whose key that is, is for an archive to say)` : sig.problem ?? "invalid");
-  else add("signature", "unmet", "not signed: an entry says who published it (aas publish --sign <key>, with a key the publisher's account publishes)");
+  else add("signature", "met", "not signed (optional: aas publish --sign, for a publisher who wants their bundles tied to one key)");
   // Reproduction: the game's build and the mods that were loaded, from the game plugin.
   try {
     const g = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).game ?? null;

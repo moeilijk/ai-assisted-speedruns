@@ -10,7 +10,7 @@ Three levels, and you only install what your level needs:
 |---|---|---|
 | **A. Read and develop** | run the test suite, write or change a plugin | Node only (§1, §2) |
 | **B. Do a run** | drive a real game with a real agent, recorded | A + an agent CLI, OBS, the game (§3 – §8) |
-| **C. Publish a run** | put a bundle in an archive | B + ffmpeg, a video platform account, and one `aas key` (§9 – §11) |
+| **C. Publish a run** | put a bundle in an archive | B + ffmpeg and a video platform account (§9 – §11); signing is optional |
 
 ## 1. Prerequisites
 
@@ -226,10 +226,15 @@ and what the bundle contains: [reference.md](reference.md#after-the-run) and the
 [packages/spec/SPEC.md](../packages/spec/SPEC.md). The upload file is `<public-dir>.zip`, written next to the
 bundle: that is what an archive's submission form takes.
 
-## 10. The publisher key (and what it is not)
+## 10. Optional: signing your bundles
 
-**It is not an upload credential, and it is not an account.** Uploading is the zip through the archive's
-submission form; no key is asked for there. The key is what says *who published this*, and you make it here:
+**You do not need a key to publish.** An archive knows who you are because you are signed in there; the bundle
+carries no identity of its own and does not have to. `aas check` passes on an unsigned bundle, and nothing in
+the tooling asks for one.
+
+Signing is a marker for a publisher who wants one. It ties your publications to a single key — in an archive
+and outside it, in a zip someone downloaded a year ago — which is worth having if a claim is ever disputed and
+worth little before that:
 
 ```bash
 aas key                                             # writes ~/.config/aas/signing.pem and prints its public line
@@ -237,35 +242,23 @@ aas publish <run-dir> <public-dir> --sign           # signs with it
 ```
 
 `aas key` makes an ed25519 key if you have none, never overwrites one, and prints the public half as a single
-line plus its `SHA256:` fingerprint. It is safe to call unconditionally, so a script can simply run
-`aas key && aas publish <run-dir> <public-dir> --sign` with no check of its own: the second run prints the
-same key and creates nothing. That line is public: register it once with the archive you publish to
-(your profile there), and every bundle you sign from then on is yours. The private half never leaves the
-machine — signing writes a signature over `manifest.json`, nothing more.
+line plus its `SHA256:` fingerprint. It is safe to call unconditionally, so a script can run
+`aas key && aas publish <run-dir> <public-dir> --sign` with no check of its own. The private half never leaves
+the machine: signing writes a signature over `manifest.json`, and because the manifest holds a hash of every
+other file, that one signature covers the whole bundle.
 
-**If you already have an SSH key**, `--sign` without a path uses `~/.config/aas/signing.pem` first and
-`~/.ssh/id_ed25519` after it, so a developer signing on their own machine needs no second key. Where a code
-host publishes an account's keys — GitHub serves them at `https://github.com/<user>.keys` — an archive can
-match that key to your account there without you registering anything. That is a convenience for people who
-have such an account, not a requirement: nothing in this tooling needs a code-hosting account, and you can
-download it without one.
+For the marker to say anything about *you* rather than about a key, an archive has to know the key is yours.
+That is one paste of the public line into your profile there, whenever you feel like it — a bundle signed with
+a key an archive has never seen is still published, simply as a signature whose publisher is not established,
+and it gains the match when you register the line later. Some code hosts publish an account's keys (GitHub at
+`https://github.com/<user>.keys`), which lets an archive match without the paste; most sign-in providers do
+not, so treat that as a shortcut for people who have such an account, not as the route.
 
-If you do rely on that shortcut, add the key on GitHub as an **Authentication key**: that is the list served
-at `/<user>.keys`. A key added as a *Signing key* is served only by the API
-(`https://api.github.com/users/<user>/ssh_signing_keys`). An account usually publishes several keys, one per
-machine, which is fine — a verifier asks whether the signing key is in the list, not whether the list has one
-entry. A repository deploy key is published nowhere and can never be matched.
-
-An OpenSSH private key without a passphrase and a PKCS#8 key both work (`aas key` writes PKCS#8); `--sign
-<path>` takes either, and `AAS_SIGN_KEY` sets the default path for a machine. The signature lands in
-`signature.json` with the public key and its fingerprint; `aas check` verifies it, and so does an archive in
-your browser.
-
-**Keep the same key.** Changing it makes you a new publisher as far as any verifier can tell; that is why
-`aas key` refuses to overwrite. An entry says who published it, so `aas check` reports an unsigned bundle as a
-requirement not met and `--strict` fails on it. Unsigned is still a readable bundle — a fixture, a local copy,
-a run someone archives on another's behalf — it is just not an entry. What a verifier can say is that a
-signature is valid **for the key in the file**; whose key that is, is what an archive's accounts record.
+`--sign <path>` takes any ed25519 key — an OpenSSH key without a passphrase (the signer cannot unlock one) or
+PKCS#8 — and `AAS_SIGN_KEY` sets a default path for a machine. Without a path, `--sign` uses the `aas key` key,
+then an SSH key if one happens to be there. **Keep the same key:** a new one makes you a new publisher as far
+as any verifier can tell, which is why `aas key` refuses to overwrite. And if you sign, sign correctly: a
+signature that does not verify fails `aas check`, because a broken one is worse than none.
 
 ## 11. Setting up for someone else
 
