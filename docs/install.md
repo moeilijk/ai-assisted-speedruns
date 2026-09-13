@@ -244,7 +244,11 @@ aas publish <run-dir> <public-dir> --sign ~/.ssh/aas_signing
 ```
 
 Use your existing `~/.ssh/id_ed25519` if it is ed25519 and has no passphrase; otherwise make the separate key
-above, because `--sign` cannot decrypt a protected key. An OpenSSH private key and a PKCS#8 key both work.
+above, because `--sign` cannot decrypt a protected key. An account usually publishes several keys, one per
+machine, and that is fine: a verifier asks whether the signing key is *in* that list, not whether the list has
+one entry. A key that is not in it — a repository deploy key, or a fresh key you have not added — cannot be
+matched to the account, however valid its signature is. GitHub serves the keys added under SSH and GPG keys as
+authentication keys; check with the `curl` line above that yours is among them before you rely on it. An OpenSSH private key and a PKCS#8 key both work.
 The signature lands in `signature.json` with the public key and its `SHA256:` fingerprint; `aas check`
 verifies it, and so does the archive in your browser. Keep using the same key: changing it makes you a new
 publisher as far as any verifier can tell, and losing it costs you nothing published so far, only the ability
