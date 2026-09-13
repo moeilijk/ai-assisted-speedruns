@@ -120,11 +120,11 @@ reader), `host`, `kind` (`upload`, `vod`, `archive`, `unknown`), `binding_field`
 in which a viewer can read the fingerprint), `duration_seconds`, `fingerprint` and `confirmed_at` (when the
 publisher last confirmed the link resolves). `recording` keeps the first of them plus the timings of the run.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4, what `aas publish` writes, adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins.
 
 ```json
 {
-  "schema_version": 3,
+  "schema_version": 4,
   "time_zone": "Europe/Amsterdam",
   "run_dates": "2026-09-20 to 2026-09-20",
   "started_at": "...", "completed_at": "...", "ended_at": "...",

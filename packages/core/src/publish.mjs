@@ -1,7 +1,8 @@
-// `aas publish <run-dir> <out-dir>`: build the public run directory of the
-// spec (§4) from a private run directory: sanitized timeline + summary
-// (schema 3), tools.json, AGENTS.md, documentation.md, runtime-config/,
-// game-config/, recording/, chapters.txt, timeline.json, manifest.json.
+// `aas publish <run-dir> <out-dir>`: build the public bundle of the spec (§4)
+// from a private run directory: sanitized timeline + summary (schema 4),
+// tools.json, AGENTS.md, documentation.md, runtime-config/, game-config/,
+// chapters.txt, timeline.json, splits.lss, manifest.json — and no recording:
+// the video is published where video is published and linked from the summary.
 // Then scans the result for private data and runs the conformance check.
 import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -133,7 +134,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log(`no timeline: ${error.message}`);
   }
 
-  // 4. summary schema 3
+  // 4. summary schema 4
   const summaryFile = path.join(outDir, "summary.json");
   const summary = JSON.parse(fs.readFileSync(summaryFile, "utf8"));
   // Three versions, because three things change at their own pace and a reader has to tell them apart:
@@ -344,7 +345,8 @@ export function mergeHarnessEvents(runDir, publicLog) {
 }
 
 /**
- * Packs a published bundle into one zip for upload, without `recording/`: the video is linked in the
+ * Packs a published bundle into one zip for upload. A bundle carries no recording, so the zip is the whole of
+ * it; the `recording/` filter below is there for a directory a publisher put in the output themselves. The video is linked in the
  * submission form, not carried in the bundle, and its sha256 stays in `manifest.json` so the linked file can
  * still be checked. Returns `{ file, bytes, files }`.
  */
