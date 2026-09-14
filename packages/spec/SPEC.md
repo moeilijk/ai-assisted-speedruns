@@ -2,7 +2,7 @@
 
 Status: draft, 2026-09-09. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
-The tool interface, the broker, the process hardening and the log format of this standard come from [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent) (MIT), which is credited as their origin. That project is not affiliated with this standard or with any archive built on it and took no part in making them. Its `evidence/` is used here only as a format fixture where this text needs a worked example.
+This standard owes its idea to the Portal run of [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent). The tool interface, the broker, the process hardening and the log format come from that project (MIT) and are credited to it; the standard and the archives built on it are maintained separately. Its `evidence/` serves as the worked example where this text needs one.
 
 ## 1. Definitions
 
