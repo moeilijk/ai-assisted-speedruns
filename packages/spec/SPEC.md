@@ -267,7 +267,7 @@ A run is verifiable when all of the following hold:
 
 1. The recording of this run, where the archive holds its link, is continuous from `run.started` to `run.ended`. Pauses are `run.wait` events in the timeline and visible in the recording.
 2. Every `tool_call` can be located in that recording at its `elapsed_seconds`; `chapters.txt` names the sections at the same offsets, so a reader can jump to any of them.
-3. `human: none` implies no `run.human` record. Any `run.human` record forces `restart-only` or `assisted`.
+3. `human: none` implies no `run.human` record in the published run. Any such record forces `restart-only` or `assisted`. A `run.human` record after `completed_at` that is followed by a `game.goal` belongs to a goal extension that is not published yet (§6) and does not count.
 4. `tools.json`, `AGENTS.md`, `documentation.md` and `runtime-config/` are published; the agent had no tool outside `tools.json`.
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.

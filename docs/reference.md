@@ -172,7 +172,7 @@ Every writer (broker, harness, plugins) appends to `run.jsonl`; `kind: "event"` 
 | `game.attempt` (`phase: start`) | game plugin | the next attempt after a death (same seed); the timer resets |
 | `game.saved` | harness | a save state was copied into `saves/` |
 | `game.phase`, `game.highlight`, `game.turn` | game plugin (optional) | scene changes, replay-buffer highlights, turn markers |
-| `run.human` | harness (resume) | a human intervened; the category becomes `restart-only` |
+| `run.human` | harness (resume) | a human intervened; the category becomes `restart-only`, except for the resume that started a goal extension not published yet (after `completed_at`, followed by `game.goal`) |
 | `run.error` | harness | the run failed to start or the runtime failed |
 | `recording.started`, `recording.stopped`, `recording.chapter` | recorder, harness | the recording's t0, files and chapters |
 
