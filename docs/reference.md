@@ -97,8 +97,9 @@ submitted, not to the bundle. Binding the two is the publisher's job:
    `AAS <run-id> · fingerprint <16 hex> · <n> s`.
 2. Upload the recording (`<run>/recording/…`, or the cut `aas render` made) and put that line in the field a
    viewer can read on that platform: the description, or the title where a platform has none.
-3. Submit the bundle to the archive and give it the link or links there (mirrors, or a VOD plus a later
-   upload). Which platforms an archive accepts, and how it keeps the links, is the archive's.
+3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/) and give the link or links there (mirrors, or
+   a VOD plus a later upload). Which platforms the archive accepts, and how it keeps the links, is the archive's.
+   Its [verify page](https://ai-assisted-speedruns.org/verify/) checks the same zip in the browser.
 
 What that buys a reader: the video cannot be swapped for another one. A platform re-encodes what you upload,
 so a hash of the file proves nothing about the video anyone can watch; the fingerprint in the description,

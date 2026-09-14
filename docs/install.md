@@ -10,7 +10,7 @@ Three levels, and you only install what your level needs:
 |---|---|---|
 | **A. Read and develop** | run the test suite, write or change a plugin | Node only (§1, §2) |
 | **B. Do a run** | drive a real game with a real agent, recorded | A + an agent CLI, OBS, the game (§3 – §8) |
-| **C. Publish a run** | put a bundle in an archive | B + ffmpeg and a video platform account (§9 – §11); signing is optional |
+| **C. Publish a run** | put a bundle in the [AAS Archive](https://ai-assisted-speedruns.org) | B + ffmpeg, a video platform account and an account at the archive (§9 – §11); signing is optional |
 
 ## 1. Prerequisites
 
@@ -208,7 +208,8 @@ where a video is published is the archive's to keep. Publish the video where vid
    sha256 of this bundle's own published timeline (`session.sanitized.jsonl`).
 2. Upload the recording and put that line in the field the platform lets a viewer read: the description, or
    the title where there is none.
-3. Submit the bundle to the archive and give the link to the recording there. The bundle carries no links.
+3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/) and give the link to the recording there.
+   The bundle carries no links.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
 duration, and a few tool calls spot-checked at their `elapsed_seconds`.
@@ -221,7 +222,8 @@ aas scan <public-dir>               # only the privacy scan
 `aas publish` runs both itself and **removes the bundle again when the scan finds anything**. What it checks
 and what the bundle contains: [reference.md](reference.md#after-the-run) and the standard,
 [packages/spec/SPEC.md](../packages/spec/SPEC.md). The upload file is `<public-dir>.zip`, written next to the
-bundle: that is what an archive's submission form takes.
+bundle: that is what the archive's [submission form](https://ai-assisted-speedruns.org/submit/) takes, and what its
+[verify page](https://ai-assisted-speedruns.org/verify/) checks in the browser.
 
 ## 10. Optional: signing your bundles
 

@@ -22,6 +22,9 @@ import { checkRun, formatReport } from "./check-run.mjs";
 import { FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 
+/** The AAS Archive, where published runs are submitted. */
+export const ARCHIVE_URL = "https://ai-assisted-speedruns.org";
+
 const copyTree = (src, dst) => {
   if (!fs.existsSync(src)) return false;
   fs.cpSync(src, dst, { recursive: true });
@@ -288,7 +291,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log("");
     log(`    ${descriptionLine(summary)}`);
     log("");
-    log("The link to the recording is given to the archive when the run is submitted, not to the bundle.");
+    log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/ and give the link to the recording there, not to the bundle.`);
     log("");
   }
   log(formatReport(outDir, check));

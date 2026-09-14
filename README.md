@@ -2,6 +2,8 @@
 
 A plugin framework and an open standard for **AI Assisted Speedruns**: an LLM agent plays a game through a small, hardened tool interface, every decision is logged on one timeline, the run is recorded, and the result is published in a form anyone can verify and compare.
 
+The runs are published in the **AAS Archive** at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org): the tooling makes the bundle, the archive keeps it, shows it and lets anyone verify it.
+
 Three kinds of plugins, one core:
 
 | Plugin | Role | First implementations |
@@ -24,8 +26,8 @@ The agent only ever sees three tools per game: `<game>_documentation`, `<game>_s
 - **Stays inside a budget.** Every runtime reports its own plan's stand; a run refuses to start above the limit and a running session is interrupted with a save when it crosses it.
 - **Closes what it opened.** At the end of a run the game, the timer, the recorder and a Steam the launcher started are closed the way a user would, and what stays open is reported.
 - **Cuts the video.** `aas render` removes the thinking pauses with ffmpeg, concatenates the segments of a resumed run, and can burn in the timers and the keys being played.
-- **Publishes a checkable bundle.** `aas publish` turns the private run directory into the public bundle: the sanitised timeline with the harness's events merged in, a machine-readable summary (identifiers, versions, category, the game's build and mods, the recording's platform and fingerprint), the agent's instructions and tool definitions, the hardened configuration with machine paths replaced, chapters, splits, and a manifest with a hash per file — plus one zip to upload. It refuses to publish anything the privacy scan flags, and can sign the bundle with the publisher's own ed25519 key (`aas key` makes one) for anyone who wants their publications tied to one key — a marker, not a requirement: who published a run is what an archive's account says.
-- **Checks it, and lets anyone else check it.** `aas check` verifies the bundle marker, the files, the timeline format, the summary schema, every hash, the signature, whether the run reached its declared goal, whether a recording was made and carries the fingerprint that binds it to this bundle, and which black intervals it declares.
+- **Publishes a checkable bundle.** `aas publish` turns the private run directory into the public bundle: the sanitised timeline with the harness's events merged in, a machine-readable summary (identifiers, versions, category, the game's build and mods, the recording's length and fingerprint), the agent's instructions and tool definitions, the hardened configuration with machine paths replaced, chapters, splits, and a manifest with a hash per file — plus one zip to upload. It refuses to publish anything the privacy scan flags, and can sign the bundle with the publisher's own ed25519 key (`aas key` makes one) for anyone who wants their publications tied to one key — a marker, not a requirement: who published a run is what an archive's account says.
+- **Checks it, and lets anyone else check it.** `aas check` verifies the bundle marker, the files, the timeline format, the summary schema, every hash, the signature, whether the run reached its declared goal, whether a recording was made and carries the fingerprint that binds it to this bundle, and which black intervals it declares. The archive checks the upload zip in the browser too (the hashes, the timeline's totals, the human axis and the signature), at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/), without uploading anything.
 
 ## Disclaimer: anti-cheat, bans, your own risk
 
@@ -103,4 +105,13 @@ MIT, see [LICENSE](LICENSE). Code by others keeps its own license and attributio
 
 Games, mods and tools that the setup downloads or builds (Communication Mod, BaseMod, ModTheSpire, SourcePauseTool, sts_lightspeed itself) are not in this repository; each is pinned in the game's `UPSTREAM.json` and comes under its own license.
 
-The archive of published runs is at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org); a run is uploaded there as the zip `aas publish` writes next to the bundle (see [docs/reference.md](docs/reference.md)).
+## The archive
+
+The archive of published runs is the AAS Archive at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org):
+
+- [Runs](https://ai-assisted-speedruns.org/runs/): every published run: its times, its sections, whether it conforms, and where its recording is published.
+- [Submit](https://ai-assisted-speedruns.org/submit/): signed in to an account, you upload the zip `aas publish` writes next to the bundle and give the link to the recording there.
+- [Verify](https://ai-assisted-speedruns.org/verify/): checks a run's zip in the browser, without uploading it.
+- [Specification](https://ai-assisted-speedruns.org/spec/) and [API](https://ai-assisted-speedruns.org/api/): the standard the bundles follow, and read-only access to the published runs.
+
+How a run gets there: [docs/reference.md](docs/reference.md#publishing-a-run-step-by-step).
