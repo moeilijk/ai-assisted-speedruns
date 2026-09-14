@@ -88,7 +88,7 @@ docs/                   install, reference, plugins, design
 
 ## Rules that apply to every game in this repository
 
-- Games are bought and installed legally. The game installation is never modified; anything that needs editing is copied to a work directory first.
+- The game installation is never modified; anything that needs editing is copied to a work directory first.
 - The agent gets no web access, no shell, and can write only inside the run directory.
 - A run without a recording is not a valid run.
 

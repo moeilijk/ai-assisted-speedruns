@@ -23,7 +23,7 @@ Three levels, and you only install what your level needs:
 | ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length and its black intervals | [ffmpeg.org/download](https://ffmpeg.org/download.html) | `ffmpeg -version` |
 | OBS Studio | 30+ (tested on 32.2.2), obs-websocket v5 enabled | the recording; **a run without a recording is not a valid run** | [obsproject.com/download](https://obsproject.com/download) | OBS → Tools → WebSocket Server Settings |
 | LiveSplit | 1.8.37 with the Server component | optional: the timer on screen and the splits | [livesplit.org/downloads](https://livesplit.org/downloads/) | its `settings.cfg` has `ServerStartup=1` |
-| The game | bought and installed legally, no anti-cheat, no online component | a run | the store you bought it from | see the game's README |
+| The game | no anti-cheat, no online component | a run | the store you bought it from | see the game's README |
 | Disk | the run directory on the drive OBS records to | OBS then records straight into `<run>/recording/` | — | — |
 
 No `npm install` is needed: the core has no dependencies. The workspaces exist for versioning, not for packages.
