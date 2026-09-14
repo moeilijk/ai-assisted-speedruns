@@ -5,6 +5,8 @@ import { pathToFileURL } from "node:url";
 import { CORE_DIR, loadGamePlugin } from "./mcp-client.mjs";
 
 export const PACKAGES = path.resolve(CORE_DIR, "..");
+/** The AAS Archive, where published runs are submitted. */
+export const ARCHIVE_URL = "https://ai-assisted-speedruns.org";
 export const FRAMEWORK_VERSION = JSON.parse(fs.readFileSync(path.join(CORE_DIR, "package.json"), "utf8")).version;
 
 async function load(kind, idOrPath) {

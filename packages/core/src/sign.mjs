@@ -140,7 +140,7 @@ export const CLAIM_KIND = "aas-key-claim v1";
 const claimBody = ({ publicLine, fingerprint, identities, issued }) =>
   [CLAIM_KIND, `key: ${publicLine}`, `fingerprint: ${fingerprint}`, ...identities.map((i) => `identity: ${i}`), `issued: ${issued}`].join("\n");
 
-/** The publisher's signed statement about their own key. `identities` are URIs (https:, mailto:, or an archive's profile). */
+/** The publisher's signed statement about their own key. `identities` are URIs (https:, mailto:). */
 export function makeClaim(keyFile, { identities = [], issued = new Date().toISOString() } = {}) {
   const { privateKey, publicLine, fingerprint } = readKey(keyFile);
   for (const id of identities) if (!/^[a-z][a-z0-9+.-]*:/i.test(id)) throw new Error(`identity must be a URI (https://…, mailto:…): ${id}`);

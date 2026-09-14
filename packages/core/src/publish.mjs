@@ -19,11 +19,8 @@ import { zipBuffer } from "./zip.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
-import { FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
+import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
-
-/** The AAS Archive, where published runs are submitted. */
-export const ARCHIVE_URL = "https://ai-assisted-speedruns.org";
 
 const copyTree = (src, dst) => {
   if (!fs.existsSync(src)) return false;
@@ -128,7 +125,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     else { fs.mkdirSync(path.dirname(dst), { recursive: true }); fs.copyFileSync(src, dst); }
   }
   // The recording itself is not copied into the bundle: a run is hours of 1080p60 and nobody ships gigabytes.
-  // Nor is where it is published: video links come from the archive the run is submitted to, not from the bundle.
+  // Nor is where it is published: a bundle carries no video links.
   // The bundle carries the chapters and the timings that place the timeline in the recording.
 
   // 3. timeline: timers, sections, chapters, cut list
@@ -291,7 +288,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log("");
     log(`    ${descriptionLine(summary)}`);
     log("");
-    log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/ and give the link to the recording there, not to the bundle.`);
+    log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/.`);
     log("");
   }
   log(formatReport(outDir, check));

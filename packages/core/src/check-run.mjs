@@ -28,7 +28,7 @@ const SUMMARY_V2_KEYS = [
 
 /**
  * `core` is accepted and ignored: it used to mean "a bundle without its recording files", which is now every
- * bundle, because a recording is published where video is published and the bundle carries the link.
+ * bundle, because a recording is published where video is published and the bundle carries no link to it.
  */
 export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   const results = []; // { requirement, status: "met" | "unmet" | "invalid", detail }
@@ -231,9 +231,9 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   } catch { /* reported above */ }
   let rec = null;
   try { rec = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording ?? null; } catch { /* reported above */ }
-  // Where the recording is published is not the bundle's to say: video links come from the archive the run is
-  // submitted to, so a bundle is never judged on a missing link.
-  // What binds that link to this bundle: the description of the video must carry this fingerprint and the
+  // Where the recording is published is not the bundle's to say: a bundle carries no video links, so it is never
+  // judged on a missing link.
+  // What binds a recording to this bundle: the description of the video must carry this fingerprint and the
   // duration must match. A platform re-encodes the file, so its hash cannot do this.
   const runId = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_id ?? null; } catch { return null; } })();
   add("recording bound to this bundle", rec?.fingerprint ? "met" : "unmet",

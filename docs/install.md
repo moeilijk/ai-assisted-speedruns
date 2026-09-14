@@ -201,15 +201,14 @@ aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thin
 aas publish <run-dir> <public-dir>          # the bundle + the upload zip; prints the description line
 ```
 
-The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares, and
-where a video is published is the archive's to keep. Publish the video where video is published, and bind the two:
+The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares.
+Publish the video where video is published, and bind the two:
 
 1. `aas publish` prints one line, `AAS <run-id> · fingerprint <16 hex> · <n> s`. The fingerprint is the
    sha256 of this bundle's own published timeline (`session.sanitized.jsonl`).
 2. Upload the recording and put that line in the field the platform lets a viewer read: the description, or
    the title where there is none.
-3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/) and give the link to the recording there.
-   The bundle carries no links.
+3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). The bundle carries no links.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
 duration, and a few tool calls spot-checked at their `elapsed_seconds`.
@@ -247,15 +246,16 @@ the machine: signing writes a signature over `manifest.json`, and because the ma
 other file, that one signature covers the whole bundle.
 
 For the marker to say anything about *you* rather than about a key, whoever reads it has to know the key is
-yours. **The archive you publish to is where that lives**: paste the public line into your profile there, and
-it keeps the key list for your account — several keys over the years, a new machine, a replacement, each with
-the date it was added. A bundle signed with a key nobody has seen is still published; it is simply a signature
-whose publisher is not established, and it gains the match whenever you record the line.
+yours. **The archive you publish to is where that lives**: paste the public line on your account page there
+([ai-assisted-speedruns.org/account](https://ai-assisted-speedruns.org/account/), Record key). The archive records the key by its fingerprint
+and lists every key you recorded — several over the years, a new machine, a replacement — and a key you retire
+stays on record, so the signatures made with it still resolve. A bundle signed with a key no account has recorded
+is still published; its run page says so, and it gains the match whenever you record the line.
 
 Nothing stops you from recording it elsewhere as well, and `aas key --claim` writes what you would publish:
 
 ```bash
-aas key --claim --identity https://ai-assisted-speedruns.org/u/<you> --identity mailto:<you>@example.org
+aas key --claim --identity https://github.com/<you> --identity mailto:<you>@example.org
 ```
 
 That prints a few lines of plain text — the key, its fingerprint, the identities you claim, the date — signed

@@ -8,7 +8,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { loadRuntime } from "./plugins.mjs";
+import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
 export { brokerSpec, configure };
 
@@ -136,13 +136,13 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         console.log(k.publicLine);
         console.log(k.fingerprint);
         if (!opts.claim) {
-          console.log("That public line is what identifies you as a publisher: give it to the archive you publish to.");
+          console.log(`That public line is what identifies you as a publisher: record it on your account page at the archive (${ARCHIVE_URL}/account/, Record key).`);
           console.log("To publish it anywhere instead: aas key --claim --identity <uri> [--identity <uri>]");
           break;
         }
         // A claim: the publisher's own signed statement about their key, plain text, tied to no archive.
         const identities = [].concat(opts.identity ?? []).filter((x) => typeof x === "string").flatMap((x) => x.split(",")).map((x) => x.trim()).filter(Boolean);
-        if (!identities.length) throw new Error("--claim needs at least one --identity <uri> (https://…, mailto:…, or your profile at an archive)");
+        if (!identities.length) throw new Error("--claim needs at least one --identity <uri> (https://…, mailto:…)");
         const claim = makeClaim(resolveSignKey(file), { identities });
         if (opts.out) { fs.writeFileSync(String(opts.out), claim.text); console.log(`claim written to ${opts.out}`); }
         else { console.log(""); console.log(claim.text.trimEnd()); }
@@ -152,7 +152,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         const { publish } = await import("./publish.mjs");
         const [src, out] = opts._;
         if (!src || !out) throw new Error("Usage: aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]");
-        if (opts["video-url"] !== undefined) throw new Error("--video-url is gone: a bundle carries no video links; the link to the recording is given to the archive when the run is submitted");
+        if (opts["video-url"] !== undefined) throw new Error("--video-url is gone: a bundle carries no video links");
         const r = await publish(src, out, { session: opts.session, completionMarker: opts["completion-marker"], signKey: opts.sign });
         process.exitCode = r.scan.findings.length || r.check.results.some((x) => x.status === "invalid") ? 1 : 0;
         break;
