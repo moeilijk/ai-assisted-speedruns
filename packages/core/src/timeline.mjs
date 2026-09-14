@@ -85,13 +85,15 @@ export function computeTimeline(runDir, options = {}) {
   // The run up to its completion (options.completedAt: the published goal's victory, or the completion marker):
   // what came after it (credits, or a goal extension that is not published yet) is post-completion time. The
   // totals above stay the whole recording; these are the run's times to its goal.
+  // The playback that won is still running when the victory is logged, so a playback counts when it started before completion.
   const done = options.completedAt ? rel(options.completedAt) : null;
-  const upTo = done === null ? null : playbacks.filter((p) => p.end <= done + 0.001);
+  const upTo = done === null ? null : playbacks.filter((p) => p.start <= done + 0.001);
+  const wallTo = done === null ? 0 : upTo.reduce((n, p) => n + (Math.min(p.end, done) - p.start), 0);
   const totalsToCompletion = done === null ? null : {
     rta: done,
     igt: upTo.reduce((n, p) => n + p.igt, 0),
-    playback_wall: upTo.reduce((n, p) => n + (p.end - p.start), 0),
-    thinking: done - upTo.reduce((n, p) => n + (p.end - p.start), 0),
+    playback_wall: wallTo,
+    thinking: done - wallTo,
     tool_calls: log.filter((r) => r.kind === "tool_call" && rel(r.timestamp) <= done + 0.001).length,
     playbacks: upTo.length,
   };
@@ -120,6 +122,11 @@ export function computeTimeline(runDir, options = {}) {
     if (e.event === "game.attempt" && e.data?.phase === "start") bounds.push({ at: rel(e.timestamp), label: `Attempt ${e.data.attempt ?? "?"}` });
     if (e.event === "run.human") bounds.push({ at: rel(e.timestamp), label: `Human: ${e.data?.note ?? "intervention"}` });
   }
+  // Where the run's sections end: at completion, or at the milestone that reached the goal when nothing of the run (a
+  // tool call, a playback starting) lies between that milestone and the victory it caused.
+  const lastBound = done === null ? null : bounds.filter((b) => b.at <= done + 0.001).at(-1);
+  const busy = (from) => log.some((r) => (r.kind === "tool_call" || (r.kind === "event" && r.event === "game.playback" && r.data?.phase === "start")) && rel(r.timestamp) > from + 0.0005 && rel(r.timestamp) <= done + 0.001);
+  const completionBound = done === null ? null : lastBound && lastBound.at > 0 && !busy(lastBound.at) ? lastBound.at : done;
   // --attempt last|N: the cut keeps only that run, from the death that ended the run before to its end.
   const selected = options.attempt === undefined || options.attempt === null ? null : options.attempt === "last" ? attempts.at(-1) : attempts.find((a) => a.attempt === Number(options.attempt));
   if (options.attempt !== undefined && options.attempt !== null && !selected) throw new Error(`No attempt ${options.attempt}; the session has ${attempts.length}.`);
@@ -135,7 +142,7 @@ export function computeTimeline(runDir, options = {}) {
       playback_wall: inside.reduce((n, p) => n + (p.end - p.start), 0),
       playbacks: inside.length,
       split_igt: playbacks.filter((p) => p.end <= end).reduce((n, p) => n + p.igt, 0),
-      post_completion: done !== null && b.at >= done - 0.001,
+      post_completion: done !== null && b.at >= completionBound - 0.001,
     };
   });
 
