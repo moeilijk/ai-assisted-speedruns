@@ -85,7 +85,7 @@ packages/
 games/
   slay-the-spire/       turn-based, through Communication Mod (bridge, install, launch, splits per act)
   portal/               adapter around cozyblaze's controller from portal-agent
-  balatro/ half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/
+  balatro/ half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
                         stubs: planned plugins with their route, license and risks in each README; not implemented
 docs/                   install, reference, plugins, design
 ```
