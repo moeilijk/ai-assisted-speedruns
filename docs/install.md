@@ -248,8 +248,9 @@ other file, that one signature covers the whole bundle.
 For the marker to say anything about *you* rather than about a key, whoever reads it has to know the key is
 yours. **The archive you publish to is where that lives**: paste the public line on your account page there
 ([ai-assisted-speedruns.org/account](https://ai-assisted-speedruns.org/account/), Record key). The archive records the key by its fingerprint
-and lists every key you recorded — several over the years, a new machine, a replacement — and a key you retire
-stays on record, so the signatures made with it still resolve. A bundle signed with a key no account has recorded
+and lists every key you recorded — several over the years, a new machine, a replacement — with the date it was
+added and, once retired, the date it was retired. A key you retire stays on record, so the signatures made with
+it still resolve. A bundle signed with a key no account has recorded
 is still published; its run page says so, and it gains the match whenever you record the line.
 
 Nothing stops you from recording it elsewhere as well, and `aas key --claim` writes what you would publish:
