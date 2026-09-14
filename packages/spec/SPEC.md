@@ -1,6 +1,6 @@
 # AI Assisted Speedruns (AAS) — Specification, draft 0.1
 
-Status: draft, 2026-09-09. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft, begun 2026-09-09, last revised 2026-09-15. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -112,6 +112,10 @@ counts publications of the same run and `bundle.published_at` orders them, so a 
 (`run_id`, `revision`) can tell an update of a run it already holds from a new one. A series may start above 1
 and may have gaps: the counter belongs to the run, and earlier publications may have carried another `run_id`.
 
+`bundle` repeats what `manifest.json` says about the packaging (§7): `kind` is the marker `aas-public`,
+`bundle_version`, `run_id`, `run_uid`, `revision` and `published_at`. `run_id` and `run_uid` also stand at the top
+level, next to `spec_version`.
+
 `run_uid` is that run's identifier, written once when the run is configured and never changed. A name can change
 where the identifier cannot, so a reader can see that two bundles under different names are the same run.
 Seeing is not deciding: whether a newer publication supersedes an entry already held is a judgement, and the
@@ -128,12 +132,16 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 ```json
 {
   "schema_version": 6,
+  "spec_version": "0.1",
+  "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
+  "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
+             "revision": 10, "published_at": "..."},
   "time_zone": "Europe/Amsterdam",
   "run_dates": "2026-09-20 to 2026-09-20",
   "started_at": "...", "completed_at": "...", "ended_at": "...",
   "models": [{"model": "claude-fable-5-1", "reasoning_effort": "high"}],
   "requested": {"model": "claude-fable-5-1", "reasoning_effort": null, "note": null},
-  "synthetic_records": 0,
+  "synthetic_records": 0, "harness_events": 0,
   "source_records": 0, "exported_records": 0, "omitted_records": 0, "removed_images": 0,
   "redactions": {},
   "elapsed_to_completion_seconds": 0,
@@ -159,7 +167,9 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   "recording": {
     "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
-    "black_intervals": [], "chapters": "chapters.txt",
+    "files": ["recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4"],
+    "black_intervals": [{"file": "recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4", "start": 0, "end": 5.1, "seconds": 5.1, "game": true}],
+    "chapters": "chapters.txt",
     "igt_seconds": null, "wall_clock_seconds": 0, "thinking_seconds": 0
   },
   "totals_to_completion": {"rta_seconds": 0, "igt_seconds": 0, "thinking_seconds": 0, "playbacks": 0, "tool_calls": 0},
@@ -176,7 +186,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 }
 ```
 
-`models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. `synthetic_records` counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one.
+`models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. `synthetic_records`, where the runtime's session log has them (Claude Code does, Codex does not), counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one. `harness_events` counts the events of the harness, the game plugin and the recorder that were merged into the timeline next to the session log; they are counted in `source_records` and `exported_records` as well.
 
 `ends` lists the game's ends as its plugin declares them, in order, each `{id, label, final}`; exactly one is final, the game's own end. `category.goal` is the published goal, and `category.goal_end` is that end with its label. `goals` lists the goals up to the published one, in order: the goal at the start and each extension by a resume that was reached, each with `declared_at` and `reached_at` (the victory while that goal held). Only the last may be unreached, when the run reached no goal at all. An extension is published once it is reached; until then the bundle keeps the goal that was reached, `completed_at` is its victory, the resume that extended it does not count on the human axis, and the extension's play is post-completion time. A run that won act 1 and was then extended to act 3 without reaching it is published as an act 1 run.
 
@@ -184,7 +194,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 
-`recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
+`recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. `recording.black_intervals` lists every black interval of a second or more as `{file, start, end, seconds}` in seconds within that file, with `game: true` when it falls in a phase the game plugin reported as `loading` or `cinematic`. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
 Binding a recording to a bundle is two claims, and they are established differently. **This recording is mine**: only the owner of a recording can write its description, so a line in it that a stranger could not have put there says the channel is the publisher's. An archive that is connected to the publisher's channel through that platform can ask the platform instead, which settles ownership without the publisher editing anything. **This recording is of this bundle**: that is what the fingerprint says, and no platform connection can answer it, because the platform knows nothing about the run. A reader who does not trust the archive can only check the second claim where the fingerprint is readable, so the line stays the route for anyone whose channel an archive cannot ask, and the better practice for everyone else: an archive may accept a connected channel without it, and then carries the binding on its own word.
 
@@ -272,7 +282,7 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The publisher measures the black intervals of the recording it made and uploaded and declares them in `summary.recording.black_intervals`, each marked when it falls in a phase the game plugin reports as `loading` or `cinematic`. Black frames are part of the recording: they are declared so a reader knows where to look, and they do not fail a run.
+8. The publisher measures the black intervals of the recording it made and uploaded and declares them in `summary.recording.black_intervals`, each marked `game: true` when it falls in a phase the game plugin reports as `loading` or `cinematic` (§6). Black frames are part of the recording: they are declared so a reader knows where to look, and they do not fail a run.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
 

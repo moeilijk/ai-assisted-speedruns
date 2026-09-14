@@ -110,7 +110,7 @@ Games, mods and tools that the setup downloads or builds (Communication Mod, Bas
 The archive of published runs is the AAS Archive at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org):
 
 - [Runs](https://ai-assisted-speedruns.org/runs/): every published run: its times, its sections, whether it conforms, and where its recording is published.
-- [Submit](https://ai-assisted-speedruns.org/submit/): signed in to an account, you upload the zip `aas publish` writes next to the bundle.
+- [Submit](https://ai-assisted-speedruns.org/submit/): signed in to an account, you upload the zip `aas publish` writes next to the bundle; an archivist reviews the submission before the run is published.
 - [Verify](https://ai-assisted-speedruns.org/verify/): checks a run's zip in the browser, without uploading it.
 - [Specification](https://ai-assisted-speedruns.org/spec/) and [API](https://ai-assisted-speedruns.org/api/): the standard the bundles follow, and read-only access to the published runs.
 
