@@ -88,7 +88,7 @@ docs/                   install, reference, plugins, design
 
 ## Rules that apply to every game in this repository
 
-- The game installation is never modified; anything that needs editing is copied to a work directory first.
+- A game gets only what its plugin needs for the run: the original tooling the plugin is built on, installed as its authors publish it, and the settings the recording needs. No cheats, mods or settings beyond that original tooling. Each game's README lists what is added to the game and what is changed.
 - The agent gets no web access, no shell, and can write only inside the run directory.
 - A run without a recording is not a valid run.
 
