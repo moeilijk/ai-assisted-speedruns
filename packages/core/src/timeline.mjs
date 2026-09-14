@@ -86,9 +86,10 @@ export function computeTimeline(runDir, options = {}) {
   // Runs (attempts) inside the session: a death ends a run, `game.attempt start` begins the next one from the
   // beginning; the death that ended the previous run is the cut point for the next one.
   const attemptStarts = events.filter((e) => e.event === "game.attempt" && e.data?.phase === "start").map((e) => ({ at: rel(e.timestamp), n: Number(e.data.attempt) || 0 }));
-  // A victory that was followed by a goal extension (game.goal at a resume) did not end the attempt: the run went on.
+  // A victory followed by a goal extension (game.goal at a resume) that was reached later did not end the attempt:
+  // the run went on to that victory. An extension that was not reached leaves the earlier victory as the end.
   const goalChanges = events.filter((e) => e.event === "game.goal").map((e) => rel(e.timestamp));
-  const overs = events.filter((e) => e.event === "game.over").map((e) => ({ at: rel(e.timestamp), victory: e.data?.victory === true, label: e.data?.label ?? null, floor: e.data?.floor ?? null })).filter((o) => !(o.victory && goalChanges.some((g) => g > o.at)));
+  const overs = events.filter((e) => e.event === "game.over").map((e) => ({ at: rel(e.timestamp), victory: e.data?.victory === true, label: e.data?.label ?? null, floor: e.data?.floor ?? null })).filter((o, _, all) => !(o.victory && goalChanges.some((g) => g > o.at && all.some((x) => x.victory && x.at > g))));
   // The seed of every run, when the game has one: attempt 1 from game.ready (prepareRun), the next ones from game.attempt.
   const ready = events.find((e) => e.event === "game.ready");
   const seedOf = (d) => (d?.seed === undefined || d?.seed === null ? null : String(d.seed));

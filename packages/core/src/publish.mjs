@@ -95,9 +95,14 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   }
   if (!session || !fs.existsSync(session)) throw new Error(`No session log found for runtime ${runtime}; pass --session <file>.`);
   // Every goal the run had, from its own events: a resume may extend the goal, and a victory reaches only the goal
-  // that held at that moment. The run is complete when its last goal was reached (the completion marker is the fallback).
-  const goals = goalHistory(readRunEvents(runDir), brief.category.goal);
-  const won = goals.at(-1)?.reached_at ? { timestamp: goals.at(-1).reached_at } : null;
+  // that held at that moment. An extension is published only once it is reached: until then the bundle keeps the
+  // last goal that was reached, completed at its victory, and what came after is post-completion time on the
+  // timeline. A run that reached no goal publishes the goal it had (the completion marker is the fallback).
+  const history = goalHistory(readRunEvents(runDir), brief.category.goal);
+  const lastReached = history.findLastIndex((g) => g.reached_at);
+  const goals = lastReached >= 0 ? history.slice(0, lastReached + 1) : history;
+  const won = lastReached >= 0 ? { timestamp: history[lastReached].reached_at } : null;
+  const publishedGoal = goals.at(-1)?.id ?? brief.category.goal;
   // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
   // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
   if (rt?.exportSession) await rt.exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
@@ -131,7 +136,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     fs.copyFileSync(path.join(runDir, "timeline", "timeline.json"), path.join(outDir, "timeline.json"));
     if (timeline.sections.length > 1) fs.copyFileSync(path.join(runDir, "timeline", "chapters.txt"), path.join(outDir, "chapters.txt"));
     const { writeLss } = await import("../../timer-livesplit/index.mjs");
-    fs.copyFileSync(writeLss(runDir, timeline, { game: plugin?.name ?? brief.category.game, category: `AI Assisted Speedrun (${brief.category.goal})` }), path.join(outDir, "splits.lss"));
+    fs.copyFileSync(writeLss(runDir, timeline, { game: plugin?.name ?? brief.category.game, category: `AI Assisted Speedrun (${publishedGoal})` }), path.join(outDir, "splits.lss"));
   } catch (error) {
     log(`no timeline: ${error.message}`);
   }
@@ -164,14 +169,14 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   summary.bundle = { kind: BUNDLE_KIND, bundle_version: BUNDLE_VERSION, run_id: summary.run_id, run_uid: brief.run_uid ?? null, revision, published_at: new Date().toISOString() };
   // What it takes to play the same thing again: the game's build, the mods with their pins, the run's settings.
   try { summary.game = (await plugin?.build?.({ runDir })) ?? null; } catch (e) { summary.game = null; log(`game build info not available (${e.message})`); }
-  summary.category = { ...brief.category, human_notes: brief.category.human_notes ?? null };
+  summary.category = { ...brief.category, goal: publishedGoal, human_notes: brief.category.human_notes ?? null };
   // The goal by name, the game's ends as the plugin declares them, and every goal the run had with when it held and
   // when it was reached: the same fields for every game, because every game plugin declares its ends.
   if (!plugin) throw new Error("the run's brief names no game module, so its ends and goals cannot be published");
   const ends = endsOf(plugin);
   const endOf = (id) => ends.find((e) => e.id === id);
   summary.ends = ends.map(publicEnd);
-  summary.category.goal_end = endOf(brief.category.goal) ? publicEnd(endOf(brief.category.goal)) : null;
+  summary.category.goal_end = endOf(publishedGoal) ? publicEnd(endOf(publishedGoal)) : null;
   // A run completed by its completion marker rather than a victory event reached its last goal at completed_at.
   if (goals.length && !goals.at(-1).reached_at && summary.completed_at) goals.at(-1).reached_at = summary.completed_at;
   summary.goals = goals.map((g) => ({ ...(endOf(g.id) ? publicEnd(endOf(g.id)) : { id: g.id, label: null, final: null }), declared_at: g.declared_at, reached_at: g.reached_at }));
@@ -179,8 +184,10 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   const lastAttempt = timeline?.attempts?.at(-1) ?? null;
   summary.seed = lastAttempt?.seed_code ?? lastAttempt?.seed ?? null;
   summary.attempts = (timeline?.attempts ?? []).map((a) => ({ attempt: a.attempt, seed: a.seed_code ?? a.seed ?? null, outcome: a.outcome, rta: a.rta, igt: a.igt }));
-  // Every resume is a run.human record; the category may then not claim `none`.
-  const humanEvents = (await import("./events.mjs")).readRunLog(runDir).filter((r) => r.kind === "event" && r.event === "run.human");
+  // Every resume is a run.human record; the category may then not claim `none`. When an extension is not published
+  // yet, only the run up to the published goal's victory counts: the resume that extended it belongs to the extension.
+  const completedMs = won && history.length > goals.length ? Date.parse(won.timestamp) : null;
+  const humanEvents = (await import("./events.mjs")).readRunLog(runDir).filter((r) => r.kind === "event" && r.event === "run.human" && (completedMs === null || Date.parse(r.timestamp) <= completedMs));
   if (humanEvents.length && summary.category.human === "none") {
     summary.category.human = "restart-only";
     summary.category.human_notes = humanEvents.map((e) => e.data?.note).filter(Boolean).join("; ") || `${humanEvents.length} resume(s)`;

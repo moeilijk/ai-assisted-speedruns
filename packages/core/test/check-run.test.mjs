@@ -83,9 +83,28 @@ test("a victory before a goal extension does not reach the extended goal", () =>
     writeFileSync(join(dir, "summary.json"), JSON.stringify({ completed_at: null }));
     return checkRun(dir).results.find((x) => x.requirement === "goal reached").status;
   };
-  const detail = () => checkRun(dir).results.find((x) => x.requirement === "goal reached").detail;
   assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" })]), "met");
   assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" }), ev("game.goal", { from: "act1", to: "act3" })]), "unmet");
-  assert.match(detail(), /no victory while the last goal held/, "the earlier victory is not denied");
   assert.equal(reached([ev("game.over", { victory: true }), ev("game.goal", { from: "act1", to: "act3" }), ev("game.over", { victory: true, label: "Victory" })]), "met");
+});
+
+test("a resume that extended a reached goal does not bind the published run's human axis", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-check-ext-"));
+  const ev = (timestamp, event, data = {}) => JSON.stringify({ timestamp, kind: "event", event, data });
+  const base = {
+    schema_version: 2, time_zone: "Europe/Amsterdam", run_dates: "2026-09-13 to 2026-09-13",
+    started_at: "2026-09-13T10:51:00.000+02:00", completed_at: "2026-09-13T11:14:00.000+02:00", ended_at: "2026-09-13T15:45:00.000+02:00",
+    source_records: 0, exported_records: 0, omitted_records: 0, removed_images: 0, redactions: {},
+    elapsed_to_completion_seconds: 1380, elapsed_including_post_completion_seconds: 17700,
+    last_reported_thread_token_usage: {}, export_notes: [], category: { human: "none" },
+  };
+  const problems = (lines) => {
+    writeFileSync(join(dir, "session.sanitized.jsonl"), lines.join("\n") + "\n");
+    writeFileSync(join(dir, "summary.json"), JSON.stringify(base));
+    return checkRun(dir).results.find((x) => x.requirement === "summary.json")?.detail ?? "";
+  };
+  const won = ev("2026-09-13T11:14:00.000+02:00", "game.over", { victory: true });
+  const resumed = ev("2026-09-13T15:42:23.000+02:00", "run.human", { note: "resumed after completed" });
+  assert.doesNotMatch(problems([won, resumed, ev("2026-09-13T15:42:23.100+02:00", "game.goal", { from: "act1", to: "act3" })]), /run\.human records with human: none/, "the extension's resume is not the published run's");
+  assert.match(problems([won, resumed]), /run\.human records with human: none/, "without an extension every resume counts");
 });

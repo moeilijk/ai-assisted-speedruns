@@ -49,7 +49,8 @@ reached. Runs are comparable only within the same goal, so a chapter never compe
 a long game is published in parts instead of as one all-or-nothing attempt. Every game plugin declares its ends, each
 with an id and a label and exactly one of them final (the game's own end, the goal when none is given), so goals work
 the same for every game. A resume may extend the goal to a later end; a victory reaches only the goal that held at
-that moment, and the summary keeps every goal the run had (§6).
+that moment. The extended goal is published only once it is reached: until then a bundle keeps the last goal that was
+reached, and what came after is post-completion time on the timeline (§6).
 
 **A run that did not reach its goal is not an entry.** A session that was stopped (a budget, a limit, a
 runtime error) is a valid recording of an attempt and may be published as such, but it is not comparable and an
@@ -149,12 +150,12 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
     "game": "slay_the_spire", "build": "V2.3.4 + Communication Mod 1.2.1", "goal": "act3",
     "goal_end": {"id": "act3", "label": "Act 3 boss", "final": true},
     "observation": "state", "input": "api", "timing": "paused-think", "human": "restart-only",
-    "human_notes": "goal extended from act1 to act3"
+    "human_notes": "resumed after completed; goal extended from act1 to act3"
   },
   "ends": [{"id": "act1", "label": "Act 1 boss", "final": false}, {"id": "act2", "label": "Act 2 boss", "final": false},
            {"id": "act3", "label": "Act 3 boss", "final": true}, {"id": "heart", "label": "Heart", "final": false}],
   "goals": [{"id": "act1", "label": "Act 1 boss", "final": false, "declared_at": "...", "reached_at": "..."},
-            {"id": "act3", "label": "Act 3 boss", "final": true, "declared_at": "...", "reached_at": null}],
+            {"id": "act3", "label": "Act 3 boss", "final": true, "declared_at": "...", "reached_at": "..."}],
   "recording": {
     "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
@@ -176,7 +177,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. `synthetic_records` counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one.
 
-`ends` lists the game's ends as its plugin declares them, in order, each `{id, label, final}`; exactly one is final, the game's own end. `category.goal` is the goal the run ended with, and `category.goal_end` is that end with its label. `goals` is every goal the run had, in order: the goal at the start and each extension by a resume, each with `declared_at` and `reached_at` (the victory while that goal held, or null). `completed_at` is the `reached_at` of the last goal. A run that reached act 1 and was then extended to act 3 therefore shows both: act 1 reached, act 3 not.
+`ends` lists the game's ends as its plugin declares them, in order, each `{id, label, final}`; exactly one is final, the game's own end. `category.goal` is the published goal, and `category.goal_end` is that end with its label. `goals` lists the goals up to the published one, in order: the goal at the start and each extension by a resume that was reached, each with `declared_at` and `reached_at` (the victory while that goal held). Only the last may be unreached, when the run reached no goal at all. An extension is published once it is reached; until then the bundle keeps the goal that was reached, `completed_at` is its victory, the resume that extended it does not count on the human axis, and the extension's play is post-completion time. A run that won act 1 and was then extended to act 3 without reaching it is published as an act 1 run.
 
 `game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 

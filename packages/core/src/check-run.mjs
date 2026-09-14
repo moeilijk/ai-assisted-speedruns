@@ -36,7 +36,14 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
 
   // --- timeline ---
   let records = [];
-  let humanRecords = 0;
+  // run.human records bind the human axis; after completed_at they do not when a goal extension follows (a game.goal
+  // after completion: an extension that is not published yet, so its resume is not part of the published run).
+  const humanTimes = [], goalChangeTimes = [];
+  const humanBefore = (summary) => {
+    const done = summary?.completed_at ? Date.parse(summary.completed_at) : null;
+    const extended = done !== null && goalChangeTimes.some((t) => Date.parse(t) > done);
+    return humanTimes.filter((t) => !extended || Date.parse(t) <= done).length;
+  };
   if (!exists("session.sanitized.jsonl")) add("session.sanitized.jsonl", "unmet", "missing");
   else {
     const problems = [];
@@ -86,7 +93,8 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           break;
         case "event":
           if (typeof r.event !== "string") problems.push(`${at}: event without name`);
-          if (r.event === "run.human") humanRecords += 1;
+          if (r.event === "run.human") humanTimes.push(r.timestamp);
+          if (r.event === "game.goal") goalChangeTimes.push(r.timestamp);
           break;
         default:
           problems.push(`${at}: unknown kind "${r.kind}"`);
@@ -128,7 +136,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
         else {
           for (const key of ["game", "build", "goal"]) if (typeof c[key] !== "string" || !c[key]) problems.push(`category.${key} missing`);
           for (const [key, values] of Object.entries(CATEGORY_VALUES)) if (!values.includes(c[key])) problems.push(`category.${key} "${c[key]}" not in ${values.join("/")}`);
-          if (c.human === "none" && humanRecords) problems.push(`category.human is none but the timeline has ${humanRecords} run.human record(s)`);
+          if (c.human === "none" && humanBefore(summary)) problems.push(`category.human is none but the timeline has ${humanBefore(summary)} run.human record(s) before completion`);
         }
         if (!summary.recording || typeof summary.recording !== "object") problems.push("a recording block is required");
         // A run without a recording is not a valid run: recorder `null` records nothing, and no recorder means no recording.json.
@@ -163,12 +171,12 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           else {
             if (goals.at(-1).id !== summary.category?.goal) problems.push(`the last of goals is "${goals.at(-1).id}", not category.goal "${summary.category?.goal}"`);
             if (goals.at(-1).reached_at && !summary.completed_at) problems.push("the last goal was reached but completed_at is null");
-            if (goals.slice(0, -1).some((g) => g.reached_at) && summary.completed_at && !goals.at(-1).reached_at && summary.completed_at === goals.find((g) => g.reached_at)?.reached_at) problems.push("completed_at is the victory of an earlier goal, not of category.goal");
+            if (goals.slice(0, -1).some((g) => !g.reached_at)) problems.push("only the last of goals may be unreached: an extension is published once it is reached");
           }
           const rn = summary.harness?.plugins?.runtime?.name;
           if (typeof rn !== "string" || !rn) problems.push("schema 6 requires harness.plugins.runtime.name");
         }
-      } else if (humanRecords && summary.category?.human === "none") problems.push("run.human records with human: none");
+      } else if (humanBefore(summary) && summary.category?.human === "none") problems.push("run.human records with human: none");
     }
     add("summary.json", problems.length ? "invalid" : "met", problems.join("; ") || `schema ${summary.schema_version}`);
   }
@@ -189,21 +197,23 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   // The goal: a run that did not reach it is a recording of an attempt, not an entry (spec §8.6). Visible in the
   // bundle itself: a game.over with victory on the timeline, and completed_at in the summary.
   if (exists("session.sanitized.jsonl")) {
-    // A victory before the last `game.goal` (a resume that extended the goal) was the earlier goal's.
-    const events = fs.readFileSync(file("session.sanitized.jsonl"), "utf8").split("\n").filter((l) => l.trim())
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r?.kind === "event");
-    const won = events.slice(events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
-    let completedAt = null;
-    try { completedAt = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).completed_at ?? null; } catch { /* reported above */ }
-    // An earlier goal reached before a resume extended it is named, so "not reached" never reads as "nothing won".
-    let earlier = [];
-    try { earlier = (JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).goals ?? []).slice(0, -1).filter((g) => g.reached_at).map((g) => `${g.label ?? g.id} at ${g.reached_at}`); } catch { /* reported above */ }
-    const before = events.slice(0, events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
-    const notReached = before || earlier.length
-      ? `no victory while the last goal held and no completed_at: a stopped session, not an entry${earlier.length ? ` (earlier goal reached: ${earlier.join("; ")})` : " (a victory before the goal was extended)"}`
-      : "no victory on the timeline and no completed_at: a stopped session, not an entry";
-    add("goal reached", won || completedAt ? "met" : "unmet", won ? `victory on the timeline${completedAt ? `, completed_at ${completedAt}` : ""}` : completedAt ? `completed_at ${completedAt}` : notReached);
+    let summary = null;
+    try { summary = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")); } catch { /* reported above */ }
+    const completedAt = summary?.completed_at ?? null;
+    const goal = Array.isArray(summary?.goals) ? summary.goals.at(-1) : null;
+    if (goal) {
+      // Schema 6: the published goal is the last of goals (an extension is published only once it is reached).
+      const name = goal.label ?? goal.id;
+      add("goal reached", goal.reached_at ? "met" : "unmet", goal.reached_at ? `${name} reached at ${goal.reached_at}` : `${name} not reached and no completed_at: a stopped session, not an entry`);
+    } else {
+      // Older bundles: a victory after the last `game.goal` (a resume that extended the goal), or completed_at.
+      const events = fs.readFileSync(file("session.sanitized.jsonl"), "utf8").split("\n").filter((l) => l.trim())
+        .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r?.kind === "event");
+      const won = events.slice(events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
+      add("goal reached", won || completedAt ? "met" : "unmet", won ? `victory on the timeline${completedAt ? `, completed_at ${completedAt}` : ""}` : completedAt ? `completed_at ${completedAt}` : "no victory on the timeline and no completed_at: a stopped session, not an entry");
+    }
   }
+
   // Who made this bundle, when it says so. A signature proves that two bundles came from one key and nothing
   // about whose key it is until someone registers it with an archive, so it is not required: a publisher's
   // identity is the archive's account, and an extra key that gates nothing would be a barrier without a
