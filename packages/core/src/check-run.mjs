@@ -131,6 +131,8 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           if (c.human === "none" && humanRecords) problems.push(`category.human is none but the timeline has ${humanRecords} run.human record(s)`);
         }
         if (!summary.recording || typeof summary.recording !== "object") problems.push("a recording block is required");
+        // A run without a recording is not a valid run: recorder `null` records nothing, and no recorder means no recording.json.
+        else if (!summary.recording.recorder || summary.recording.recorder === "null") problems.push(`no recording was made (recorder ${summary.recording.recorder ?? "none"}): a run without a recording is not a valid run`);
         if (!summary.harness || typeof summary.harness !== "object") problems.push("a harness block is required");
       }
       if (summary.schema_version >= 4) {

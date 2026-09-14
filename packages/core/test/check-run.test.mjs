@@ -55,3 +55,22 @@ test("a model the run did not ask for is reported (silent fallback)", () => {
   const honest = report({ ...base, models: [{ model: "claude-opus-5", reasoning_effort: null }], requested: { model: "claude-opus-5", reasoning_effort: null } });
   assert.doesNotMatch(problems(honest), /requested model/);
 });
+
+test("a run made without a recording is invalid", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-check-norec-"));
+  const base = {
+    schema_version: 3, time_zone: "Europe/Amsterdam", run_dates: "2026-09-09 to 2026-09-09",
+    started_at: "2026-09-09T10:00:00.000+02:00", completed_at: null, ended_at: "2026-09-09T10:01:00.000+02:00",
+    source_records: 0, exported_records: 0, omitted_records: 0, removed_images: 0, redactions: {},
+    elapsed_to_completion_seconds: null, elapsed_including_post_completion_seconds: 60,
+    last_reported_thread_token_usage: {}, export_notes: [],
+    category: { game: "portal", build: "5135", goal: "credits" }, harness: { version: "0.1.0" },
+  };
+  const report = (recording) => { writeFileSync(join(dir, "summary.json"), JSON.stringify({ ...base, recording })); return checkRun(dir).results.find((x) => x.requirement === "summary.json"); };
+  for (const recording of [{ recorder: "null" }, { recorder: null }]) {
+    const r = report(recording);
+    assert.equal(r.status, "invalid");
+    assert.match(r.detail, /no recording was made .*a run without a recording is not a valid run/);
+  }
+  assert.doesNotMatch(report({ recorder: "obs" }).detail, /no recording was made/);
+});
