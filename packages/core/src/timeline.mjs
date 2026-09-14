@@ -82,6 +82,19 @@ export function computeTimeline(runDir, options = {}) {
   const playbackWall = playbacks.reduce((n, p) => n + (p.end - p.start), 0);
   const igt = playbacks.reduce((n, p) => n + p.igt, 0);
   const toolCalls = log.filter((r) => r.kind === "tool_call").length;
+  // The run up to its completion (options.completedAt: the published goal's victory, or the completion marker):
+  // what came after it (credits, or a goal extension that is not published yet) is post-completion time. The
+  // totals above stay the whole recording; these are the run's times to its goal.
+  const done = options.completedAt ? rel(options.completedAt) : null;
+  const upTo = done === null ? null : playbacks.filter((p) => p.end <= done + 0.001);
+  const totalsToCompletion = done === null ? null : {
+    rta: done,
+    igt: upTo.reduce((n, p) => n + p.igt, 0),
+    playback_wall: upTo.reduce((n, p) => n + (p.end - p.start), 0),
+    thinking: done - upTo.reduce((n, p) => n + (p.end - p.start), 0),
+    tool_calls: log.filter((r) => r.kind === "tool_call" && rel(r.timestamp) <= done + 0.001).length,
+    playbacks: upTo.length,
+  };
 
   // Runs (attempts) inside the session: a death ends a run, `game.attempt start` begins the next one from the
   // beginning; the death that ended the previous run is the cut point for the next one.
@@ -122,6 +135,7 @@ export function computeTimeline(runDir, options = {}) {
       playback_wall: inside.reduce((n, p) => n + (p.end - p.start), 0),
       playbacks: inside.length,
       split_igt: playbacks.filter((p) => p.end <= end).reduce((n, p) => n + p.igt, 0),
+      post_completion: done !== null && b.at >= done - 0.001,
     };
   });
 
@@ -157,6 +171,8 @@ export function computeTimeline(runDir, options = {}) {
     recorder: recording?.recorder ?? null,
     segments: segments.map((sg, i) => ({ index: i, t0: new Date(sg.t0).toISOString(), ended_at: new Date(sg.end).toISOString(), seconds: (sg.end - sg.t0) / 1000, offset: segmentOffsets[i], file: sg.file })),
     keep_by_file: keepByFile,
+    completed_rta: done,
+    totals_to_completion: totalsToCompletion,
     totals: { rta, igt, playback_wall: playbackWall, thinking: rta - playbackWall, tool_calls: toolCalls, playbacks: playbacks.length, cut_video: kept, attempts: attempts.length, deaths: overs.filter((o) => !o.victory).length },
     attempts,
     cut_attempt: selected ? selected.attempt : null,

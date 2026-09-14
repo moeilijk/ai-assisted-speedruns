@@ -47,3 +47,37 @@ test("attempts in the timeline and the cut of the last run", () => {
   assert.equal(last.playbacks.length, 5, "the playback list still covers the whole session");
   assert.throws(() => computeTimeline(runDir, { attempt: 3 }), /No attempt 3/);
 });
+
+test("a completed run has its times to completion; what came after is post-completion and not split", async () => {
+  const runDir = mkdtempSync(join(tmpdir(), "aas-completion-"));
+  const t0 = Date.parse("2026-09-13T09:00:00.000Z");
+  const at = (s) => new Date(t0 + s * 1000).toISOString();
+  const pb = (i, s, e) => [
+    { timestamp: at(s), kind: "event", event: "game.playback", data: { phase: "start", index: i } },
+    { timestamp: at(e), kind: "event", event: "game.playback", data: { phase: "end", index: i, seconds: e - s } },
+  ];
+  const rows = [
+    { timestamp: at(0), kind: "event", event: "run.started", data: { goal: "act1" } },
+    ...pb(1, 2, 4), { timestamp: at(5), kind: "tool_call", name: "g_exec" },
+    { timestamp: at(10), kind: "event", event: "game.milestone", data: { label: "Act 1 boss", chapter: true } },
+    { timestamp: at(10), kind: "event", event: "game.over", data: { victory: true } },
+    { timestamp: at(20), kind: "event", event: "run.human", data: { note: "goal extended from act1 to act3" } },
+    ...pb(2, 30, 36), { timestamp: at(37), kind: "tool_call", name: "g_exec" },
+    { timestamp: at(40), kind: "event", event: "run.ended", data: {} },
+  ];
+  writeFileSync(join(runDir, "run.jsonl"), rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  writeFileSync(join(runDir, "recording.json"), JSON.stringify({ recorder: "obs", t0: at(0), ended_at: at(40), files: [] }));
+  const tl = computeTimeline(runDir, { completedAt: at(10) });
+  assert.equal(tl.totals.rta, 40, "the totals stay the whole recording");
+  assert.equal(tl.completed_rta, 10);
+  assert.equal(tl.totals_to_completion.rta, 10);
+  assert.equal(tl.totals_to_completion.playbacks, 1);
+  assert.equal(tl.totals_to_completion.tool_calls, 1);
+  assert.equal(tl.totals_to_completion.thinking, 8);
+  assert.deepEqual(tl.sections.map((s) => [s.label, s.post_completion]), [["Start", false], ["Act 1 boss", true], ["Human: goal extended from act1 to act3", true]]);
+  const { renderLss } = await import("../../timer-livesplit/index.mjs");
+  const lss = renderLss(tl, {});
+  assert.equal((lss.match(/<Segment>/g) ?? []).length, 1, "one split, at completion");
+  assert.match(lss, /<Name>Act 1 boss<\/Name>/);
+  assert.equal(computeTimeline(runDir).totals_to_completion, null, "no completion, no totals to it");
+});

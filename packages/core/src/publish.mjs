@@ -131,7 +131,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // 3. timeline: timers, sections, chapters, cut list
   let timeline = null;
   try {
-    timeline = computeTimeline(runDir);
+    // Completion as the exported summary states it (the published goal's victory, or the completion marker).
+    const exportedCompletion = (() => { try { return JSON.parse(fs.readFileSync(path.join(outDir, "summary.json"), "utf8")).completed_at ?? null; } catch { return null; } })();
+    timeline = computeTimeline(runDir, { completedAt: exportedCompletion });
     writeTimeline(runDir, timeline);
     fs.copyFileSync(path.join(runDir, "timeline", "timeline.json"), path.join(outDir, "timeline.json"));
     if (timeline.sections.length > 1) fs.copyFileSync(path.join(runDir, "timeline", "chapters.txt"), path.join(outDir, "chapters.txt"));
@@ -218,6 +220,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     wall_clock_seconds: recording?.wall_clock_seconds ?? (timeline ? Math.round(timeline.totals.rta) : null),
     thinking_seconds: timeline ? Math.round(timeline.totals.thinking) : null,
   };
+  // The run's times to its goal, next to the recording's whole-length figures above: null when the run was not completed.
+  const ttc = timeline?.totals_to_completion ?? null;
+  summary.totals_to_completion = ttc && { rta_seconds: Math.round(ttc.rta * 1000) / 1000, igt_seconds: Math.round(ttc.igt * 1000) / 1000, thinking_seconds: Math.round(ttc.thinking * 1000) / 1000, playbacks: ttc.playbacks, tool_calls: ttc.tool_calls };
   summary.harness = {
     name: "ai-assisted-speedruns",
     version: FRAMEWORK_VERSION,

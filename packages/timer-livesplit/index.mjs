@@ -195,9 +195,13 @@ export function renderLss(timeline, { game = "Portal", category = "AI Assisted S
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   const started = new Date(timeline.t0);
   const fmt = (d) => `${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}:${String(d.getSeconds()).padStart(2, "0")}`;
-  const ended = new Date(started.getTime() + timeline.totals.rta * 1000);
-  const segments = timeline.sections.map((s, i, all) => {
-    const name = i + 1 < all.length ? all[i + 1].label : "End";
+  // A completed run splits up to its completion; post-completion sections (credits, an unpublished goal extension) are not splits.
+  const sections = timeline.sections.filter((s) => !s.post_completion);
+  const ended = new Date(started.getTime() + (timeline.totals_to_completion?.rta ?? timeline.totals.rta) * 1000);
+  const segments = sections.map((s, i) => {
+    // A split is named after what ends it: the next section in the whole timeline (the goal's milestone at completion).
+    const next = timeline.sections[timeline.sections.indexOf(s) + 1];
+    const name = next ? next.label : "End";
     return `    <Segment>
       <Name>${esc(name)}</Name>
       <Icon />
