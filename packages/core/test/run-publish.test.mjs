@@ -139,6 +139,7 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.equal(p.summary.completed_at !== null, true);
   const files = readdirSync(outDir).sort();
   for (const f of ["AGENTS.md", "chapters.txt", "documentation.md", "game-config", "manifest.json", "runtime-config", "session.sanitized.jsonl", "splits.lss", "summary.json", "timeline.json", "tools.json"]) assert.ok(files.includes(f), f);
+  assert.match(readFileSync(join(outDir, "game-config", "LICENSE"), "utf8"), /Copyright \(c\) 2026 cozyblaze/, "cozyblaze's license travels with his game configuration");
   const timeline = readFileSync(join(outDir, "session.sanitized.jsonl"), "utf8");
   assert.doesNotMatch(timeline, /data:image/);
   assert.match(timeline, /image_omitted/);

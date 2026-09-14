@@ -1,8 +1,8 @@
 // Process hardening for the AAS broker. MUST be imported before any other
 // module so the patches are in place before agent-supplied code can run.
 //
-// Derived from cozyblaze/portal-agent controller/mcp/hardening.mjs (MIT, see
-// ../NOTICE). Changes: the allowed network destinations come from
+// Derived from cozyblaze's portal-agent, controller/mcp/hardening.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE). Changes: the allowed network destinations come from
 // AAS_ALLOWED_ENDPOINTS (or AAS_GAME_HOST/AAS_GAME_PORT) instead of the SPT
 // port, and every AAS_* environment variable survives the scrub.
 //

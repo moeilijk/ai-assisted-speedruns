@@ -3,12 +3,13 @@
 // per-thread .jsonl Codex writes). Review the output before publishing it.
 // Images, reasoning payloads, prompts injected by the host, and metadata are omitted.
 //
-// Derived from cozyblaze/portal-agent tools/export-session.mjs (MIT, see ../NOTICE).
+// Derived from cozyblaze's portal-agent, tools/export-session.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE).
 // Changes: time zone from AAS_TIME_ZONE (default: system), completion marker
 // from AAS_COMPLETION_MARKER (a prefix of the agent's final message) instead
 // of the Portal-specific text, summary.json keeps schema_version 2 so it stays
-// byte-compatible with portal-agent's evidence; `aas summarize` (later) adds
-// the schema 3 blocks.
+// byte-compatible with portal-agent's evidence; `aas publish` raises it and adds
+// the blocks that belong to a bundle.
 //
 // Usage: node export-codex-rollout.mjs <private-rollout.jsonl> <new-output-directory>
 import fs from 'node:fs';

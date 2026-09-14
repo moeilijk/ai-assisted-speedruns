@@ -1,0 +1,16 @@
+This game plugin contains material by gamerpuppy, derived from sts_lightspeed
+(https://github.com/gamerpuppy/sts_lightspeed), commit 7476a81954020087da31d41d16fddf475746ec2d
+(2024-08-10), licensed under the MIT License, Copyright (c) 2021 gamerpuppy. The original
+license text is in lightspeed/LICENSE.
+
+Derived material (paths from games/slay-the-spire/):
+  lightspeed/aas-hooks.patch      changes to sts_lightspeed sources, carrying their surrounding code
+  lightspeed/event-fixes.patch    changes to sts_lightspeed sources, carrying their surrounding code
+  lightspeed/aas.cpp              a planner built against the sts_lightspeed sources and library
+  expert-weights.json             card ratings generated from src/sim/search/ExpertKnowledge.cpp
+  event-names.json                event names and ids from include/constants/Events.h
+  bot.mjs                         its card-reward rule follows src/sim/search/ExpertKnowledge.cpp
+
+sts_lightspeed itself is not vendored: lightspeed/build.sh clones it into .local/sts_lightspeed.
+
+The repository itself is MIT licensed (see ../../LICENSE).

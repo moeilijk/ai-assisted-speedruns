@@ -6,8 +6,24 @@
     "sha256": "12b99249eccfd5245ddb0b6b7575e1a1dfba0ce0ed6fad5bd5bbd4a303897ef5",
     "sts_version": "11-30-2020",
     "mts_version": "3.18.1",
-    "dependencies": ["basemod"]
+    "dependencies": [
+      "basemod"
+    ],
+    "license": "MIT, Copyright (c) 2019 ForgottenArbiter"
   },
-  "modthespire": { "workshop_id": 1605060445 },
-  "basemod": { "workshop_id": 1605833019 }
+  "modthespire": {
+    "workshop_id": 1605060445,
+    "license": "MIT, Copyright (c) 2018 Anthony Moore"
+  },
+  "basemod": {
+    "workshop_id": 1605833019,
+    "license": "MIT, Copyright (c) 2018 t-larson"
+  },
+  "sts_lightspeed": {
+    "repo": "https://github.com/gamerpuppy/sts_lightspeed.git",
+    "commit": "7476a81954020087da31d41d16fddf475746ec2d",
+    "commit_date": "2024-08-10T14:30:50-07:00",
+    "license": "MIT, Copyright (c) 2021 gamerpuppy (LICENSE.md; a copy is in lightspeed/LICENSE)",
+    "used_by": "lightspeed/build.sh (the combat oracle and the aas planner)"
+  }
 }

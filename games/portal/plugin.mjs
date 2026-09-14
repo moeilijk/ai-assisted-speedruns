@@ -1,7 +1,8 @@
 // Portal game plugin for the AAS broker: a thin adapter around
-// cozyblaze/portal-agent's controller (MIT). The controller, its API
-// documentation and the in-game SourcePauseTool patch are theirs and are not
-// vendored; `node games/portal/fetch-portal-agent.mjs` clones the pinned
+// cozyblaze's controller from portal-agent (MIT, Copyright (c) 2026 cozyblaze). The
+// controller, its API documentation, the agent instructions, the game configuration and the
+// in-game SourcePauseTool patch are his and are not vendored; a published bundle carries his
+// license text in game-config/LICENSE; `node games/portal/fetch-portal-agent.mjs` clones the pinned
 // commit into .local/portal-agent (or AAS_PORTAL_AGENT_DIR).
 //
 // Environment (AAS_* survives the broker's hardening scrub):
@@ -125,7 +126,8 @@ export default {
   env: ["AAS_PORTAL_GAME_ROOT", "AAS_PORTAL_AGENT_DIR", "AAS_PORTAL_SPT_HOST", "AAS_PORTAL_SPT_PORT"],
   readable: [PORTAL_AGENT_DIR],
   // Published as game-config/ by `aas publish`.
-  gameConfig: [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json")],
+  // His license travels with his files: game-config/LICENSE.
+  gameConfig: [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json"), join(PORTAL_AGENT_DIR, "controller", "LICENSE")],
   // The goal the original run was given; `aas run` hands it to the agent as its first prompt.
   goalPrompt:
     "You are controlling Portal. Your goal is to progress through the game and reach the end credits. " +

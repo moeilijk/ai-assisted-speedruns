@@ -1,6 +1,6 @@
 // Local timestamps with an explicit UTC offset, e.g. T17:00:38.361-07:00.
-// Derived from cozyblaze/portal-agent tools/pacific-time.mjs (MIT, see ../NOTICE);
-// the time zone is configurable instead of fixed to America/Los_Angeles.
+// Derived from cozyblaze's portal-agent, tools/pacific-time.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE); the time zone is configurable instead of fixed to America/Los_Angeles.
 
 const formatters = new Map();
 

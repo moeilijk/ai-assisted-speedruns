@@ -4,7 +4,10 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd); REPO=$(cd "$HERE/../../.." && pwd)
 LS=${1:-$REPO/.local/sts_lightspeed}
-[ -d "$LS" ] || git clone -q https://github.com/gamerpuppy/sts_lightspeed.git "$LS"
+# The commit the patches were made against, pinned in ../UPSTREAM.json (gamerpuppy's sts_lightspeed, MIT; see ../NOTICE).
+PIN=$(node -p "require('$HERE/../UPSTREAM.json').sts_lightspeed.commit")
+[ -d "$LS" ] || { git clone -q https://github.com/gamerpuppy/sts_lightspeed.git "$LS" && git -C "$LS" checkout -q "$PIN"; }
+[ "$(git -C "$LS" rev-parse HEAD)" = "$PIN" ] || echo "note: $LS is not at the pinned commit $PIN; the patches were made against that one" >&2
 cd "$LS"; git submodule update --init --depth 1 json >/dev/null 2>&1 || true
 # Patches this repo keeps against the upstream checkout (hooks for the planner, corrections to event
 # effects measured against the real game). Applied only when they still apply cleanly, so re-running is safe.

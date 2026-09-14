@@ -1,5 +1,6 @@
-// Text sanitisation shared by the exporters and `aas scan`. Derived from
-// cozyblaze/portal-agent tools/export-session.mjs and tools/scan-publication.mjs (MIT).
+// Text sanitisation shared by the exporters and `aas scan`. Derived from cozyblaze's portal-agent,
+// tools/export-session.mjs and tools/scan-publication.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE).
 export function createSanitizer() {
   const counts = { removed_images: 0 };
   const redactions = {};

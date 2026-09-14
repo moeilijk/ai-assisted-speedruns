@@ -94,6 +94,11 @@ docs/                   install, reference, plugins, design
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Code derived from [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent) (MIT) is listed in [packages/core/NOTICE](packages/core/NOTICE).
+MIT, see [LICENSE](LICENSE). Code by others keeps its own license and attribution:
+
+- cozyblaze's code from [portal-agent](https://github.com/cozyblaze/portal-agent) (MIT): listed in [packages/core/NOTICE](packages/core/NOTICE), license text in [packages/core/vendor/portal-agent/LICENSE](packages/core/vendor/portal-agent/LICENSE). A published bundle that carries his material (the Portal game configuration, instructions and documentation, or the Codex configuration template) carries his license text next to it.
+- gamerpuppy's [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) (MIT): the patches, the planner and the data derived from it are listed in [games/slay-the-spire/NOTICE](games/slay-the-spire/NOTICE), license text in [games/slay-the-spire/lightspeed/LICENSE](games/slay-the-spire/lightspeed/LICENSE).
+
+Games, mods and tools that the setup downloads or builds (Communication Mod, BaseMod, ModTheSpire, SourcePauseTool, sts_lightspeed itself) are not in this repository; each is pinned in the game's `UPSTREAM.json` and comes under its own license.
 
 The archive of published runs is at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org); a run is uploaded there as the zip `aas publish` writes next to the bundle (see [docs/reference.md](docs/reference.md)).

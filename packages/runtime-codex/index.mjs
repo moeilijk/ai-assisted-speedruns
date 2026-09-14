@@ -1,6 +1,7 @@
 // Codex runtime plugin: writes a hardened .codex/config.toml plus AGENTS.md
 // into the run directory (refusing to overwrite), then starts `codex` there.
-// Derived from cozyblaze/portal-agent tools/configure-run.mjs (MIT).
+// Derived from cozyblaze's portal-agent, tools/configure-run.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE).
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -9,6 +10,8 @@ import { checkCodexBudget, codexMax, codexVerdict, readCodexUsage, rolloutFiles 
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+/** The template is derived from cozyblaze's portal-agent: its license text is published next to it in runtime-config/. */
+const PORTAL_AGENT_LICENSE = path.join(here, "..", "core", "vendor", "portal-agent", "LICENSE");
 let interruptChild = null;
 
 /** Codex's user config file: $CODEX_HOME/config.toml, else ~/.codex/config.toml. */
@@ -111,6 +114,7 @@ export default {
     fs.writeFileSync(instructions, brief.instructions, { flag: "wx" });
     fs.mkdirSync(path.join(runDir, "runtime-config"), { recursive: true });
     fs.writeFileSync(path.join(runDir, "runtime-config", "config.template.toml"), renderConfig(broker, { placeholders: true }), { flag: "wx" });
+    fs.copyFileSync(PORTAL_AGENT_LICENSE, path.join(runDir, "runtime-config", "LICENSE"));
     const trust = trustRunDir(runDir);
     return { files: [config, instructions], trust, hint: `Open ${runDir} as a project in Codex, trust it, and start a new task; or run: aas start --runtime codex --run-dir ${runDir}` };
   },
@@ -118,6 +122,7 @@ export default {
   async writePublicConfig(runDir, broker) {
     fs.mkdirSync(path.join(runDir, "runtime-config"), { recursive: true });
     fs.writeFileSync(path.join(runDir, "runtime-config", "config.template.toml"), renderConfig(broker, { placeholders: true }));
+    fs.copyFileSync(PORTAL_AGENT_LICENSE, path.join(runDir, "runtime-config", "LICENSE"));
   },
   /** Rewrite the configuration (absolute paths) when the run directory moved; the instructions are kept. */
   async reconfigure(runDir, broker) {

@@ -6,8 +6,8 @@
 //   <game>_screenshot     Capture a full-resolution screenshot.
 //   <game>_exec           Run a snippet of JavaScript against the live `game` controller.
 //
-// Derived from cozyblaze/portal-agent controller/mcp/portal-mcp-server.mjs
-// (MIT, see ../NOTICE). Changes: the game plugin is loaded from
+// Derived from cozyblaze's portal-agent, controller/mcp/portal-mcp-server.mjs
+// (MIT, Copyright (c) 2026 cozyblaze; license text in packages/core/vendor/portal-agent/LICENSE; see packages/core/NOTICE). Changes: the game plugin is loaded from
 // AAS_GAME_MODULE, tool names derive from the plugin id, tool calls and
 // results are appended to <AAS_RUN_DIR>/run.jsonl (screenshots saved to
 // <AAS_RUN_DIR>/screenshots/), and tools.json + documentation.md are written
