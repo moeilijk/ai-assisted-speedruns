@@ -34,6 +34,7 @@ export async function configure(opts) {
   const runtime = await loadRuntime(opts.runtime);
   const spec = await brokerSpec({ gameModule: opts.game, runDir, timeZone: process.env.AAS_TIME_ZONE });
   const plugin = spec.plugin;
+  if (plugin.stub) throw new Error(`${plugin.id} is a stub game plugin: nothing is implemented yet, so no run can be configured with it.`);
   const instructions = opts.instructions
     ? fs.readFileSync(opts.instructions, "utf8")
     : typeof plugin.instructions === "function"

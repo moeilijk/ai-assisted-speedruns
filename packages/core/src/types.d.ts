@@ -127,6 +127,8 @@ export interface GamePlugin {
    * every game declares at least its own end, so goals, their labels and their history work the same for every game.
    */
   ends: { id: string; label: string; split?: string; final?: boolean }[];
+  /** A planned plugin that is not implemented: it loads and declares its ends, and `aas configure` refuses it. */
+  stub?: boolean;
   /** Default first prompt for the agent (the goal); `aas configure --prompt` overrides it. */
   goalPrompt?: string;
   /** Optional extra checks for `aas check-connection --exercise`. */

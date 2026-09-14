@@ -20,6 +20,7 @@ export default {
   readable: [here],              // directories the broker process may read besides core
   segments: ["Level 1", "Level 2"],                  // the splits (chapter milestones), in order
   ends: [{ id: "level1", label: "Level 1", split: "Level 1" }, { id: "end", label: "The end", split: "Level 2", final: true }],   // required: the game's ends, each with a label, exactly one `final` (the default goal)
+  stub: false,                   // true for a planned plugin that is not implemented: it loads, and `aas configure` refuses it
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim
   goalPrompt: "Play the run that has been started for you to the end.", // the first prompt
