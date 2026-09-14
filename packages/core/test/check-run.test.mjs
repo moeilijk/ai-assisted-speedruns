@@ -83,7 +83,9 @@ test("a victory before a goal extension does not reach the extended goal", () =>
     writeFileSync(join(dir, "summary.json"), JSON.stringify({ completed_at: null }));
     return checkRun(dir).results.find((x) => x.requirement === "goal reached").status;
   };
+  const detail = () => checkRun(dir).results.find((x) => x.requirement === "goal reached").detail;
   assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" })]), "met");
   assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" }), ev("game.goal", { from: "act1", to: "act3" })]), "unmet");
+  assert.match(detail(), /no victory while the last goal held/, "the earlier victory is not denied");
   assert.equal(reached([ev("game.over", { victory: true }), ev("game.goal", { from: "act1", to: "act3" }), ev("game.over", { victory: true, label: "Victory" })]), "met");
 });

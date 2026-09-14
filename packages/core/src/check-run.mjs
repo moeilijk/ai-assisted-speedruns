@@ -195,7 +195,14 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     const won = events.slice(events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
     let completedAt = null;
     try { completedAt = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).completed_at ?? null; } catch { /* reported above */ }
-    add("goal reached", won || completedAt ? "met" : "unmet", won ? `victory on the timeline${completedAt ? `, completed_at ${completedAt}` : ""}` : completedAt ? `completed_at ${completedAt}` : "no victory on the timeline and no completed_at: a stopped session, not an entry");
+    // An earlier goal reached before a resume extended it is named, so "not reached" never reads as "nothing won".
+    let earlier = [];
+    try { earlier = (JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).goals ?? []).slice(0, -1).filter((g) => g.reached_at).map((g) => `${g.label ?? g.id} at ${g.reached_at}`); } catch { /* reported above */ }
+    const before = events.slice(0, events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
+    const notReached = before || earlier.length
+      ? `no victory while the last goal held and no completed_at: a stopped session, not an entry${earlier.length ? ` (earlier goal reached: ${earlier.join("; ")})` : " (a victory before the goal was extended)"}`
+      : "no victory on the timeline and no completed_at: a stopped session, not an entry";
+    add("goal reached", won || completedAt ? "met" : "unmet", won ? `victory on the timeline${completedAt ? `, completed_at ${completedAt}` : ""}` : completedAt ? `completed_at ${completedAt}` : notReached);
   }
   // Who made this bundle, when it says so. A signature proves that two bundles came from one key and nothing
   // about whose key it is until someone registers it with an archive, so it is not required: a publisher's
