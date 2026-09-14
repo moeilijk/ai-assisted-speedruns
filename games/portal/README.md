@@ -1,6 +1,6 @@
 # Portal (via cozyblaze/portal-agent)
 
-A thin adapter that loads [portal-agent](https://github.com/cozyblaze/portal-agent)'s controller (MIT) as an AAS `GamePlugin`. Portal-agent's published `evidence/` serves as the worked example of the format in the spec, and their SourcePauseTool (SPT) patch is the in-game side. Nothing of theirs is vendored: [fetch-portal-agent.mjs](fetch-portal-agent.mjs) clones the commit pinned in [UPSTREAM.json](UPSTREAM.json) into `.local/portal-agent`.
+A thin adapter that loads cozyblaze's controller from [portal-agent](https://github.com/cozyblaze/portal-agent) as an AAS `GamePlugin`. The session log he published there (`evidence/`) serves as the worked example of the format in the spec, and his SourcePauseTool (SPT) patch is the in-game side. Nothing of his is vendored: [fetch-portal-agent.mjs](fetch-portal-agent.mjs) clones the commit pinned in [UPSTREAM.json](UPSTREAM.json) into `.local/portal-agent`.
 
 | | |
 |---|---|
@@ -12,7 +12,7 @@ A thin adapter that loads [portal-agent](https://github.com/cozyblaze/portal-age
 
 ## 1. Game side (Windows, unchanged from portal-agent)
 
-Follow portal-agent's [setup guide](https://github.com/cozyblaze/portal-agent/blob/main/docs/setup.md) steps 1 and 2: Source Unpack 2.6, Visual Studio with C++ tools, then from **their** checkout (`.local/portal-agent` after `npm run portal:fetch`) in PowerShell:
+Follow portal-agent's [setup guide](https://github.com/cozyblaze/portal-agent/blob/main/docs/setup.md) steps 1 and 2: Source Unpack 2.6, Visual Studio with C++ tools, then from **that** checkout (`.local/portal-agent` after `npm run portal:fetch`) in PowerShell:
 
 ```powershell
 cd .local\portal-agent
@@ -84,7 +84,7 @@ and after `wsl --shutdown` (from PowerShell) Windows loopback is shared with WSL
 
 `AAS_PORTAL_SPT_HOST` exists for other topologies, but SPT binds to loopback, so a different host only works with a port forward.
 
-**Runtime for the first run: Claude Code** (installed under the active Node version; the generated config is verified headless against the fake SPT, see [runtime-claude-code](../../packages/runtime-claude-code/README.md)). Codex is the second run: it is portal-agent's own reference setup, but needs `npm install -g @openai/codex@latest` first (0.153.4+; installed here is 0.101.0 under other nvm Node versions).
+**Runtime for the first run: Claude Code** (installed under the active Node version; the generated config is verified headless against the fake SPT, see [runtime-claude-code](../../packages/runtime-claude-code/README.md)). Codex is the second run: it is the setup cozyblaze used for his run, but needs `npm install -g @openai/codex@latest` first (0.153.4+; installed here is 0.101.0 under other nvm Node versions).
 
 ### Save states and resuming
 
@@ -113,7 +113,7 @@ node packages/core/src/cli.mjs publish <runs>/portal-01 <runs>/portal-01-public 
 
 `publish` finds the Claude Code session log for the run directory, exports it sanitized, adds the schema 3 summary (category, recording, harness), copies tools.json, AGENTS.md, documentation.md, runtime-config/, game-config/ (portal-agent's cvars and SPT upstream reference), recording/, chapters.txt, timeline.json and splits.lss, writes manifest.json, scans for private data and runs `aas check`. Review the output before sharing it.
 
-`aas check` against portal-agent's own evidence reports: timeline and summary valid (schema 2), the other required files missing, exactly as the conformance table in the spec says.
+`aas check` against the session log cozyblaze published with portal-agent reports: timeline and summary valid (schema 2), the other required files missing, exactly as the conformance table in the spec says.
 
 ## Testing without the game
 

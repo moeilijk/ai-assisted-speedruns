@@ -2,7 +2,7 @@
 
 Status: draft, 2026-09-09. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
-This standard owes its idea to the Portal run of [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent). The tool interface, the broker, the process hardening and the log format come from that project (MIT) and are credited to it; the standard and the archives built on it are maintained separately. Its `evidence/` serves as the worked example where this text needs one.
+Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
 ## 1. Definitions
 
@@ -40,7 +40,7 @@ Every run declares one value on each axis. Runs are comparable only when they ag
 | `timing` | `paused-think`, `realtime` | `paused-think`: the game is stopped while the agent thinks, only playback advances time; `realtime`: thinking time counts |
 | `human` | `none`, `restart-only`, `assisted` | `none`: no human input between start and end; `restart-only`: a human only resumed the agent after runtime errors, gave no game information; `assisted`: anything else, described in `summary.json` |
 
-Portal-agent's run is: `portal · credits · vision · input · paused-think · restart-only · gpt-6-astra/codex/max`.
+cozyblaze's Portal run is: `portal · credits · vision · input · paused-think · restart-only · gpt-6-astra/codex/max`.
 
 **Chapters.** A game may be played to an end short of its own ending: the boss of act 1 rather than the whole
 game, one mission rather than the campaign. Such an end is a goal like any other and is declared on the `goal`

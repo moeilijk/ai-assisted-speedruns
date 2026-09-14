@@ -1,6 +1,6 @@
 # Design: one harness for every game
 
-Source and inspiration: [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent), commit `31311b8` of 2026-09-06 (controller MIT; file and field names below are quoted from that repository).
+Inspired by cozyblaze's Portal run; the design and the code this builds on are his, from [portal-agent](https://github.com/cozyblaze/portal-agent) at commit `31311b8` of 2026-09-06 (file and field names below are quoted from that repository).
 
 ## Goal
 
