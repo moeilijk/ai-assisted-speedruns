@@ -1,5 +1,5 @@
 // `aas publish <run-dir> <out-dir>`: build the public bundle of the spec (§4)
-// from a private run directory: sanitized timeline + summary (schema 5),
+// from a private run directory: sanitized timeline + summary (schema 6),
 // tools.json, AGENTS.md, documentation.md, runtime-config/, game-config/,
 // chapters.txt, timeline.json, splits.lss, manifest.json — and no recording:
 // the video is published where video is published and linked from the summary.
@@ -20,6 +20,7 @@ import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
+import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 
 const copyTree = (src, dst) => {
   if (!fs.existsSync(src)) return false;
@@ -35,7 +36,7 @@ export const SPEC_VERSION = "0.1";
 /** The bundle's packaging: which files it holds and how they are named. */
 export const BUNDLE_VERSION = 1;
 /** The shape of summary.json. */
-export const SUMMARY_SCHEMA = 5;
+export const SUMMARY_SCHEMA = 6;
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
   const walk = (d, prefix = "") =>
@@ -93,11 +94,10 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     else if (fs.existsSync(path.join(runDir, "session.jsonl"))) session = path.join(runDir, "session.jsonl");
   }
   if (!session || !fs.existsSync(session)) throw new Error(`No session log found for runtime ${runtime}; pass --session <file>.`);
-  // The goal is reached at `game.over` with victory (the completion marker is the fallback). A victory before the
-  // last `game.goal` (a resume that extended the goal) was the old goal's, so it does not complete this one.
-  const runEvents = readRunEvents(runDir);
-  const lastGoalChange = runEvents.findLastIndex((e) => e.event === "game.goal");
-  const won = runEvents.slice(lastGoalChange + 1).find((e) => e.event === "game.over" && e.data?.victory === true);
+  // Every goal the run had, from its own events: a resume may extend the goal, and a victory reaches only the goal
+  // that held at that moment. The run is complete when its last goal was reached (the completion marker is the fallback).
+  const goals = goalHistory(readRunEvents(runDir), brief.category.goal);
+  const won = goals.at(-1)?.reached_at ? { timestamp: goals.at(-1).reached_at } : null;
   // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
   // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
   if (rt?.exportSession) await rt.exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
@@ -136,7 +136,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log(`no timeline: ${error.message}`);
   }
 
-  // 4. summary schema 5
+  // 4. summary schema 6
   const summaryFile = path.join(outDir, "summary.json");
   const summary = JSON.parse(fs.readFileSync(summaryFile, "utf8"));
   // Three versions, because three things change at their own pace and a reader has to tell them apart:
@@ -165,6 +165,16 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // What it takes to play the same thing again: the game's build, the mods with their pins, the run's settings.
   try { summary.game = (await plugin?.build?.({ runDir })) ?? null; } catch (e) { summary.game = null; log(`game build info not available (${e.message})`); }
   summary.category = { ...brief.category, human_notes: brief.category.human_notes ?? null };
+  // The goal by name, the game's ends as the plugin declares them, and every goal the run had with when it held and
+  // when it was reached: the same fields for every game, because every game plugin declares its ends.
+  if (!plugin) throw new Error("the run's brief names no game module, so its ends and goals cannot be published");
+  const ends = endsOf(plugin);
+  const endOf = (id) => ends.find((e) => e.id === id);
+  summary.ends = ends.map(publicEnd);
+  summary.category.goal_end = endOf(brief.category.goal) ? publicEnd(endOf(brief.category.goal)) : null;
+  // A run completed by its completion marker rather than a victory event reached its last goal at completed_at.
+  if (goals.length && !goals.at(-1).reached_at && summary.completed_at) goals.at(-1).reached_at = summary.completed_at;
+  summary.goals = goals.map((g) => ({ ...(endOf(g.id) ? publicEnd(endOf(g.id)) : { id: g.id, label: null, final: null }), declared_at: g.declared_at, reached_at: g.reached_at }));
   // Reproducibility: the seed of the last run (the game's own seed code, and the raw value), plus every run's seed.
   const lastAttempt = timeline?.attempts?.at(-1) ?? null;
   summary.seed = lastAttempt?.seed_code ?? lastAttempt?.seed ?? null;
@@ -207,7 +217,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     framework: `ai-assisted-speedruns ${FRAMEWORK_VERSION}`,
     plugins: {
       game: { id: brief.game?.id ?? brief.category.game ?? null, version: brief.game?.version ?? null },
-      runtime: { id: runtime ?? null, version: brief.runtimeVersion ?? null },
+      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null },
       recorder: { id: recording?.recorder ?? null, version: recording?.recorder_version ?? null },
       timer: { id: recording?.timer?.id ?? null, version: recording?.timer?.version ?? null },
     },

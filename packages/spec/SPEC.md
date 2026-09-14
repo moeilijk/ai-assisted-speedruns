@@ -46,7 +46,10 @@ Portal-agent's run is: `portal · credits · vision · input · paused-think · 
 game, one mission rather than the campaign. Such an end is a goal like any other and is declared on the `goal`
 axis; a game plugin lists the ends it offers and the harness declares the victory when the goal's end is
 reached. Runs are comparable only within the same goal, so a chapter never competes with a full run: this is how
-a long game is published in parts instead of as one all-or-nothing attempt.
+a long game is published in parts instead of as one all-or-nothing attempt. Every game plugin declares its ends, each
+with an id and a label and exactly one of them final (the game's own end, the goal when none is given), so goals work
+the same for every game. A resume may extend the goal to a later end; a victory reaches only the goal that held at
+that moment, and the summary keeps every goal the run had (§6).
 
 **A run that did not reach its goal is not an entry.** A session that was stopped (a budget, a limit, a
 runtime error) is a valid recording of an attempt and may be published as such, but it is not comparable and an
@@ -91,9 +94,9 @@ Per kind:
 - `message`: `role` (`user` or `assistant`), `channel` (string or null), `text`.
 - `tool_call`: `call` (sequential id `call-00001`), `name`, `input` (string or object).
 - `tool_result`: `call`, `output`: an array of content parts `{type: "text", text}` (schema 2 also `input_text`, Codex's name) or `{type: "image_omitted"}`; schema 2 also allows a plain string.
-- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`.
+- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.goal`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`.
 
-`game.over` (`victory`, `label`, `deaths`, plus game-specific fields) marks the end of an attempt inside the game. With `victory: true` the goal is reached: the harness ends the agent session, the timer stops (the milestone before it did the final split) and the run's status is `completed`. With `victory: false` the agent died: that run is over, but not the session (no ironman rule). The game plugin offers a restart from the beginning (a new game with the same seed where the game has one), and the next run begins with `game.attempt` (`phase: start`, `attempt` N, `seed`). Every run is its own attempt: the timer resets and takes its own splits, and `timeline.json` lists the runs under `attempts` (start, end, outcome `death`/`victory`/`stopped`, IGT). The session's RTA keeps running over all runs; `aas render --attempt last` cuts the last run on its own. Deaths are counted in the outcome. A session that ends without a victory is `stopped` and may be resumed.
+`run.started` carries the `goal` that holds for that segment. `game.goal` (`from`, `to`) marks a resume that extended the goal to a later end. `game.over` (`victory`, `label`, `deaths`, plus game-specific fields) marks the end of an attempt inside the game. With `victory: true` the goal is reached: the harness ends the agent session, the timer stops (the milestone before it did the final split) and the run's status is `completed`. With `victory: false` the agent died: that run is over, but not the session (no ironman rule). The game plugin offers a restart from the beginning (a new game with the same seed where the game has one), and the next run begins with `game.attempt` (`phase: start`, `attempt` N, `seed`). Every run is its own attempt: the timer resets and takes its own splits, and `timeline.json` lists the runs under `attempts` (start, end, outcome `death`/`victory`/`stopped`, IGT). The session's RTA keeps running over all runs; `aas render --attempt last` cuts the last run on its own. Deaths are counted in the outcome. A session that ends without a victory is `stopped` and may be resumed.
 
 `game.playback` marks the only intervals in which game time advances in the `paused-think` category: `data.phase` is `start` (with `steps`, the exact inputs about to be played) or `end` (with `ticks` played, `aborted`, `reason`). In-game time (IGT) is the sum of played ticks times the tick interval; everything between playbacks is thinking time.
 
@@ -112,17 +115,18 @@ and may have gaps: the counter belongs to the run, and earlier publications may 
 where the identifier cannot, so a reader can see that two bundles under different names are the same run.
 Seeing is not deciding: whether a newer publication supersedes an entry already held is a judgement, and the
 standard leaves it to whoever keeps the archive rather than merging anything on a matching field. `harness` names the
-framework and every plugin with its own version, each as `{id, version}` rather than as a sentence.
+framework and every plugin with its own version, each as `{id, version}` rather than as a sentence; the runtime also
+with its `name` for people (`Claude Code` for `claude-code`), which every runtime plugin declares.
 
 Where a recording is published is not in the bundle. A run may be published in more than one place, and a stream VOD
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5, what `aas publish` writes, drops `recordings` and `recording.url`: video links come from the archive, not from the bundle.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6, what `aas publish` writes, adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`.
 
 ```json
 {
-  "schema_version": 5,
+  "schema_version": 6,
   "time_zone": "Europe/Amsterdam",
   "run_dates": "2026-09-20 to 2026-09-20",
   "started_at": "...", "completed_at": "...", "ended_at": "...",
@@ -143,9 +147,14 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   "attempts": [{"attempt": 1, "seed": "ATGY4CVU47AK", "outcome": "death", "rta": 205.2, "igt": 200.9}, {"attempt": 2, "seed": "ATGY4CVU47AK", "outcome": "victory", "rta": 0, "igt": 0}],
   "category": {
     "game": "slay_the_spire", "build": "V2.3.4 + Communication Mod 1.2.1", "goal": "act3",
-    "observation": "state", "input": "api", "timing": "paused-think", "human": "none",
-    "human_notes": null
+    "goal_end": {"id": "act3", "label": "Act 3 boss", "final": true},
+    "observation": "state", "input": "api", "timing": "paused-think", "human": "restart-only",
+    "human_notes": "goal extended from act1 to act3"
   },
+  "ends": [{"id": "act1", "label": "Act 1 boss", "final": false}, {"id": "act2", "label": "Act 2 boss", "final": false},
+           {"id": "act3", "label": "Act 3 boss", "final": true}, {"id": "heart", "label": "Heart", "final": false}],
+  "goals": [{"id": "act1", "label": "Act 1 boss", "final": false, "declared_at": "...", "reached_at": "..."},
+            {"id": "act3", "label": "Act 3 boss", "final": true, "declared_at": "...", "reached_at": null}],
   "recording": {
     "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
@@ -158,13 +167,16 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
     "settings": {"character": "IRONCLAD", "ascension": 0, "seed": "23M", "fast_mode": true}
   },
   "harness": {
-    "framework": "ai-assisted-speedruns 0.1.0",
-    "plugins": {"game": "slay_the_spire 0.1.0", "runtime": "claude-code 0.1.0", "recorder": "obs 0.1.0"}
+    "name": "ai-assisted-speedruns", "version": "0.1.0", "framework": "ai-assisted-speedruns 0.1.0",
+    "plugins": {"game": {"id": "slay_the_spire", "version": "0.1.0"}, "runtime": {"id": "claude-code", "name": "Claude Code", "version": "0.1.0"},
+                "recorder": {"id": "obs", "version": "0.1.0"}, "timer": {"id": "livesplit", "version": "0.1.0"}}
   }
 }
 ```
 
 `models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. `synthetic_records` counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one.
+
+`ends` lists the game's ends as its plugin declares them, in order, each `{id, label, final}`; exactly one is final, the game's own end. `category.goal` is the goal the run ended with, and `category.goal_end` is that end with its label. `goals` is every goal the run had, in order: the goal at the start and each extension by a resume, each with `declared_at` and `reached_at` (the victory while that goal held, or null). `completed_at` is the `reached_at` of the last goal. A run that reached act 1 and was then extended to act 3 therefore shows both: act 1 reached, act 3 not.
 
 `game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 

@@ -109,7 +109,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     }
     if (summary) {
       for (const key of SUMMARY_V2_KEYS) if (!(key in summary)) problems.push(`missing ${key}`);
-      if (![2, 3, 4, 5].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4 or 5`);
+      if (![2, 3, 4, 5, 6].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4, 5 or 6`);
       for (const key of ["started_at", "ended_at"]) if (!TIMESTAMP_RE.test(String(summary[key]))) problems.push(`${key} is not ISO 8601 with offset`);
       if (summary.completed_at !== null && !TIMESTAMP_RE.test(String(summary.completed_at))) problems.push("completed_at must be null or ISO 8601 with offset");
       if (!Array.isArray(summary.models) || !summary.models.every((m) => typeof m?.model === "string")) problems.push("models must list {model, reasoning_effort}");
@@ -149,6 +149,25 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
         }
         if (summary.schema_version === 4 && !Array.isArray(summary.recordings)) problems.push("schema 4 requires recordings as a list");
         if (summary.harness && (typeof summary.harness.version !== "string" || !summary.harness.version)) problems.push("harness.version missing");
+        if (summary.schema_version >= 6) {
+          // The game's ends, the goal by name and every goal the run had: the same shape for every game.
+          const isEnd = (e) => e && typeof e.id === "string" && e.id && typeof e.label === "string" && e.label && typeof e.final === "boolean";
+          const ends = Array.isArray(summary.ends) ? summary.ends : null;
+          if (!ends || !ends.length || !ends.every(isEnd)) problems.push("schema 6 requires ends as a list of { id, label, final }");
+          else if (ends.filter((e) => e.final).length !== 1) problems.push("ends must have exactly one final end");
+          const ge = summary.category?.goal_end;
+          if (!isEnd(ge) || ge.id !== summary.category?.goal) problems.push("schema 6 requires category.goal_end { id, label, final } for category.goal");
+          else if (ends && !ends.some((e) => e.id === ge.id)) problems.push(`category.goal "${ge.id}" is not one of the ends`);
+          const goals = Array.isArray(summary.goals) ? summary.goals : null;
+          if (!goals || !goals.length) problems.push("schema 6 requires goals as a non-empty list");
+          else {
+            if (goals.at(-1).id !== summary.category?.goal) problems.push(`the last of goals is "${goals.at(-1).id}", not category.goal "${summary.category?.goal}"`);
+            if (goals.at(-1).reached_at && !summary.completed_at) problems.push("the last goal was reached but completed_at is null");
+            if (goals.slice(0, -1).some((g) => g.reached_at) && summary.completed_at && !goals.at(-1).reached_at && summary.completed_at === goals.find((g) => g.reached_at)?.reached_at) problems.push("completed_at is the victory of an earlier goal, not of category.goal");
+          }
+          const rn = summary.harness?.plugins?.runtime?.name;
+          if (typeof rn !== "string" || !rn) problems.push("schema 6 requires harness.plugins.runtime.name");
+        }
       } else if (humanRecords && summary.category?.human === "none") problems.push("run.human records with human: none");
     }
     add("summary.json", problems.length ? "invalid" : "met", problems.join("; ") || `schema ${summary.schema_version}`);

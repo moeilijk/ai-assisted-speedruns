@@ -21,7 +21,7 @@ test("codex configure writes config.toml, AGENTS.md, runtime-config and brief.js
   const runDir = mkdtempSync(join(tmpdir(), "aas-cfg-codex-"));
   const instructions = join(runDir, "..", `instr-${Date.now()}.md`);
   writeFileSync(instructions, "# Play\n");
-  const r = await configure({ runtime: "codex", game: fakeGame, "run-dir": runDir, instructions, goal: "credits", model: "gpt-6" });
+  const r = await configure({ runtime: "codex", game: fakeGame, "run-dir": runDir, instructions, goal: "end", model: "gpt-6" });
   const toml = readFileSync(join(runDir, ".codex", "config.toml"), "utf8");
   assert.match(toml, /\[mcp_servers\.fake_game\]/);
   assert.match(toml, /"fake_game_exec"/);
@@ -34,7 +34,7 @@ test("codex configure writes config.toml, AGENTS.md, runtime-config and brief.js
   assert.match(published, /__REPO__/);
   assert.equal(readFileSync(join(runDir, "AGENTS.md"), "utf8"), "# Play\n");
   const brief = JSON.parse(readFileSync(join(runDir, "brief.json"), "utf8"));
-  assert.equal(brief.category.goal, "credits");
+  assert.equal(brief.category.goal, "end");
   assert.equal(brief.category.game, "fake_game");
   assert.equal(brief.model, "gpt-6");
   assert.equal(brief.goalPrompt, null);

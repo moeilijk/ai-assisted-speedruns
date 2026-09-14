@@ -147,7 +147,8 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
     throw error;
   }
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null });
+  const goal = resolveGoal(plugin, brief.category?.goal);
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.
@@ -155,7 +156,6 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   let deaths = 0; // deaths so far in this session (game.over without victory); a death is not the end of the run
   // The goal: one of the game's ends. The plugin marks its ends with milestones; when the milestone of the goal's
   // end goes by, the harness declares the victory (game.over), which ends the session like the game's own victory.
-  const goal = resolveGoal(plugin, brief.category?.goal);
   const forward = async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
       events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });

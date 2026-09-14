@@ -13,7 +13,12 @@ async function load(kind, idOrPath) {
   const loaded = await import(pathToFileURL(file).href);
   return loaded.default ?? loaded;
 }
-export const loadRuntime = (id) => load("runtime", id);
+/** A runtime names itself for people (`name`, e.g. "Claude Code") next to its `id`; a bundle carries both. */
+export const loadRuntime = async (id) => {
+  const runtime = await load("runtime", id);
+  if (typeof runtime?.name !== "string" || !runtime.name) throw new Error(`runtime "${id}" has no name: every runtime plugin names itself ({ id, name }).`);
+  return runtime;
+};
 export const loadRecorder = (id) => load("recorder", id);
 export const loadTimer = (id) => load("timer", id);
 export { loadGamePlugin };

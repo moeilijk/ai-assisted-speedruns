@@ -83,6 +83,7 @@ export function renderConfig(broker, { placeholders = false } = {}) {
 
 export default {
   id: "codex",
+  name: "Codex",
   version: "0.1.0",
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
   async budget() { const b = checkCodexBudget(); return { ok: b.ok, percent: b.percent, max: b.max, detail: b.detail, data: { window_minutes: b.usage.windowMinutes, plan_type: b.usage.planType } }; },

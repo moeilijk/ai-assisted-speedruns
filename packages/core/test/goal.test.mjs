@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 import { run } from "../src/run.mjs";
 import { resume } from "../src/resume.mjs";
 import { configure } from "../src/configure.mjs";
+import { goalHistory } from "../src/goal.mjs";
 import { computeTimeline } from "../src/timeline.mjs";
 import { resolveGoal, defaultGoal, goalReached, laterGoal } from "../src/goal.mjs";
 
@@ -42,7 +43,9 @@ test("goal resolution: default is the final end, unknown goals are refused, a la
   assert.ok(goalReached(plugin.ends[0], { event: "game.milestone", data: { end: "a" } }));
   assert.ok(!goalReached(plugin.ends[0], { event: "game.milestone", data: { split: "A", victory: true } }), "the plugin's own victory milestone is left to its game.over");
   assert.ok(laterGoal(plugin, "a", "c") && !laterGoal(plugin, "c", "a") && !laterGoal(plugin, "a", "a"));
-  assert.equal(defaultGoal({ id: "p", category: { goal: "credits" } }), "credits", "a game without ends keeps its category goal");
+  assert.throws(() => defaultGoal({ id: "p", category: { goal: "credits" } }), /p declares no ends/, "every game declares its ends; there is no per-game fallback");
+  assert.throws(() => defaultGoal({ id: "p", ends: [{ id: "a", final: true }] }), /needs a label/);
+  assert.throws(() => defaultGoal({ id: "p", ends: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }), /exactly one end is final/);
 });
 
 test("an earlier end as the goal: the harness declares the victory; a resume may extend the goal to the end", async () => {
@@ -75,9 +78,18 @@ test("an earlier end as the goal: the harness declares the victory; a resume may
   await assert.rejects(resume({ "run-dir": runDir, runtime: join(here, "stub-runtime.mjs"), recorder: "null", "keep-open": true, goal: "half" }, { log() {} }), /only be extended to a later end/);
 });
 
-test("a game without ends keeps its category goal and its own victory", async () => {
+test("a game declares its ends: without --goal the run's goal is the final one", async () => {
   const dir = mkdtempSync(join(tmpdir(), "aas-goal-plain-"));
   const runDir = join(dir, "run");
   await configure({ runtime: join(here, "stub-runtime.mjs"), game: join(here, "fake-game.mjs"), "run-dir": runDir, instructions: join(here, "fake-game.mjs") }, { log() {} });
-  assert.equal(JSON.parse(readFileSync(join(runDir, "brief.json"), "utf8")).category.goal, "");
+  assert.equal(JSON.parse(readFileSync(join(runDir, "brief.json"), "utf8")).category.goal, "end");
+});
+
+test("the goal history keeps every goal with when it held and when it was reached", () => {
+  const ev = (timestamp, event, data = {}) => ({ timestamp, kind: "event", event, data });
+  // A log from before run.started carried the goal: act1 won, then a resume extended the goal to act3 and stopped.
+  const old = [ev("10:51", "run.started"), ev("11:14", "game.over", { victory: true, label: "Victory (act1)" }), ev("15:42a", "game.goal", { from: "act1", to: "act3" }), ev("15:42b", "run.started"), ev("15:45", "run.ended")];
+  assert.deepEqual(goalHistory(old, "act3"), [{ id: "act1", declared_at: "10:51", reached_at: "11:14" }, { id: "act3", declared_at: "15:42a", reached_at: null }]);
+  const plain = [ev("1", "run.started", { goal: "end" }), ev("2", "game.over", { victory: false }), ev("3", "game.over", { victory: true })];
+  assert.deepEqual(goalHistory(plain, "end"), [{ id: "end", declared_at: "1", reached_at: "3" }]);
 });

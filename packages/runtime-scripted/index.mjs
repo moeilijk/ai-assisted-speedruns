@@ -15,6 +15,7 @@ import { startBroker } from "../core/src/mcp-client.mjs";
 let interrupted = null;
 export default {
   id: "scripted",
+  name: "Scripted bot",
   version: "0.1.0",
   interrupt(reason) { interrupted = reason; },
   async configure(runDir, broker, brief) {

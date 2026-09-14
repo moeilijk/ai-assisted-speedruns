@@ -8,6 +8,7 @@ import { startBroker } from "../src/mcp-client.mjs";
 let interrupted = null;
 export default {
   id: "stub",
+  name: "Stub runtime",
   version: "0.1.0",
   /** The harness asks the session to end (game over): the remaining codes are skipped. */
   interrupt(reason) { interrupted = reason; },

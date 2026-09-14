@@ -118,7 +118,13 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
-  assert.equal(p.summary.schema_version, 5);
+  assert.equal(p.summary.schema_version, 6);
+  assert.deepEqual(p.summary.ends, [{ id: "credits", label: "Credits", final: true }], "the game's ends as the plugin declares them");
+  assert.deepEqual(p.summary.category.goal_end, { id: "credits", label: "Credits", final: true });
+  assert.equal(p.summary.goals.length, 1);
+  assert.equal(p.summary.goals[0].id, "credits");
+  assert.equal(p.summary.goals[0].reached_at !== null, true);
+  assert.equal(p.summary.harness.plugins.runtime.name, "Stub runtime");
   assert.equal(p.summary.spec_version, "0.1");
   assert.equal(p.summary.bundle.kind, "aas-public");
   assert.equal(p.summary.bundle.revision, 1, "the first publication of this run");

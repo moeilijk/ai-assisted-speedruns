@@ -4,25 +4,62 @@
 // when the milestone of that end goes by. The plugin never knows the goal. A resume may move the goal to a later
 // end only (the earlier victory then no longer ends the attempt), recorded as `run.human` and `game.goal`.
 
+/**
+ * The game's ends, checked: every game plugin declares them (at least its own end), each with an `id` and a `label`,
+ * exactly one `final`. The core has no per-game fallback, so goals, their labels and their history work the same for
+ * every game.
+ */
 export function endsOf(plugin) {
-  return Array.isArray(plugin?.ends) && plugin.ends.length ? plugin.ends : null;
+  const ends = plugin?.ends;
+  const who = plugin?.id ?? "the game plugin";
+  if (!Array.isArray(ends) || !ends.length) throw new Error(`${who} declares no ends: every game plugin lists its ends ({ id, label, final }), at least the game's own end.`);
+  for (const e of ends) {
+    if (typeof e?.id !== "string" || !e.id) throw new Error(`${who}: every end needs an id`);
+    if (typeof e.label !== "string" || !e.label) throw new Error(`${who}: end "${e.id}" needs a label`);
+  }
+  if (ends.filter((e) => e.final).length !== 1) throw new Error(`${who}: exactly one end is final (the game's own end)`);
+  return ends;
 }
 
-/** The game's own end: the entry marked `final`, else the last one; games without `ends` keep their category goal. */
+/** An end as a bundle carries it: `{ id, label, final }`. */
+export const publicEnd = (end) => ({ id: end.id, label: end.label, final: end.final === true });
+
+/** The game's own end: the entry marked `final`. */
 export function defaultGoal(plugin) {
-  const ends = endsOf(plugin);
-  if (!ends) return plugin?.category?.goal ?? "";
-  return (ends.find((e) => e.final) ?? ends.at(-1)).id;
+  return endsOf(plugin).find((e) => e.final).id;
 }
 
 /** `{ id, end }` for a requested goal (or the default), checked against the game's ends. */
 export function resolveGoal(plugin, goal) {
   const ends = endsOf(plugin);
   const id = goal || defaultGoal(plugin);
-  if (!ends) return { id, end: null };
   const end = ends.find((e) => e.id === id);
   if (!end) throw new Error(`Unknown goal "${id}" for ${plugin.id}; its ends are ${ends.map((e) => e.id).join(", ")} (no goal = ${defaultGoal(plugin)}, the game's own end).`);
   return { id, end };
+}
+
+/**
+ * Every goal the run had, in order, from its own events: the goal at the first `run.started` (older logs without
+ * `data.goal`: the `from` of the first `game.goal`, else `current`), then each `game.goal` extension. Each entry is
+ * `{ id, declared_at, reached_at }`; a goal is reached by the first victory (`game.over` with `victory`) while it held.
+ */
+export function goalHistory(events, current) {
+  const firstChange = events.find((e) => e.event === "game.goal");
+  const goals = [];
+  let now = null;
+  for (const e of events) {
+    if (e.event === "run.started" && !now) {
+      now = { id: e.data?.goal ?? firstChange?.data?.from ?? current, declared_at: e.timestamp, reached_at: null };
+      goals.push(now);
+    } else if (e.event === "game.goal") {
+      if (!now) goals.push({ id: e.data?.from ?? current, declared_at: null, reached_at: null });
+      now = { id: e.data?.to, declared_at: e.timestamp, reached_at: null };
+      goals.push(now);
+    } else if (e.event === "game.over" && e.data?.victory === true && now && !now.reached_at) {
+      now.reached_at = e.timestamp;
+    }
+  }
+  return goals;
 }
 
 /** Whether a `game.milestone` event marks this end. The plugin's own victory milestone (`victory: true`) is left to its `game.over`. */
@@ -34,7 +71,6 @@ export function goalReached(end, event) {
 /** Whether `to` comes after `from` in the game's ends (a resume may only extend the goal). */
 export function laterGoal(plugin, from, to) {
   const ends = endsOf(plugin);
-  if (!ends) return false;
   const a = ends.findIndex((e) => e.id === from), b = ends.findIndex((e) => e.id === to);
   return a >= 0 && b > a;
 }

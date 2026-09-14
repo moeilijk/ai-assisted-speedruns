@@ -123,9 +123,10 @@ export interface GamePlugin {
   category?: Partial<Category>;
   /**
    * The game's ends, in order: the milestone `split` (or `data.end` = id) that marks each, one `final` (the game's own
-   * end, the goal when none is given). The harness declares the victory when the goal's milestone goes by.
+   * end, the goal when none is given). The harness declares the victory when the goal's milestone goes by. Required:
+   * every game declares at least its own end, so goals, their labels and their history work the same for every game.
    */
-  ends?: { id: string; label: string; split?: string; final?: boolean }[];
+  ends: { id: string; label: string; split?: string; final?: boolean }[];
   /** Default first prompt for the agent (the goal); `aas configure --prompt` overrides it. */
   goalPrompt?: string;
   /** Optional extra checks for `aas check-connection --exercise`. */
@@ -183,6 +184,8 @@ export interface DoctorRow { ok: boolean; what: string; detail?: string }
 
 export interface RuntimePlugin {
   id: string;
+  /** The name people know the runtime by ("Claude Code"); required, a bundle carries it next to the id. */
+  name: string;
   version?: string;
   /** Write the hardened configuration into the run directory. Must refuse to overwrite. */
   configure(runDir: string, broker: BrokerSpec, brief: RunBrief): Promise<void>;

@@ -19,7 +19,7 @@ export default {
   env: ["AAS_MY_GAME_HOST", "AAS_MY_GAME_PORT"],     // the variables the controller reads inside the broker; nothing else reaches it
   readable: [here],              // directories the broker process may read besides core
   segments: ["Level 1", "Level 2"],                  // the splits (chapter milestones), in order
-  ends: [{ id: "level1", label: "Level 1", split: "Level 1" }, { id: "end", label: "The end", split: "Level 2", final: true }],   // the game's ends; `final` is the default goal
+  ends: [{ id: "level1", label: "Level 1", split: "Level 1" }, { id: "end", label: "The end", split: "Level 2", final: true }],   // required: the game's ends, each with a label, exactly one `final` (the default goal)
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim
   goalPrompt: "Play the run that has been started for you to the end.", // the first prompt
@@ -56,6 +56,7 @@ A runtime writes the agent's hardened configuration into the run directory and s
 ```js
 export default {
   id: "my-runtime",
+  name: "My Runtime",            // required: the name people know it by; a bundle carries it next to the id
   version: "0.1.0",
   async configure(runDir, broker, brief) { /* write the config; refuse to overwrite; return { files, hint } */ },
   async reconfigure(runDir, broker, brief) { /* rewrite machine paths after a move (resume) */ },

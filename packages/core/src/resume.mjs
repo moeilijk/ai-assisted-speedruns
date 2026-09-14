@@ -28,7 +28,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     const from = brief.category?.goal ?? "";
     const to = resolveGoal(plugin, opts.goal).id;
     if (to !== from) {
-      if (!laterGoal(plugin, from, to)) throw new Error(`The goal can only be extended to a later end of the game: from ${from} to ${to} is not (ends: ${(plugin.ends ?? []).map((e) => e.id).join(", ")}).`);
+      if (!laterGoal(plugin, from, to)) throw new Error(`The goal can only be extended to a later end of the game: from ${from} to ${to} is not (ends: ${plugin.ends.map((e) => e.id).join(", ")}).`);
       goalExtended = { from, to };
       brief.category.goal = to;
     }
@@ -96,7 +96,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("run.human", { note: `goal extended from ${goalExtended.from} to ${goalExtended.to}`, segment });
     events.append("game.goal", { from: goalExtended.from, to: goalExtended.to, segment });
   }
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, resumed: true, segment });
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   let over = null;
   let deaths = 0;

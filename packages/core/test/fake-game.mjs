@@ -3,6 +3,7 @@ const PNG1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhf
 export default {
   id: "fake_game",
   name: "Fake Game",
+  ends: [{ id: "end", label: "The end", final: true }],
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: false },
   endpoints: [],
   documentation: "# Fake Game API\n\n`game.observe()` returns `{turn, hp}`; `game.act(name)` returns `{ok, turn}`; `game.screenshot()`.\n",

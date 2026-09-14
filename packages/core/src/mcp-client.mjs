@@ -133,5 +133,7 @@ export async function loadGamePlugin(modulePath) {
   const loaded = await import(pathToFileURL(resolve(modulePath)).href);
   const plugin = loaded.default ?? loaded;
   if (!plugin || typeof plugin.id !== "string") throw new Error(`${modulePath} does not export a GamePlugin.`);
+  const { endsOf } = await import("./goal.mjs");
+  endsOf(plugin); // every game declares its ends
   return plugin;
 }
