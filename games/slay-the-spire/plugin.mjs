@@ -426,16 +426,23 @@ export default {
         played = { build_version: save.metric_build_version ?? null, seed_played: save.metric_seed_played ?? save.seed ?? null, ascension_level: save.ascension_level ?? null, chose_seed: save.seed_set ?? null, character_chosen: save.class_name ?? null };
       } catch { /* no save either */ }
     }
-    // The mods that were really loaded, from the jars themselves: every ModTheSpire mod carries its id and
-    // version in ModTheSpire.json inside its jar, and the jar's sha256 pins the exact file. The loader prints
-    // its own version into the game's log, because its jar does not carry a usable one.
+    // The mods that were really loaded: ModTheSpire prints its "Mod list:" into the launch log, and the launcher
+    // passes `--mods basemod,CommunicationMod` when there is no log. A jar in <game>/mods that was not in that list
+    // (SeedSearch, used only to pick a seed) was not loaded and is not reported. Every ModTheSpire mod carries its
+    // id and version in ModTheSpire.json inside its jar, and the jar's sha256 pins the exact file. The loader
+    // prints its own version into the same log, because its jar does not carry a usable one.
     const mods = [];
     if (GAME_ROOT) {
+      let launchLog = "";
+      try { launchLog = readFileSync(join(GAME_ROOT, "aas-launch.log"), "utf8"); } catch { /* no launch log */ }
+      const listed = (launchLog.match(/^Mod list:\r?\n((?:\s+- .*\r?\n?)+)/m)?.[1] ?? "").split(/\r?\n/).map((l) => l.match(/^\s+- (\S+)/)?.[1]).filter(Boolean);
+      const loaded = new Set((listed.length ? listed : ["basemod", "CommunicationMod"]).map((id) => id.toLowerCase()));
       const modsDir = join(GAME_ROOT, "mods");
       for (const jar of existsSync(modsDir) ? readdirSync(modsDir).filter((x) => x.endsWith(".jar")).sort() : []) {
         const file = join(modsDir, jar);
         let info = null;
         try { info = JSON.parse(readZipEntry(file, "ModTheSpire.json").toString("utf8").replace(/^\uFEFF/, "")); } catch { /* not a ModTheSpire mod */ }
+        if (!loaded.has(String(info?.modid ?? "").toLowerCase())) continue;
         const pinned = info?.modid === "CommunicationMod" ? upstream.communication_mod : null;
         mods.push({
           name: info?.name ?? info?.modid ?? jar.replace(/\.jar$/, ""),
@@ -444,8 +451,7 @@ export default {
           source: pinned?.jar ?? `installed in <game>/mods/${jar}`,
         });
       }
-      let loader = null;
-      try { loader = (readFileSync(join(GAME_ROOT, "aas-launch.log"), "utf8").match(/ModTheSpire \(([^)]+)\)/) ?? [])[1] ?? null; } catch { /* no launch log */ }
+      const loader = launchLog.match(/ModTheSpire \(([^)]+)\)/)?.[1] ?? null;
       mods.unshift({ name: "ModTheSpire", version: loader, source: `Steam Workshop ${upstream.modthespire?.workshop_id}` });
     }
     return {
