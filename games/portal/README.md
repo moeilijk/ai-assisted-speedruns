@@ -1,6 +1,6 @@
 # Portal (via cozyblaze/portal-agent)
 
-A thin adapter that loads [portal-agent](https://github.com/cozyblaze/portal-agent)'s controller (MIT) as an AAS `GamePlugin`. Portal-agent's published `evidence/` serves as a format fixture for the spec (it is not an entry and they are not affiliated with this project), and their SourcePauseTool (SPT) patch is the in-game side. Nothing of theirs is vendored: [fetch-portal-agent.mjs](fetch-portal-agent.mjs) clones the commit pinned in [UPSTREAM.json](UPSTREAM.json) into `.local/portal-agent`.
+A thin adapter that loads [portal-agent](https://github.com/cozyblaze/portal-agent)'s controller (MIT) as an AAS `GamePlugin`. Portal-agent's published `evidence/` serves as a format fixture for the spec (portal-agent is not affiliated with this project and took no part in making it), and their SourcePauseTool (SPT) patch is the in-game side. Nothing of theirs is vendored: [fetch-portal-agent.mjs](fetch-portal-agent.mjs) clones the commit pinned in [UPSTREAM.json](UPSTREAM.json) into `.local/portal-agent`.
 
 | | |
 |---|---|

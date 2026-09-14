@@ -11,7 +11,7 @@ Three kinds of plugins, one core:
 | **recorder** | records the run and reacts to run events | OBS (obs-websocket v5), source-demo (in-game demo via SPT), null |
 | **timer** | speedrun timer on screen and splits | LiveSplit (LiveSplit Server) |
 
-The agent only ever sees three tools per game: `<game>_documentation`, `<game>_screenshot`, `<game>_exec`. That shape, the broker, the process hardening and the log/export format come from [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent) (MIT), which is credited as their origin and is not affiliated with this project.
+The agent only ever sees three tools per game: `<game>_documentation`, `<game>_screenshot`, `<game>_exec`. That shape, the broker, the process hardening and the log/export format come from [cozyblaze/portal-agent](https://github.com/cozyblaze/portal-agent) (MIT), which is credited as their origin; it is not affiliated with this project and took no part in making it.
 
 ## What the tooling does
 
