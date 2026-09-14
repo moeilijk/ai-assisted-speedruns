@@ -191,7 +191,6 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     const mods = (g?.mods ?? []).map((m) => `${m.name}${m.version ? ` ${m.version}` : ""}`).join(", ");
     add("reproducible", g?.version ? "met" : "unmet", g?.version ? `${g.game ?? "game"} ${g.version}${mods ? `; ${mods}` : ""}` : "summary.game has no game version: the bundle does not say which build was played");
   } catch { /* reported above */ }
-  const recordingFiles = exists("recording") ? fs.readdirSync(file("recording")).filter((f) => !f.startsWith(".")) : [];
   let rec = null;
   try { rec = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording ?? null; } catch { /* reported above */ }
   // Where the recording is published is not the bundle's to say: video links come from the archive the run is
@@ -203,17 +202,15 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     rec?.fingerprint
       ? `the recording's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${rec.duration_seconds ? `, and the length must be about ${rec.duration_seconds} s` : ""}`
       : "summary.recording has no fingerprint: nothing ties the published recording to this bundle");
-  const recordingPresent = recordingFiles.length > 0;
   if (exists("summary.json")) {
     try {
       const bi = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording?.black_intervals;
       if (Array.isArray(bi)) {
-        const long = bi.filter((b) => b.seconds >= 10 && !b.game); // black inside a loading/cinematic phase is the game's own
-        // The publisher measures this at publish time and declares it here; a reader that has only the bundle cannot
-        // recompute it, because the recording is linked, not packed. What a reader can check is the recording's
-        // sha256 in the manifest, and then measure the linked file itself with the same tool.
-        const where = "measured by the publisher on the recording it made and uploaded";
-        add("recording shows a picture", long.length ? "unmet" : "met", `${long.length ? long.map((b) => `${b.file}: black ${b.seconds} s from ${b.start} s`).join("; ") : bi.length ? `${bi.length} short black interval(s)` : "no black interval of a second or more"} (${where})`);
+        // Black frames are part of the recording and never fail a run (owner, 2026-09-14). The publisher measures them
+        // at publish time and declares them, so a reader knows where to look; a reader that has only the bundle cannot
+        // recompute them, because the recording is linked, not packed.
+        const where = "measured by the publisher on the recording it made and uploaded; black frames are part of the recording, not a failure";
+        add("black intervals declared", "met", `${bi.length ? bi.map((b) => `${b.file}: black ${b.seconds} s from ${b.start} s${b.game ? " (the game's own)" : ""}`).join("; ") : "no black interval of a second or more"} (${where})`);
       }
     } catch { /* summary problems are reported above */ }
   }

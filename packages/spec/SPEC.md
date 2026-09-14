@@ -256,7 +256,7 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The recording shows the game's picture from t0 to `run.ended`. Black frames the game itself draws (its loading screens and transitions, which the game plugin reports as `game.phase` `loading` or `cinematic`) are part of the game; a capture that shows nothing while the game runs is missing evidence, whatever the log says. The publisher measures the black intervals of the recording it made and uploaded, and declares them in `summary.recording.black_intervals`; a whole frame black for ten seconds or more outside such a phase fails this point. A reader checks it by watching the published recording at those offsets.
+8. The publisher measures the black intervals of the recording it made and uploaded and declares them in `summary.recording.black_intervals`, each marked when it falls in a phase the game plugin reports as `loading` or `cinematic`. Black frames are part of the recording: they are declared so a reader knows where to look, and they do not fail a run.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
 
