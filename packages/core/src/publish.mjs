@@ -1,5 +1,5 @@
 // `aas publish <run-dir> <out-dir>`: build the public bundle of the spec (§4)
-// from a private run directory: sanitized timeline + summary (schema 4),
+// from a private run directory: sanitized timeline + summary (schema 5),
 // tools.json, AGENTS.md, documentation.md, runtime-config/, game-config/,
 // chapters.txt, timeline.json, splits.lss, manifest.json — and no recording:
 // the video is published where video is published and linked from the summary.
@@ -14,7 +14,6 @@ import { exportClaudeSession } from "./export-claude-session.mjs";
 import { SCAN_RULES } from "./sanitize.mjs";
 import { computeTimeline, writeTimeline } from "./timeline.mjs";
 import { probeDuration } from "./render.mjs";
-import { describeRecordingUrl } from "./platform.mjs";
 import { SIGNATURE_FILE, signBundle } from "./sign.mjs";
 import { zipBuffer } from "./zip.mjs";
 import { brokerSpec } from "./configure.mjs";
@@ -36,7 +35,7 @@ export const SPEC_VERSION = "0.1";
 /** The bundle's packaging: which files it holds and how they are named. */
 export const BUNDLE_VERSION = 1;
 /** The shape of summary.json. */
-export const SUMMARY_SCHEMA = 4;
+export const SUMMARY_SCHEMA = 5;
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
   const walk = (d, prefix = "") =>
@@ -73,7 +72,7 @@ export function scanPublication(dir) {
   return { files, findings };
 }
 
-export async function publish(runDir, outDir, { session, completionMarker, log = console.log , videoUrl: videoUrlOption = null, signKey = null } = {}) {
+export async function publish(runDir, outDir, { session, completionMarker, log = console.log , signKey = null } = {}) {
   runDir = path.resolve(runDir);
   outDir = path.resolve(outDir);
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length) throw new Error(`Refusing to write into non-empty ${outDir}`);
@@ -118,8 +117,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     else { fs.mkdirSync(path.dirname(dst), { recursive: true }); fs.copyFileSync(src, dst); }
   }
   // The recording itself is not copied into the bundle: a run is hours of 1080p60 and nobody ships gigabytes.
-  // It is published where video is published and the bundle carries the link (--video-url, or recording.url in
-  // the run directory's recording.json), with the chapters and the timings that place the timeline in it.
+  // Nor is where it is published: video links come from the archive the run is submitted to, not from the bundle.
+  // The bundle carries the chapters and the timings that place the timeline in the recording.
 
   // 3. timeline: timers, sections, chapters, cut list
   let timeline = null;
@@ -134,7 +133,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log(`no timeline: ${error.message}`);
   }
 
-  // 4. summary schema 4
+  // 4. summary schema 5
   const summaryFile = path.join(outDir, "summary.json");
   const summary = JSON.parse(fs.readFileSync(summaryFile, "utf8"));
   // Three versions, because three things change at their own pace and a reader has to tell them apart:
@@ -176,7 +175,6 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // What the recording shows, measured (ffmpeg blackdetect on every raw recording file): intervals of a second or
   // more in which the whole frame is black. A capture that showed nothing is invisible to every other check.
   const blackIntervals = measureBlack(runDir, (recording?.files ?? []).filter((f) => !/\.cut\.mp4$/.test(f)), gamePhases(runDir, recording?.t0 ?? timeline?.t0 ?? null));
-  const videoUrl = videoUrlOption ?? recording?.url ?? null;
   // A platform re-encodes what you upload, so a hash of the video file proves nothing about the video anyone can
   // watch. What ties the two together is this: the length of the recording, and a fingerprint of this bundle's own
   // timeline that the publisher puts in the video's description. An archive reads the description, compares the
@@ -188,18 +186,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     ? createHash("sha256").update(fs.readFileSync(path.join(outDir, "session.sanitized.jsonl"))).digest("hex")
     : null;
   const duration = durations.length ? Math.round(durations.reduce((a, b) => a + b, 0)) : null;
-  const urls = String(videoUrl ?? "").split(",").map((u) => u.trim()).filter(Boolean);
-  const recordings = urls.map((u) => {
-    const d = describeRecordingUrl(u);
-    if (!d) { log(`not a usable recording link, skipped: ${u}`); return null; }
-    // confirmed_at: when the publisher last said this link resolves. A VOD rots; an archive that keeps a list
-    // with dates can see which publication of the same run is still the one to watch.
-    return { ...d, duration_seconds: duration, fingerprint, confirmed_at: new Date().toISOString() };
-  }).filter(Boolean);
-  summary.recordings = recordings;
   summary.recording = {
-    url: recordings[0]?.url ?? null,
-    platform: recordings[0]?.platform ?? null,
     duration_seconds: duration,
     fingerprint,
     recorder: recording?.recorder ?? null,
@@ -276,8 +263,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log("");
     log(`    ${descriptionLine(summary)}`);
     log("");
-    log(`Then: aas publish ${runDir} ${outDir} --video-url <link>`);
-    if (videoUrl) log(`(this bundle already links ${urls.length} recording${urls.length === 1 ? "" : "s"}; re-run only when a link changes)`);
+    log("The link to the recording is given to the archive when the run is submitted, not to the bundle.");
     log("");
   }
   log(formatReport(outDir, check));

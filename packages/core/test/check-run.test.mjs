@@ -18,7 +18,7 @@ test("portal-agent evidence: timeline and summary valid, other files reported mi
   assert.equal(report.records, 6925);
   assert.equal(status(report, "summary.json"), "met");
   assert.equal(report.summary.schema_version, 2);
-  for (const name of ["tools.json", "AGENTS.md", "documentation.md", "runtime-config", "recording published", "manifest.json"]) {
+  for (const name of ["tools.json", "AGENTS.md", "documentation.md", "runtime-config", "manifest.json"]) {
     assert.equal(status(report, name), "unmet", name);
   }
 });

@@ -151,8 +151,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       case "publish": {
         const { publish } = await import("./publish.mjs");
         const [src, out] = opts._;
-        if (!src || !out) throw new Error("Usage: aas publish <run-dir> <out-dir> [--video-url <url>] [--sign [key]] [--session <log>] [--completion-marker <text>]");
-        const r = await publish(src, out, { session: opts.session, completionMarker: opts["completion-marker"], videoUrl: opts["video-url"], signKey: opts.sign });
+        if (!src || !out) throw new Error("Usage: aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]");
+        if (opts["video-url"] !== undefined) throw new Error("--video-url is gone: a bundle carries no video links; the link to the recording is given to the archive when the run is submitted");
+        const r = await publish(src, out, { session: opts.session, completionMarker: opts["completion-marker"], signKey: opts.sign });
         process.exitCode = r.scan.findings.length || r.check.results.some((x) => x.status === "invalid") ? 1 : 0;
         break;
       }
@@ -198,7 +199,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas key [file]                           the publisher's signing key: makes one if there is none, prints the public line to register",
             "  aas key --claim --identity <uri> [--out f]   a signed statement that this key is yours, to publish anywhere",
             "  aas key --verify <file|->                a claim as published: does it verify, and which identities does it name",
-            "  aas publish <run-dir> <out-dir> [--video-url <url>[,<url>]] [--sign [key]] [--session <log>] [--completion-marker <text>]",
+            "  aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]",
             "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
             "  aas check [--strict] <run-dir>",
             "  aas scan <dir>",

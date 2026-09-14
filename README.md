@@ -51,7 +51,7 @@ aas run --runtime claude-code --game games/slay-the-spire/plugin.mjs --run-dir <
         --recorder obs --timer livesplit --overlay-port 8765 --goal act1 --headless --max-minutes 60
 aas timeline <runs>/sts-claude-code-01
 aas render   <runs>/sts-claude-code-01
-aas publish  <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01 --video-url <link to the recording>
+aas publish  <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
 aas check --strict <runs>/public/sts-claude-code-01
 ```
 

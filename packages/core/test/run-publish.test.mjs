@@ -115,17 +115,18 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   // Signed, because an entry says who published it; a generated PKCS#8 key needs no ssh-keygen here.
   const signKey = join(dirname(runDir), "publisher.pem");
   writeFileSync(signKey, generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
-  const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", videoUrl: "https://www.youtube.com/watch?v=aaaaaaaaaaa, https://example.invalid/vod", signKey, log: () => {} });
+  const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
-  assert.equal(p.summary.schema_version, 4);
+  assert.equal(p.summary.schema_version, 5);
   assert.equal(p.summary.spec_version, "0.1");
   assert.equal(p.summary.bundle.kind, "aas-public");
   assert.equal(p.summary.bundle.revision, 1, "the first publication of this run");
   assert.equal(p.summary.bundle.run_id, p.summary.run_id);
   assert.equal(p.summary.harness.version, p.summary.harness.framework.split(" ").at(-1));
-  assert.deepEqual(p.summary.recordings.map((r) => [r.platform, r.kind, r.binding_field]), [["youtube", "upload", "description"], ["other", "unknown", "title or description"]], "a run may be published in more than one place");
-  assert.equal(p.summary.recordings[0].fingerprint, p.summary.recording.fingerprint);
+  assert.equal("recordings" in p.summary, false, "video links come from the archive, not from the bundle");
+  assert.equal("url" in p.summary.recording, false);
+  assert.match(p.summary.recording.fingerprint, /^[0-9a-f]{64}$/);
   assert.equal(p.summary.category.game, "portal");
   assert.equal(p.summary.category.human, "restart-only", "a resume makes the run restart-only");
   assert.equal(p.summary.recording.igt_seconds, 4.005);

@@ -3,7 +3,7 @@
 // private per-session .jsonl under ~/.claude/projects/<project>/). Review the
 // output before publishing it. Same output shape as runtime-codex/export-rollout.mjs:
 // session.sanitized.jsonl + summary.json (schema 2); `aas publish` raises it to
-// schema 4 and adds the blocks that belong to a bundle.
+// schema 5 and adds the blocks that belong to a bundle.
 //
 // Usage: node export-claude-session.mjs <session.jsonl> <new-output-directory>
 // Env:   AAS_TIME_ZONE, AAS_COMPLETION_MARKER (prefix of the agent's final message)

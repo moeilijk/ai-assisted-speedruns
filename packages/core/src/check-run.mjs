@@ -109,7 +109,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     }
     if (summary) {
       for (const key of SUMMARY_V2_KEYS) if (!(key in summary)) problems.push(`missing ${key}`);
-      if (![2, 3, 4].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3 or 4`);
+      if (![2, 3, 4, 5].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4 or 5`);
       for (const key of ["started_at", "ended_at"]) if (!TIMESTAMP_RE.test(String(summary[key]))) problems.push(`${key} is not ISO 8601 with offset`);
       if (summary.completed_at !== null && !TIMESTAMP_RE.test(String(summary.completed_at))) problems.push("completed_at must be null or ISO 8601 with offset");
       if (!Array.isArray(summary.models) || !summary.models.every((m) => typeof m?.model === "string")) problems.push("models must list {model, reasoning_effort}");
@@ -137,9 +137,9 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
       }
       if (summary.schema_version >= 4) {
         // What a store needs to file this bundle: which standard, which packaging, which publication of which run.
-        if (typeof summary.spec_version !== "string" || !summary.spec_version) problems.push("schema 4 requires spec_version");
+        if (typeof summary.spec_version !== "string" || !summary.spec_version) problems.push("schema 4 and later require spec_version");
         const b = summary.bundle;
-        if (!b || typeof b !== "object") problems.push("schema 4 requires a bundle block");
+        if (!b || typeof b !== "object") problems.push("schema 4 and later require a bundle block");
         else {
           if (b.kind !== "aas-public") problems.push(`bundle.kind "${b.kind}" is not "aas-public"`);
           if (!Number.isInteger(b.bundle_version)) problems.push("bundle.bundle_version must be an integer");
@@ -147,7 +147,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           if (typeof b.run_id !== "string" || !b.run_id) problems.push("bundle.run_id missing");
           if (!TIMESTAMP_RE.test(String(b.published_at))) problems.push("bundle.published_at is not ISO 8601 with offset");
         }
-        if (!Array.isArray(summary.recordings)) problems.push("schema 4 requires recordings as a list");
+        if (summary.schema_version === 4 && !Array.isArray(summary.recordings)) problems.push("schema 4 requires recordings as a list");
         if (summary.harness && (typeof summary.harness.version !== "string" || !summary.harness.version)) problems.push("harness.version missing");
       } else if (humanRecords && summary.category?.human === "none") problems.push("run.human records with human: none");
     }
@@ -193,20 +193,16 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     add("reproducible", g?.version ? "met" : "unmet", g?.version ? `${g.game ?? "game"} ${g.version}${mods ? `; ${mods}` : ""}` : "summary.game has no game version: the bundle does not say which build was played");
   } catch { /* reported above */ }
   const recordingFiles = exists("recording") ? fs.readdirSync(file("recording")).filter((f) => !f.startsWith(".")) : [];
-  let recordingUrl = null;
-  try { recordingUrl = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording?.url ?? null; } catch { /* reported above */ }
   let rec = null;
   try { rec = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording ?? null; } catch { /* reported above */ }
-  const publications = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recordings ?? []; } catch { return []; } })();
-  add("recording published", publications.length ? "met" : "unmet",
-    publications.length ? publications.map((r) => `${r.platform}: ${r.url}${r.kind === "vod" ? " (a VOD expires; publish a copy that keeps)" : ""}`).join("; ")
-      : "summary.recordings is empty: the bundle does not say where the recording can be watched (aas publish --video-url <url>[,<url>])");
+  // Where the recording is published is not the bundle's to say: video links come from the archive the run is
+  // submitted to, so a bundle is never judged on a missing link.
   // What binds that link to this bundle: the description of the video must carry this fingerprint and the
   // duration must match. A platform re-encodes the file, so its hash cannot do this.
   const runId = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_id ?? null; } catch { return null; } })();
   add("recording bound to this bundle", rec?.fingerprint ? "met" : "unmet",
     rec?.fingerprint
-      ? `${publications.length ? publications.map((r) => `${r.platform} ${r.binding_field}`).join(", ") : "the recording's description"} must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${rec.duration_seconds ? `, and the length must be about ${rec.duration_seconds} s` : ""}`
+      ? `the recording's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${rec.duration_seconds ? `, and the length must be about ${rec.duration_seconds} s` : ""}`
       : "summary.recording has no fingerprint: nothing ties the published recording to this bundle");
   const recordingPresent = recordingFiles.length > 0;
   if (exists("summary.json")) {

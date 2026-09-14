@@ -201,17 +201,14 @@ aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thin
 aas publish <run-dir> <public-dir>          # the bundle + the upload zip; prints the description line
 ```
 
-The recording is not part of the bundle: gigabyte files are not what anyone shares. Publish the video where
-video is published, and bind the two:
+The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares, and
+where a video is published is the archive's to keep. Publish the video where video is published, and bind the two:
 
 1. `aas publish` prints one line, `AAS <run-id> · fingerprint <16 hex> · <n> s`. The fingerprint is the
    sha256 of this bundle's own published timeline (`session.sanitized.jsonl`).
-2. Upload the recording (YouTube, Twitch, Vimeo, archive.org, PeerTube and more are recognised by name) and
-   put that line in the field the platform lets a viewer read: the description, or the title where there is
-   none.
-3. Run publish again with the link: `aas publish <run-dir> <public-dir> --video-url <url>`. Several links
-   (mirrors, a VOD plus an upload) are comma-separated; each is recorded with its platform, its kind and the
-   field the fingerprint is in.
+2. Upload the recording and put that line in the field the platform lets a viewer read: the description, or
+   the title where there is none.
+3. Submit the bundle to the archive and give the link to the recording there. The bundle carries no links.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
 duration, and a few tool calls spot-checked at their `elapsed_seconds`.
@@ -294,4 +291,3 @@ No file has to be edited by hand beyond `.env`.
 | `aas render`: `ffmpeg failed` / no duration in the bundle | ffmpeg or ffprobe is not on the PATH. |
 | `aas publish` deleted the output directory | the privacy scan found something (a home path, a mount path, an e-mail address, a credential). The findings are printed; fix the source, then publish again. |
 | `--sign`: the key cannot be read, or "is not ed25519" | the key has a passphrase (the signer cannot unlock one) or is RSA. Make a passphrase-free ed25519 key as in §10. |
-| `aas check`: `recording published: unmet` | the bundle has no `--video-url` yet. Upload the recording and publish again with the link. |

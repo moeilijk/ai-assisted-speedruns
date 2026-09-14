@@ -67,7 +67,7 @@ A published run is a directory with these files. Names are fixed.
 | `AGENTS.md` | yes | the instructions / system prompt, verbatim |
 | `documentation.md` | yes | what `<game>_documentation` returned |
 | `manifest.json` | yes | sha256 of every published file, see §7 |
-| `recording.url` in `summary.json` | yes | where the recording of this run is published (a video platform): continuous from t0 to `run.ended`. The video itself is not part of the bundle: a run is hours of 1080p60 and nobody ships that around. |
+| `recording` in `summary.json` | yes | the recording's length, the fingerprint that binds it to this bundle, and the timings that place the timeline in it. The recording is continuous from t0 to `run.ended`. The video is not part of the bundle (a run is hours of 1080p60 and nobody ships that around), and neither is where it is published: video links come from the archive the run is submitted to. |
 | `chapters.txt` | if the recording has chapters | `HH:MM:SS Label` per line, relative to t0 (YouTube format) |
 | `runtime-config/` | yes | the runtime's configuration with machine paths replaced (portal-agent: `config.template.toml`) |
 | `game-config/` | if applicable | game settings changed for the run (cvars, mods, patches, with upstream references) |
@@ -114,17 +114,15 @@ Seeing is not deciding: whether a newer publication supersedes an entry already 
 standard leaves it to whoever keeps the archive rather than merging anything on a matching field. `harness` names the
 framework and every plugin with its own version, each as `{id, version}` rather than as a sentence.
 
-A run may be published in more than one place, and a stream VOD expires where an upload keeps. `recordings` is
-therefore a list, each entry with `url`, `platform` (named in the bundle, not guessed from the link by the
-reader), `host`, `kind` (`upload`, `vod`, `archive`, `unknown`), `binding_field` (the field on that platform
-in which a viewer can read the fingerprint), `duration_seconds`, `fingerprint` and `confirmed_at` (when the
-publisher last confirmed the link resolves). `recording` keeps the first of them plus the timings of the run.
+Where a recording is published is not in the bundle. A run may be published in more than one place, and a stream VOD
+expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
+supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4, what `aas publish` writes, adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5, what `aas publish` writes, drops `recordings` and `recording.url`: video links come from the archive, not from the bundle.
 
 ```json
 {
-  "schema_version": 4,
+  "schema_version": 5,
   "time_zone": "Europe/Amsterdam",
   "run_dates": "2026-09-20 to 2026-09-20",
   "started_at": "...", "completed_at": "...", "ended_at": "...",
@@ -149,7 +147,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
     "human_notes": null
   },
   "recording": {
-    "recorder": "obs", "t0": "...", "url": "https://www.youtube.com/watch?v=...",
+    "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
     "black_intervals": [], "chapters": "chapters.txt",
     "igt_seconds": null, "wall_clock_seconds": 0, "thinking_seconds": 0
@@ -170,7 +168,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 
-`recording.url` is where the recording of this run is published, `duration_seconds` its length and `fingerprint` the sha256 of `session.sanitized.jsonl`. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
+`recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
 Binding a recording to a bundle is two claims, and they are established differently. **This recording is mine**: only the owner of a recording can write its description, so a line in it that a stranger could not have put there says the channel is the publisher's. An archive that is connected to the publisher's channel through that platform can ask the platform instead, which settles ownership without the publisher editing anything. **This recording is of this bundle**: that is what the fingerprint says, and no platform connection can answer it, because the platform knows nothing about the run. A reader who does not trust the archive can only check the second claim where the fingerprint is readable, so the line stays the route for anyone whose channel an archive cannot ask, and the better practice for everyone else: an archive may accept a connected channel without it, and then carries the binding on its own word.
 
@@ -195,7 +193,7 @@ bundle as carrying a stray file.
 
 ## 7a. The upload
 
-A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was; `summary.recording.url` says where it can be watched.
+A bundle is offered as one **zip**, named `<run_id>.zip`, with every file under a single top-level directory `<run_id>/`. It is small: a timeline, a summary, the tool definitions, the instructions, the configuration, the chapters and the splits. The recording is not in it and never was, and where it can be watched is kept by the archive, not by the bundle.
 
 ## 7b. `signature.json` (optional)
 
@@ -251,7 +249,7 @@ bundle by the fingerprint in its description instead.
 
 A run is verifiable when all of the following hold:
 
-1. The recording named by `summary.recording.url` is continuous from `run.started` to `run.ended`. Pauses are `run.wait` events in the timeline and visible in the recording.
+1. The recording of this run, where the archive holds its link, is continuous from `run.started` to `run.ended`. Pauses are `run.wait` events in the timeline and visible in the recording.
 2. Every `tool_call` can be located in that recording at its `elapsed_seconds`; `chapters.txt` names the sections at the same offsets, so a reader can jump to any of them.
 3. `human: none` implies no `run.human` record. Any `run.human` record forces `restart-only` or `assisted`.
 4. `tools.json`, `AGENTS.md`, `documentation.md` and `runtime-config/` are published; the agent had no tool outside `tools.json`.
