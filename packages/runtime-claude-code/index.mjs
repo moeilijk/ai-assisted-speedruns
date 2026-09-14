@@ -114,7 +114,9 @@ export default {
       throw new Error(`Claude Code does not trust ${runDir}, so it would ignore the allow rules of .claude/settings.json and the run would not be valid. ` +
         `aas run/resume set this when they configure the directory; to set it by hand: projects["${path.resolve(runDir)}"].hasTrustDialogAccepted: true in ${claudeConfigFile()}.`);
     }
-    const args = ["--mcp-config", ".mcp.json", "--strict-mcp-config", "--settings", path.join(".claude", "settings.json")];
+    // `--tools ""` removes every built-in tool (shell, web, files, subagents) from the session, so the agent has only
+    // the broker's three; the deny rules in settings.json stay as a second line should a tool slip through.
+    const args = ["--tools", "", "--mcp-config", ".mcp.json", "--strict-mcp-config", "--settings", path.join(".claude", "settings.json")];
     if (brief.model) args.push("--model", brief.model);
     // Effort level for the session (low, medium, high, xhigh, max). Passed only when the run asked for one;
     // the CLI writes it on every assistant record, so the published summary reports what was actually used.

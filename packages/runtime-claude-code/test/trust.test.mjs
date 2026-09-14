@@ -2,10 +2,10 @@
 // a second call changes nothing, an unreadable file is left alone, and `start` refuses an untrusted directory.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { IGNORED_RULES, claudeConfigFile, isTrusted, trustRunDir } from "../trust.mjs";
+import { IGNORED_RULES, claudeConfigFile, isTrusted, trustDir, trustRunDir } from "../trust.mjs";
 import runtime from "../index.mjs";
 
 test("trustRunDir sets the flag for that directory and keeps the rest of the file", () => {
@@ -33,6 +33,19 @@ test("a missing config file is created; a broken one is not touched", () => {
   assert.throws(() => trustRunDir("/run", { file: broken }), /not valid JSON/);
   assert.equal(readFileSync(broken, "utf8"), "{not json");
   assert.equal(isTrusted("/run", { file: broken }), false);
+});
+
+test("inside a git repository the trust entry is the repository's root, as Claude Code checks it", () => {
+  const repo = mkdtempSync(join(tmpdir(), "aas-trust-repo-"));
+  mkdirSync(join(repo, ".git"));
+  const run = join(repo, "runs", "smoke");
+  mkdirSync(run, { recursive: true });
+  assert.equal(trustDir(run), repo);
+  const plain = mkdtempSync(join(tmpdir(), "aas-trust-plain-"));
+  assert.equal(trustDir(plain), plain);
+  const file = join(mkdtempSync(join(tmpdir(), "aas-trust-cfg-")), ".claude.json");
+  assert.deepEqual(trustRunDir(run, { file }), { file, dir: repo, changed: true });
+  assert.equal(isTrusted(run, { file }), true);
 });
 
 test("the config file follows CLAUDE_CONFIG_DIR, else HOME", () => {

@@ -50,7 +50,7 @@ if (runtimeId === "codex") {
   res = { status: outcome.status === "failed" ? 1 : 0, stdout: JSON.stringify({ result: last, num_turns: null, modelUsage: {}, total_cost_usd: null, notes: outcome.notes, privateLog: outcome.privateLog }), stderr: "" };
   console.log(`--- codex: ${outcome.notes}; rollout ${outcome.privateLog ?? "not found"}`);
 } else {
-const cmd = ["-p", prompt, "--output-format", "json", "--mcp-config", ".mcp.json", "--strict-mcp-config", "--settings", path.join(".claude", "settings.json"), "--model", model, "--max-turns", "12"];
+const cmd = ["-p", prompt, "--output-format", "stream-json", "--verbose", "--tools", "", "--mcp-config", ".mcp.json", "--strict-mcp-config", "--settings", path.join(".claude", "settings.json"), "--model", model, "--max-turns", "12"];
 console.log(`claude ${cmd.slice(2).join(" ")}  (cwd ${runDir})`);
 // Asynchronous on purpose: a fake SPT in this process must keep serving while claude runs.
 res = await new Promise((resolve) => {
@@ -72,8 +72,16 @@ const { IGNORED_RULES } = await import("./trust.mjs");
 const ignored = res.stderr.match(IGNORED_RULES)?.[0] ?? null;
 const warnings = res.stderr.split("\n").filter((l) => /warn|ignor|trust/i.test(l));
 if (warnings.length) console.log("--- claude stderr:\n" + warnings.join("\n"));
-let out;
-try { out = JSON.parse(res.stdout); } catch { console.log(res.stdout); throw new Error("claude did not return JSON"); }
+let out, offered = null;
+if (runtimeId === "codex") {
+  try { out = JSON.parse(res.stdout); } catch { console.log(res.stdout); throw new Error("codex did not return JSON"); }
+} else {
+  // stream-json: the init record lists every tool the session offers the agent, the result record ends it.
+  const lines = res.stdout.split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  out = lines.find((x) => x.type === "result");
+  if (!out) { console.log(res.stdout); throw new Error("claude did not return a result record"); }
+  offered = lines.find((x) => x.type === "system" && x.subtype === "init")?.tools ?? null;
+}
 console.log("\n--- agent reply:\n" + (out.result ?? JSON.stringify(out)).trim());
 console.log(`\n--- cost: $${out.total_cost_usd?.toFixed(4)}  turns: ${out.num_turns}  model: ${Object.keys(out.modelUsage ?? {}).join(",")}`);
 const log = fs.existsSync(path.join(runDir, "run.jsonl")) ? fs.readFileSync(path.join(runDir, "run.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)) : [];
@@ -82,6 +90,11 @@ console.log(`--- broker log: ${calls.length} tool calls: ${calls.join(", ")}`);
 const results = log.filter((x) => x.kind === "tool_result");
 console.log(`--- results with error: ${results.filter((x) => x.is_error).length}; images saved: ${fs.existsSync(path.join(runDir, "screenshots")) ? fs.readdirSync(path.join(runDir, "screenshots")).length : 0}`);
 const expected = [`${id}_documentation`, `${id}_screenshot`, `${id}_exec`];
-const ok = expected.every((t) => calls.includes(t)) && results.filter((x) => x.is_error).length === 0 && !ignored;
-console.log(ok ? `\nPASS: all three broker tools were used through the generated config, and ${runtimeId === "codex" ? "Codex" : "Claude Code"} applied every permission rule` : ignored ? `\nFAIL: Claude Code ignored permission rules: ${ignored}` : "\nFAIL: see above");
+// No shell, no web, no file tools: the session may offer the agent the broker's three tools and nothing else.
+const extra = offered ? offered.filter((t) => !expected.map((e) => `mcp__${id}__${e}`).includes(t)) : [];
+if (offered) console.log(`--- tools offered to the agent: ${offered.join(", ") || "none"}`);
+const toolsOk = runtimeId === "codex" || (offered !== null && extra.length === 0);
+if (!toolsOk) console.log(`--- tools beyond the broker's: ${offered === null ? "the session did not report its tools" : extra.join(", ")}`);
+const ok = expected.every((t) => calls.includes(t)) && results.filter((x) => x.is_error).length === 0 && !ignored && toolsOk;
+console.log(ok ? `\nPASS: all three broker tools were used through the generated config, and ${runtimeId === "codex" ? "Codex" : "Claude Code"} applied every permission rule${runtimeId === "codex" ? "" : " and offered no other tool"}` : ignored ? `\nFAIL: Claude Code ignored permission rules: ${ignored}` : "\nFAIL: see above");
 process.exitCode = ok ? 0 : 1;

@@ -29,9 +29,23 @@ function readConfig(file) {
   }
 }
 
+/**
+ * The directory whose trust Claude Code checks for a session started in `runDir`: the root of the git repository
+ * the directory is in, else the directory itself. Measured with Claude Code 2.1.270: a session in
+ * <repo>/runs/claude-smoke, trusted under its own path, still printed "Ignoring 3 permissions.allow entries" and
+ * named projects["<repo>"] as the entry to set.
+ */
+export function trustDir(runDir) {
+  const dir = path.resolve(runDir);
+  for (let d = dir; ; d = path.dirname(d)) {
+    if (fs.existsSync(path.join(d, ".git"))) return d;
+    if (path.dirname(d) === d) return dir;
+  }
+}
+
 /** Whether Claude Code trusts `runDir` (the trust dialog accepted, or the flag set by `trustRunDir`). */
 export function isTrusted(runDir, { file = claudeConfigFile() } = {}) {
-  const dir = path.resolve(runDir);
+  const dir = trustDir(runDir);
   try {
     return readConfig(file).projects?.[dir]?.hasTrustDialogAccepted === true;
   } catch {
@@ -44,7 +58,7 @@ export function isTrusted(runDir, { file = claudeConfigFile() } = {}) {
  * Returns what changed: `{ file, dir, changed }`.
  */
 export function trustRunDir(runDir, { file = claudeConfigFile() } = {}) {
-  const dir = path.resolve(runDir);
+  const dir = trustDir(runDir);
   const config = readConfig(file);
   if (config.projects?.[dir]?.hasTrustDialogAccepted === true) return { file, dir, changed: false };
   config.projects = config.projects ?? {};
