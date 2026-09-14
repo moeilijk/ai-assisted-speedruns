@@ -52,7 +52,7 @@ aas run --runtime claude-code --game games/slay-the-spire/plugin.mjs --run-dir <
 aas timeline <runs>/sts-claude-code-01
 aas render   <runs>/sts-claude-code-01
 aas publish  <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
-aas check --strict <runs>/public/sts-claude-code-01
+aas check --strict <runs>/public/sts-claude-code-01.zip
 ```
 
 `aas` commands: `configure`, `run`, `resume`, `start`, `doctor`, `check-connection`, `budget`, `timeline`, `render`, `publish`, `check`, `scan`, `key`. Every command works the same whatever game, agent, recorder or timer is loaded; what each one does and leaves behind is in [docs/reference.md](docs/reference.md).

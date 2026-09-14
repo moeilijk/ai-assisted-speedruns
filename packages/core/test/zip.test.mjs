@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { crc32, zipBuffer } from "../src/zip.mjs";
 import { packBundle, writeManifest } from "../src/publish.mjs";
+import { checkBundle, checkRun } from "../src/check-run.mjs";
 
 const hasUnzip = (() => { try { execFileSync("unzip", ["-v"], { stdio: "ignore" }); return true; } catch { return false; } })();
 
@@ -44,4 +45,26 @@ test("packBundle leaves the recording out, keeps its hashes in the manifest, and
   assert.ok(existsSync(zip.file));
   const list = execFileSync("unzip", ["-Z", "-1", zip.file], { encoding: "utf8" }).split("\n").filter(Boolean).sort();
   assert.deepEqual(list, ["sts-01/manifest.json", "sts-01/runtime-config/mcp.template.json", "sts-01/summary.json"]);
+});
+
+test("aas check gives the upload zip the same verdict as the bundle directory it was packed from", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-checkzip-"));
+  const out = join(dir, "sts-01");
+  mkdirSync(join(out, "runtime-config"), { recursive: true });
+  writeFileSync(join(out, "summary.json"), "{}\n");
+  writeFileSync(join(out, "runtime-config", "mcp.template.json"), "{}\n");
+  writeManifest(out, { runId: "sts-01" });
+  const zip = packBundle(out);
+  const strip = (r) => r.results.map(({ requirement, status }) => ({ requirement, status }));
+  assert.deepEqual(strip(checkBundle(zip.file)), strip(checkRun(out)));
+  assert.ok(checkBundle(zip.file).results.some((r) => r.requirement === "manifest.json" && r.status !== "unmet"), "the zip's manifest is found");
+});
+
+test("aas check refuses a zip whose entries leave the bundle directory", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-checkzip-"));
+  const file = join(dir, "bad.zip");
+  writeFileSync(file, zipBuffer([{ name: "sts-01/../../evil.json", data: Buffer.from("{}") }]));
+  assert.throws(() => checkBundle(file), /outside the bundle/);
+  writeFileSync(file, zipBuffer([{ name: "a/summary.json", data: Buffer.from("{}") }, { name: "b/summary.json", data: Buffer.from("{}") }]));
+  assert.throws(() => checkBundle(file), /one directory/);
 });

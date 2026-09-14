@@ -214,7 +214,7 @@ Anyone can then check that the video belongs to this bundle: the fingerprint in 
 duration, and a few tool calls spot-checked at their `elapsed_seconds`.
 
 ```bash
-aas check --strict <public-dir>     # the conformance check of the bundle
+aas check --strict <public-dir>.zip # the conformance check of the upload zip (the directory works too)
 aas scan <public-dir>               # only the privacy scan
 ```
 

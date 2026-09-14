@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// `aas check <run-dir>`: conformance check of a (published) run directory
+// `aas check <bundle>`: conformance check of a published bundle, its directory or the upload zip,
 // against the AAS specification (packages/spec/SPEC.md). Validates the
 // timeline (session.sanitized.jsonl), summary.json (schema 2 or 3), manifest
 // hashes, and the presence of the other required files. Exit code 1 when the
@@ -7,7 +7,9 @@
 import { createHash } from "node:crypto";
 import { verifyBundle } from "./sign.mjs";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
+import { readZipEntries } from "./zip-read.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
@@ -305,12 +307,36 @@ export function formatReport(runDir, { results }) {
   return lines.join("\n");
 }
 
+/**
+ * Checks a bundle directory or the upload zip `aas publish` writes. The zip holds the bundle under one directory
+ * named after the run; it is unpacked into a temporary directory, checked there, and the directory is removed.
+ */
+export function checkBundle(target, options = {}) {
+  if (!fs.statSync(target).isFile()) return checkRun(target, options);
+  const entries = readZipEntries(target);
+  if (!entries) throw new Error(`${target} is neither a bundle directory nor a zip`);
+  const tops = new Set(entries.map((e) => e.name.split("/")[0]));
+  if (tops.size !== 1 || entries.some((e) => !e.name.includes("/"))) throw new Error(`${target}: the zip must hold the bundle under one directory named after the run`);
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aas-check-"));
+  try {
+    for (const { name, data } of entries) {
+      const dest = path.resolve(tmp, name);
+      if (!dest.startsWith(tmp + path.sep) || name.includes("\\")) throw new Error(`${target}: entry ${name} points outside the bundle`);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, data);
+    }
+    return checkRun(path.join(tmp, [...tops][0]), options);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 if (process.argv[1]?.endsWith("check-run.mjs")) {
   const args = process.argv.slice(2);
   const strict = args.includes("--strict");
   const dir = args.find((a) => !a.startsWith("--"));
-  if (!dir) throw new Error("Usage: check [--strict] <run-dir>");
-  const report = checkRun(path.resolve(dir));
+  if (!dir) throw new Error("Usage: check [--strict] <bundle-dir | bundle.zip>");
+  const report = checkBundle(path.resolve(dir));
   console.log(formatReport(dir, report));
   const invalid = report.results.some((r) => r.status === "invalid");
   const unmet = report.results.some((r) => r.status === "unmet");

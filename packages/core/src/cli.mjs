@@ -4,7 +4,7 @@
 //   aas configure --runtime <codex|claude-code> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--instructions file]
 //   aas start --runtime <id> --run-dir <dir>
 //   aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]
-//   aas check [--strict] [--core] <run-dir>   (--core: bundle without its recording files)
+//   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -73,10 +73,10 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         break;
       }
       case "check": {
-        const { checkRun, formatReport } = await import("./check-run.mjs");
+        const { checkBundle, formatReport } = await import("./check-run.mjs");
         const dir = opts._[0];
-        if (!dir) throw new Error("Usage: aas check [--strict] [--core] <run-dir>");
-        const report = checkRun(path.resolve(dir), { core: Boolean(opts.core) });
+        if (!dir) throw new Error("Usage: aas check [--strict] <bundle-dir | bundle.zip>");
+        const report = checkBundle(path.resolve(dir), { core: Boolean(opts.core) });
         console.log(formatReport(dir, report));
         const invalid = report.results.some((r) => r.status === "invalid");
         const unmet = report.results.some((r) => r.status === "unmet");
