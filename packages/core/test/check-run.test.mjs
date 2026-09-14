@@ -74,3 +74,16 @@ test("a run made without a recording is invalid", () => {
   }
   assert.doesNotMatch(report({ recorder: "obs" }).detail, /no recording was made/);
 });
+
+test("a victory before a goal extension does not reach the extended goal", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-check-goal-"));
+  const ev = (event, data) => JSON.stringify({ timestamp: "2026-09-13T10:00:00.000+02:00", kind: "event", event, data });
+  const reached = (lines) => {
+    writeFileSync(join(dir, "session.sanitized.jsonl"), lines.join("\n") + "\n");
+    writeFileSync(join(dir, "summary.json"), JSON.stringify({ completed_at: null }));
+    return checkRun(dir).results.find((x) => x.requirement === "goal reached").status;
+  };
+  assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" })]), "met");
+  assert.equal(reached([ev("game.over", { victory: true, label: "Victory (act1)" }), ev("game.goal", { from: "act1", to: "act3" })]), "unmet");
+  assert.equal(reached([ev("game.over", { victory: true }), ev("game.goal", { from: "act1", to: "act3" }), ev("game.over", { victory: true, label: "Victory" })]), "met");
+});

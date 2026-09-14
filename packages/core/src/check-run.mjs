@@ -170,15 +170,14 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   // The goal: a run that did not reach it is a recording of an attempt, not an entry (spec §8.6). Visible in the
   // bundle itself: a game.over with victory on the timeline, and completed_at in the summary.
   if (exists("session.sanitized.jsonl")) {
-    const won = fs.readFileSync(file("session.sanitized.jsonl"), "utf8").split("\n").filter((l) => l.trim()).some((l) => {
-      try { const r = JSON.parse(l); return r.kind === "event" && r.event === "game.over" && r.data?.victory === true; } catch { return false; }
-    });
+    // A victory before the last `game.goal` (a resume that extended the goal) was the earlier goal's.
+    const events = fs.readFileSync(file("session.sanitized.jsonl"), "utf8").split("\n").filter((l) => l.trim())
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r?.kind === "event");
+    const won = events.slice(events.findLastIndex((r) => r.event === "game.goal") + 1).some((r) => r.event === "game.over" && r.data?.victory === true);
     let completedAt = null;
     try { completedAt = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).completed_at ?? null; } catch { /* reported above */ }
     add("goal reached", won || completedAt ? "met" : "unmet", won ? `victory on the timeline${completedAt ? `, completed_at ${completedAt}` : ""}` : completedAt ? `completed_at ${completedAt}` : "no victory on the timeline and no completed_at: a stopped session, not an entry");
   }
-  // Where the recording is published: a bundle carries the link, not the video (a run is hours of 1080p60).
-  // With the chapters and `elapsed_seconds` that link is what makes a tool call locatable in the recording.
   // Who made this bundle, when it says so. A signature proves that two bundles came from one key and nothing
   // about whose key it is until someone registers it with an archive, so it is not required: a publisher's
   // identity is the archive's account, and an extra key that gates nothing would be a barrier without a

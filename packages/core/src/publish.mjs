@@ -93,8 +93,11 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     else if (fs.existsSync(path.join(runDir, "session.jsonl"))) session = path.join(runDir, "session.jsonl");
   }
   if (!session || !fs.existsSync(session)) throw new Error(`No session log found for runtime ${runtime}; pass --session <file>.`);
-  // The goal is reached at `game.over` with victory (the completion marker is the fallback).
-  const won = readRunEvents(runDir).find((e) => e.event === "game.over" && e.data?.victory === true);
+  // The goal is reached at `game.over` with victory (the completion marker is the fallback). A victory before the
+  // last `game.goal` (a resume that extended the goal) was the old goal's, so it does not complete this one.
+  const runEvents = readRunEvents(runDir);
+  const lastGoalChange = runEvents.findLastIndex((e) => e.event === "game.goal");
+  const won = runEvents.slice(lastGoalChange + 1).find((e) => e.event === "game.over" && e.data?.victory === true);
   // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
   // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
   if (rt?.exportSession) await rt.exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
