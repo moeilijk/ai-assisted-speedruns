@@ -1,33 +1,39 @@
 # ai-assisted-speedruns
 
-A plugin framework and an open standard for **AI Assisted Speedruns**: an LLM agent plays a game through a small, hardened tool interface, every decision is logged on one timeline, the run is recorded, and the result is published in a form anyone can verify and compare.
-
-The runs are published in the **AAS Archive** at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org): the tooling makes the bundle, the archive keeps it, shows it and lets anyone verify it.
-
-Three kinds of plugins, one core:
-
-| Plugin | Role | First implementations |
-|---|---|---|
-| **game** | exposes one game as a controller object plus API documentation | Portal (via cozyblaze/portal-agent), Slay the Spire (via Communication Mod); Kerbal Space Program (kRPC) planned |
-| **runtime** | starts the agent against the broker with a hardened config | Codex, Claude Code, scripted (a bot module, for baselines) |
-| **recorder** | records the run and reacts to run events | OBS (obs-websocket v5), source-demo (in-game demo via SPT), null |
-| **timer** | speedrun timer on screen and splits | LiveSplit (LiveSplit Server) |
+The tooling for **AI Assisted Speedruns**: an LLM agent plays a game through a small, hardened tool interface, and the tooling records the run and packs it into a bundle. What happens to a bundle after that — keeping it, showing it, checking it — is the archive's: the **AAS Archive** at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org).
 
 The agent only ever sees three tools per game: `<game>_documentation`, `<game>_screenshot`, `<game>_exec`. Inspired by cozyblaze's Portal run: that tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent).
 
-## What the tooling does
+## What is in this repository
 
-- **Runs an agent against a game, hardened.** The broker is an MCP server with exactly those three tools, running under `node --permission`: it may read the core and the game plugin, write only the run directory, and open a socket only to the endpoints the game plugin declares. Shell, web and everything else is denied in the agent's own configuration, and a runtime whose permission rules were ignored stops the run.
-- **Records the run and proves there is a picture.** The recorder builds its own OBS scene collection (the game window, the game's audio, the timer, a live overlay), refuses a microphone, and checks OBS's own rendering of the game source at the start; at publish time every recording is measured for black intervals, which the bundle declares; black frames are part of the recording and do not fail a run.
-- **Keeps one timeline.** Tool calls, agent messages and events from the harness, the game plugin and the recorder all land in one append-only log on one clock: `aas timeline` derives RTA, in-game time, thinking time, sections, attempts and the cut list from it, and writes subtitles and a chapter list.
-- **Owns the goal.** The game plugin declares the game's ends in order (one of them the game's own); the harness resolves the goal, declares the victory when that end's milestone goes by, and `aas resume --goal` can only extend a goal to a later end, logged as a human intervention.
-- **Times the run.** In the `paused-think` model game time advances only while the game is actually playing, so an agent's thinking costs wall clock but not in-game time; the timer and the video follow the same intervals.
-- **Survives an interruption.** The game is saved every ten minutes, at every chapter and at the end; `aas resume` restores the save, resumes the agent's own session, records a new segment and records that a human intervened.
-- **Stays inside a budget.** Every runtime reports its own plan's stand; a run refuses to start above the limit and a running session is interrupted with a save when it crosses it.
-- **Closes what it opened.** At the end of a run the game, the timer, the recorder and a Steam the launcher started are closed the way a user would, and what stays open is reported.
-- **Cuts the video.** `aas render` removes the thinking pauses with ffmpeg, concatenates the segments of a resumed run, and can burn in the timers and the keys being played.
-- **Publishes a checkable bundle.** `aas publish` turns the private run directory into the public bundle: the sanitised timeline with the harness's events merged in, a machine-readable summary (identifiers, versions, category, the game's build and mods, the recording's length and fingerprint), the agent's instructions and tool definitions, the hardened configuration with machine paths replaced, chapters, splits, and a manifest with a hash per file — plus one zip to upload. It refuses to publish anything the privacy scan flags, and can sign the bundle with the publisher's own ed25519 key (`aas key` makes one) for anyone who wants their publications tied to one key — a marker, not a requirement: who published a run is what an archive's account says.
-- **Checks it, and lets anyone else check it.** `aas check` verifies the bundle marker, the files, the timeline format, the summary schema, every hash, the signature, whether the run reached its declared goal, whether a recording was made and carries the fingerprint that binds it to this bundle, and which black intervals it declares. The archive checks the upload zip in the browser too (the hashes, the timeline's totals, the human axis and the signature), at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/), without uploading anything.
+```
+packages/
+  core/                 the `aas` command: the broker the agent's tools run in, the process hardening, the run log,
+                        run/resume, timeline, render, publish, check
+  spec/                 SPEC.md, the standard a bundle follows
+  runtime-claude-code/  starts Claude Code against the broker, with its tools locked down
+  runtime-codex/        the same for Codex
+  runtime-scripted/     a bot module instead of an agent, for baselines and tests
+  recorder-obs/         records the run with OBS: its own scenes, the game's audio, no microphone
+  recorder-source-demo/ an in-game Source demo through SourcePauseTool
+  recorder-null/        no recording; for development only, never a valid run
+  timer-livesplit/      the speedrun timer and splits on screen, through LiveSplit Server
+games/
+  slay-the-spire/       Slay the Spire through Communication Mod
+  portal/               Portal through cozyblaze's controller from portal-agent
+  balatro/ half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
+                        stubs: planned game plugins, each README with its route, license and risks; not implemented
+docs/                   install, command reference, writing plugins, design
+```
+
+A **game** plugin connects one game, a **runtime** starts the agent, a **recorder** records and a **timer** times. Every `aas` command works the same whichever are loaded.
+
+## A run, from start to upload
+
+1. **Record.** With the game started by its own launch script, `aas run` starts the recorder, the timer and the agent, and writes everything that happens to one log in the run directory: every tool call, every message, every event of the game. The run directory stays on your machine.
+2. **Bundle.** `aas publish` turns that run directory into a bundle: the sanitised log, the times, the agent's instructions and tools, the configuration, and a hash of every file. It refuses anything the privacy scan flags, and packs the bundle into one zip. The recording is not in it.
+3. **Upload the video, with its fingerprint.** `aas publish` prints one line: `AAS <run-id> · fingerprint <16 hex> · <n> s`. Upload your recording where you publish video and put that line in its description (or its title, where a platform has no description). That line is what ties the video to this bundle.
+4. **Submit the bundle.** Upload the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). Everything after that happens on the site; [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/) checks a zip in your browser before you send it.
 
 ## Disclaimer: anti-cheat, bans, your own risk
 
@@ -48,47 +54,20 @@ Then the game's own side ([Slay the Spire](games/slay-the-spire/README.md), [Por
 
 ```bash
 aas doctor --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --runtime claude-code
-aas check-connection --game games/slay-the-spire/plugin.mjs --run-dir <runs>/check --exercise
 aas run --runtime claude-code --game games/slay-the-spire/plugin.mjs --run-dir <runs>/sts-claude-code-01 \
         --recorder obs --timer livesplit --overlay-port 8765 --goal act1 --headless --max-minutes 60
-aas timeline <runs>/sts-claude-code-01
-aas render   <runs>/sts-claude-code-01
-aas publish  <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
-aas check --strict <runs>/public/sts-claude-code-01.zip
+aas publish <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
 ```
-
-`aas` commands: `configure`, `run`, `resume`, `start`, `doctor`, `check-connection`, `budget`, `timeline`, `render`, `publish`, `check`, `scan`, `key`. Every command works the same whatever game, agent, recorder or timer is loaded; what each one does and leaves behind is in [docs/reference.md](docs/reference.md).
 
 ## Documentation
 
 | Document | What is in it |
 |---|---|
-| [docs/install.md](docs/install.md) | prerequisites and the installation, step by step, per level; troubleshooting |
-| [docs/reference.md](docs/reference.md) | every command, the settings, the run directory, the bundle, the events |
+| [docs/install.md](docs/install.md) | prerequisites and the installation, step by step; troubleshooting |
+| [docs/reference.md](docs/reference.md) | every command, what it does and what it leaves behind; the run directory and the bundle |
 | [docs/plugins.md](docs/plugins.md) | how to write a game, runtime, recorder or timer plugin |
 | [docs/design.md](docs/design.md) | the architecture and the decisions behind it |
-| [packages/spec/SPEC.md](packages/spec/SPEC.md) | the standard: what a published run must contain and how it is checked |
-
-## Layout
-
-```
-packages/
-  core/                 broker, hardening, run log, run/resume/timeline/render/publish/check, exporters, `aas` CLI
-  spec/                 the AAS standard + JSON Schemas (later)
-  recorder-source-demo/ in-game Source demo via SPT IPC (start_run / stop_run)
-  recorder-obs/         obs-websocket v5 recorder: scenes per phase, chapters, replay buffer, no mic
-  recorder-null/        no recording; development only, never a valid run
-  timer-livesplit/      LiveSplit Server client + .lss export
-  runtime-codex/        Codex config generator, launcher, plan budget, rollout export
-  runtime-claude-code/  Claude Code config generator, launcher, trust, plan budget, session export
-  runtime-scripted/     a bot module through the same broker (baselines, chain tests)
-games/
-  slay-the-spire/       turn-based, through Communication Mod (bridge, install, launch, splits per act)
-  portal/               adapter around cozyblaze's controller from portal-agent
-  balatro/ half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
-                        stubs: planned plugins with their route, license and risks in each README; not implemented
-docs/                   install, reference, plugins, design
-```
+| [packages/spec/SPEC.md](packages/spec/SPEC.md) | the standard: what a bundle contains |
 
 ## Rules that apply to every game in this repository
 
@@ -104,14 +83,3 @@ MIT, see [LICENSE](LICENSE). Code by others keeps its own license and attributio
 - gamerpuppy's [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) (MIT): the patches, the planner and the data derived from it are listed in [games/slay-the-spire/NOTICE](games/slay-the-spire/NOTICE), license text in [games/slay-the-spire/lightspeed/LICENSE](games/slay-the-spire/lightspeed/LICENSE).
 
 Games, mods and tools that the setup downloads or builds (Communication Mod, BaseMod, ModTheSpire, SourcePauseTool, sts_lightspeed itself) are not in this repository; each is pinned in the game's `UPSTREAM.json` and comes under its own license.
-
-## The archive
-
-The archive of published runs is the AAS Archive at [ai-assisted-speedruns.org](https://ai-assisted-speedruns.org):
-
-- [Runs](https://ai-assisted-speedruns.org/runs/): every published run: its times, its sections, whether it conforms, and where its recording is published.
-- [Submit](https://ai-assisted-speedruns.org/submit/): signed in to an account, you upload the zip `aas publish` writes next to the bundle; an archivist reviews the submission before the run is published.
-- [Verify](https://ai-assisted-speedruns.org/verify/): checks a run's zip in the browser, without uploading it.
-- [Specification](https://ai-assisted-speedruns.org/spec/) and [API](https://ai-assisted-speedruns.org/api/): the standard the bundles follow, and read-only access to the published runs.
-
-How a run gets there: [docs/reference.md](docs/reference.md#publishing-a-run-step-by-step).
