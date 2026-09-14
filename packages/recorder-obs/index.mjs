@@ -75,15 +75,19 @@ export function createObsRecorder(options = {}) {
     if (!r?.imageData) return null;
     try { return pngMeanLuma(r.imageData.split(",")[1]); } catch { return null; }
   }
-  /** Waits until the source shows something (brightness above 1 of 255); after `seconds` of black, rebinds it once and waits again; then throws. */
+  /**
+   * Waits until the source shows something (brightness above 1 of 255); after `seconds` of black, rebinds it once and
+   * waits again; then throws. A source OBS cannot render at all is not a picture either: it fails the same way.
+   */
   async function assertPicture(o, sourceName, { seconds = 10, every = Math.min(2, seconds) } = {}) {
+    let rendered = false;
     for (let round = 0; round < 2; round += 1) {
       const deadline = Date.now() + seconds * 1000;
       let last = null;
       while (Date.now() < deadline) {
         last = await sourceBrightness(o, sourceName);
-        if (last === null) { log(`picture check: OBS did not render ${sourceName} (no screenshot); not checked`); return null; }
-        if (last > 1) { log(`picture check: ${sourceName} shows a picture (brightness ${last.toFixed(1)}${round ? ", after a rebind" : ""})`); return last; }
+        if (last !== null) rendered = true;
+        if (last !== null && last > 1) { log(`picture check: ${sourceName} shows a picture (brightness ${last.toFixed(1)}${round ? ", after a rebind" : ""})`); return last; }
         await new Promise((r) => setTimeout(r, every * 1000));
       }
       if (round === 0) {
@@ -94,7 +98,26 @@ export function createObsRecorder(options = {}) {
         await o.tryCall("SetInputSettings", { inputName: sourceName, inputSettings: { window }, overlay: true });
       }
     }
+    if (!rendered) throw new Error(`OBS could not render the game window capture (${sourceName}) for ${2 * seconds} s from the start of the recording, a rebind included, so there is no evidence the game is being recorded; the run does not start.`);
     throw new Error(`the game window capture in OBS (${sourceName}) shows nothing: black for ${2 * seconds} s from the start of the recording, a rebind included. The run would have no recording of the game, so it does not start.`);
+  }
+
+  /**
+   * Waits until OBS is actually writing the recording: the output is active and its size grows between two readings.
+   * A recording that "started" but writes nothing (a full disk, a failing encoder) is found here, not after the run.
+   */
+  async function assertWriting(o, { seconds = 10, every = Math.min(1, seconds / 4) } = {}) {
+    const deadline = Date.now() + seconds * 1000;
+    let first = null, st = null;
+    while (Date.now() < deadline) {
+      st = await o.call("GetRecordStatus");
+      if (st.outputActive && st.outputBytes > 0) {
+        if (first === null) first = st.outputBytes;
+        else if (st.outputBytes > first) { log(`recording check: OBS is writing (${st.outputBytes} bytes, ${st.outputTimecode})`); return st.outputBytes; }
+      }
+      await new Promise((r) => setTimeout(r, every * 1000));
+    }
+    throw new Error(`OBS reports a recording but is not writing it: ${st?.outputActive ? `${st.outputBytes} bytes and not growing` : "the output is not active"} after ${seconds} s. The run would have no recording, so it does not start.`);
   }
 
   async function listMicrophones(o) {
@@ -284,6 +307,7 @@ export function createObsRecorder(options = {}) {
       // assumed: a window capture stayed black for the first 116 s of a run while the game was
       // being played, and nothing in OBS's log said so. Black after a rebind means no recording of the game, and
       // then the run does not start (the caller stops and discards the recording).
+      await assertWriting(o, { seconds: options.writingSeconds ?? 10 });
       if (gamePlugin?.processName) await assertPicture(o, `${names.prefix} Game Window`, { seconds: options.pictureSeconds ?? 10 });
       return { t0 };
     },

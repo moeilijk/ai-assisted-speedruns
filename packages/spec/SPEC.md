@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.1
+# AI Assisted Speedruns (AAS) — Specification, draft 0.23
 
-Status: draft, begun 2026-09-09, last revised 2026-09-15. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.23, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -127,12 +127,12 @@ Where a recording is published is not in the bundle. A run may be published in m
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6, what `aas publish` writes, adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7, what `aas publish` writes, drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge.
 
 ```json
 {
-  "schema_version": 6,
-  "spec_version": "0.1",
+  "schema_version": 7,
+  "spec_version": "0.23",
   "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
   "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
              "revision": 10, "published_at": "..."},
@@ -168,7 +168,6 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
     "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
     "files": ["recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4"],
-    "black_intervals": [{"file": "recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4", "start": 0, "end": 5.1, "seconds": 5.1, "game": true}],
     "chapters": "chapters.txt",
     "igt_seconds": null, "wall_clock_seconds": 0, "thinking_seconds": 0
   },
@@ -194,7 +193,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 
-`recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. `recording.black_intervals` lists every black interval of a second or more as `{file, start, end, seconds}` in seconds within that file, with `game: true` when it falls in a phase the game plugin reported as `loading` or `cinematic`. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
+`recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
 Binding a recording to a bundle is two claims, and they are established differently. **This recording is mine**: only the owner of a recording can write its description, so a line in it that a stranger could not have put there says the channel is the publisher's. An archive that is connected to the publisher's channel through that platform can ask the platform instead, which settles ownership without the publisher editing anything. **This recording is of this bundle**: that is what the fingerprint says, and no platform connection can answer it, because the platform knows nothing about the run. A reader who does not trust the archive can only check the second claim where the fingerprint is readable, so the line stays the route for anyone whose channel an archive cannot ask, and the better practice for everyone else: an archive may accept a connected channel without it, and then carries the binding on its own word.
 
@@ -282,7 +281,36 @@ A run is verifiable when all of the following hold:
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
-8. The publisher measures the black intervals of the recording it made and uploaded and declares them in `summary.recording.black_intervals`, each marked `game: true` when it falls in a phase the game plugin reports as `loading` or `cinematic` (§6). Black frames are part of the recording: they are declared so a reader knows where to look, and they do not fail a run.
+8. The recording was checked when the run started: the harness confirmed that the recording is being written and that the game capture shows a picture, and a run whose check fails does not start. A failed recording is found while the run can still be stopped, not after a run that has no evidence. What the published video shows is for the archive to judge.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
 
+## Drafts
+
+Every change to this text is a draft of its own. A bundle's `spec_version` names the draft it was published under.
+
+| Draft | Date | Change |
+|---|---|---|
+| 0.1 | 2026-09-09 – 09-13 | First draft: definitions, tool interface, category, bundle, timeline format, summary, manifest, verifiability |
+| 0.2 | 2026-09-13 | The manifest does not list `signature.json`, and a verifier exempts it; the upload is one zip |
+| 0.3 | 2026-09-13 | An archive that matches keys to accounts reads every key list a host offers |
+| 0.4 | 2026-09-13 | A bundle says who published it by being signed; signing required |
+| 0.5 | 2026-09-13 | Verifiability point on the publisher's key reworded |
+| 0.6 | 2026-09-13 | The publisher makes their own key; no code-hosting account needed |
+| 0.7 | 2026-09-13 | Binding a recording to a bundle is two claims: the recording is mine, and it is of this bundle |
+| 0.8 | 2026-09-13 | A publisher has several keys over time; retiring one does not un-publish what it signed |
+| 0.9 | 2026-09-14 | Signing is optional: a marker for whoever wants one |
+| 0.10 | 2026-09-14 | The standard names no place to record a key |
+| 0.11 | 2026-09-14 | The ordinary place for a key is the archive; a publisher may also publish a signed claim |
+| 0.12 | 2026-09-14 | Schema 4: identifiers, versions, `bundle` with its revision, recordings as a list |
+| 0.13 | 2026-09-14 | Schema 5: video links come from the archive, not from the bundle |
+| 0.14 | 2026-09-14 | Black frames are part of the recording and declared, never a failure |
+| 0.15 | 2026-09-14 | Schema 6: every game plugin declares its ends; goals by name, with every goal the run had |
+| 0.16 | 2026-09-14 | An extended goal is published once it is reached |
+| 0.17 | 2026-09-14 | `totals_to_completion`; post-completion sections are marked |
+| 0.18 | 2026-09-14 | §8.3 carries the human-axis exception for a goal extension |
+| 0.19 | 2026-09-14 | Credit to portal-agent reworded |
+| 0.20 | 2026-09-14 | Credit to portal-agent for the idea |
+| 0.21 | 2026-09-14 | Credit to cozyblaze for the run, the design and the code |
+| 0.22 | 2026-09-15 | §6 describes `summary.json` as schema 6 writes it: `bundle`, identifiers, `harness_events`, `recording.files` |
+| 0.23 | 2026-09-15 | Schema 7 drops `recording.black_intervals`; §8.8: the recording is checked when the run starts; drafts are numbered |

@@ -20,7 +20,7 @@ Three levels, and you only install what your level needs:
 | git | any | cloning this repository and the pinned upstreams | your package manager | `git --version` |
 | WSL 2 | current | **on Windows**: the harness itself runs in a Linux shell (see §1a) | [learn.microsoft.com — `wsl --install`](https://learn.microsoft.com/en-us/windows/wsl/install) | `wsl -l -v` |
 | An agent CLI | Claude Code 2.1.207+ **or** Codex, logged in | a run with an agent | [Claude Code setup](https://code.claude.com/docs/en/setup) · [Codex CLI](https://github.com/openai/codex) | `claude --version`, `codex --version` |
-| ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length and its black intervals | [ffmpeg.org/download](https://ffmpeg.org/download.html) | `ffmpeg -version` |
+| ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length | [ffmpeg.org/download](https://ffmpeg.org/download.html) | `ffmpeg -version` |
 | OBS Studio | 30+ (tested on 32.2.2), obs-websocket v5 enabled | the recording; **a run without a recording is not a valid run** | [obsproject.com/download](https://obsproject.com/download) | OBS → Tools → WebSocket Server Settings |
 | LiveSplit | 1.8.37 with the Server component | optional: the timer on screen and the splits | [livesplit.org/downloads](https://livesplit.org/downloads/) | its `settings.cfg` has `ServerStartup=1` |
 | The game | no anti-cheat, no online component | a run | the store you bought it from | see the game's README |
@@ -153,9 +153,10 @@ Each game has its own install: the mod or the in-game tooling, the bridge, and i
    window and the game's audio, and removes the microphone OBS adds by default. **A microphone anywhere in
    the scene aborts the run.**
 
-The recorder checks the picture instead of assuming it: right after the recording starts it asks OBS for its
-own rendering of the game source every two seconds, and a capture that stays black is rebound once and then
-aborts the run. See [packages/recorder-obs/README.md](../packages/recorder-obs/README.md).
+The recorder checks the recording instead of assuming it, at the start of the run, while a failed recording can
+still stop it: right after the recording starts it confirms that OBS is writing the file (its size grows), and it
+asks OBS for its own rendering of the game source every two seconds. A recording that is not written, or a capture
+that stays black or cannot be rendered after one rebind, aborts the run. See [packages/recorder-obs/README.md](../packages/recorder-obs/README.md).
 
 ## 7. LiveSplit (optional)
 

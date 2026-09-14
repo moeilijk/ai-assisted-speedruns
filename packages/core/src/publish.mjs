@@ -5,7 +5,6 @@
 // the video is published where video is published and linked from the summary.
 // Then scans the result for private data and runs the conformance check.
 import { createHash, randomBytes } from "node:crypto";
-import { spawnSync } from "node:child_process";
 import os from "node:os";
 import fs from "node:fs";
 import path from "node:path";
@@ -32,11 +31,12 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
-export const SPEC_VERSION = "0.1";
+/** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
+export const SPEC_VERSION = "0.23";
 /** The bundle's packaging: which files it holds and how they are named. */
 export const BUNDLE_VERSION = 1;
 /** The shape of summary.json. */
-export const SUMMARY_SCHEMA = 6;
+export const SUMMARY_SCHEMA = 7;
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
   const walk = (d, prefix = "") =>
@@ -194,9 +194,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     summary.category.human = "restart-only";
     summary.category.human_notes = humanEvents.map((e) => e.data?.note).filter(Boolean).join("; ") || `${humanEvents.length} resume(s)`;
   }
-  // What the recording shows, measured (ffmpeg blackdetect on every raw recording file): intervals of a second or
-  // more in which the whole frame is black. A capture that showed nothing is invisible to every other check.
-  const blackIntervals = measureBlack(runDir, (recording?.files ?? []).filter((f) => !/\.cut\.mp4$/.test(f)), gamePhases(runDir, recording?.t0 ?? timeline?.t0 ?? null));
+  // Whether the recording shows the game is checked by the recorder at the start of the run, where a failed capture
+  // can still stop the run; what the published video shows is for the archive to judge (owner, 2026-09-15).
   // A platform re-encodes what you upload, so a hash of the video file proves nothing about the video anyone can
   // watch. What ties the two together is this: the length of the recording, and a fingerprint of this bundle's own
   // timeline that the publisher puts in the video's description. An archive reads the description, compares the
@@ -212,7 +211,6 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     duration_seconds: duration,
     fingerprint,
     recorder: recording?.recorder ?? null,
-    black_intervals: blackIntervals,
     t0: recording?.t0 ?? timeline?.t0 ?? null,
     files: recording?.files ?? [],
     chapters: fs.existsSync(path.join(outDir, "chapters.txt")) ? "chapters.txt" : null,
@@ -293,35 +291,6 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   }
   log(formatReport(outDir, check));
   return { outDir, summary, scan, check, timeline, zip, signature };
-}
-
-/** Black intervals (>= 1 s, whole frame) per recording file, or null when ffmpeg is not available. */
-/** Intervals (seconds since t0) in which the game plugin reported a loading or cinematic phase: black there is the game's own. */
-export function gamePhases(runDir, t0) {
-  if (!t0) return [];
-  const start = Date.parse(t0);
-  const phases = readRunEvents(runDir).filter((e) => e.event === "game.phase").map((e) => ({ at: (Date.parse(e.timestamp) - start) / 1000, phase: e.data?.phase }));
-  const out = [];
-  for (let i = 0; i < phases.length; i += 1) {
-    if (!["loading", "cinematic"].includes(phases[i].phase)) continue;
-    out.push({ start: phases[i].at, end: phases[i + 1]?.at ?? Infinity });
-  }
-  return out;
-}
-export function measureBlack(dir, files, phases = []) {
-  if (spawnSync("ffmpeg", ["-version"], { stdio: "ignore" }).status !== 0) return null;
-  const out = [];
-  for (const rel of files) {
-    const file = path.join(dir, rel);
-    if (!fs.existsSync(file)) continue;
-    const r = spawnSync("ffmpeg", ["-v", "info", "-i", file, "-vf", "blackdetect=d=1:pix_th=0.10", "-an", "-f", "null", "-"], { encoding: "utf8", maxBuffer: 1 << 26 });
-    for (const m of (r.stderr ?? "").matchAll(/black_start:([\d.]+) black_end:([\d.]+) black_duration:([\d.]+)/g)) {
-      const start = Number(m[1]), end = Number(m[2]);
-      const game = phases.some((p) => start >= p.start - 1 && end <= p.end + 1);
-      out.push({ file: rel, start, end, seconds: Math.round(Number(m[3]) * 10) / 10, ...(game ? { game: true } : {}) });
-    }
-  }
-  return out;
 }
 
 /** Events of run.jsonl that are not published: the operator's plan usage. */

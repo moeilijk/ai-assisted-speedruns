@@ -108,7 +108,7 @@ test("recorder-obs: a game capture that stays black at the start of the recordin
   const obs = await startFakeObs();
   try {
     const lines = [];
-    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, log: (t) => lines.push(t) });
+    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, writingSeconds: 0.5, log: (t) => lines.push(t) });
     await rec.preflight(brief, game);
     obs.state.screenshot = BLACK_PNG;
     await assert.rejects(rec.start(brief, { runDir: "/tmp/not-a-mnt-path" }), /shows nothing: black/);
@@ -117,6 +117,30 @@ test("recorder-obs: a game capture that stays black at the start of the recordin
     obs.state.screenshot = null;
     const rec2 = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, log: (t) => lines.push(t) });
     await rec2.stop().catch(() => {});
+  } finally {
+    await obs.close();
+  }
+});
+
+test("recorder-obs: a recording OBS started but does not write refuses the run", async () => {
+  const obs = await startFakeObs();
+  try {
+    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, writingSeconds: 0.3 });
+    await rec.preflight(brief, game);
+    obs.state.stalled = true;
+    await assert.rejects(rec.start(brief, { runDir: "/tmp/not-a-mnt-path" }), /not writing it: 1000 bytes and not growing/);
+  } finally {
+    await obs.close();
+  }
+});
+
+test("recorder-obs: a game capture OBS cannot render at all refuses the run instead of going unchecked", async () => {
+  const obs = await startFakeObs();
+  try {
+    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, writingSeconds: 0.5 });
+    await rec.preflight(brief, game);
+    obs.state.noScreenshot = true;
+    await assert.rejects(rec.start(brief, { runDir: "/tmp/not-a-mnt-path" }), /could not render the game window capture/);
   } finally {
     await obs.close();
   }

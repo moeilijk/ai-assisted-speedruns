@@ -119,7 +119,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     }
     if (summary) {
       for (const key of SUMMARY_V2_KEYS) if (!(key in summary)) problems.push(`missing ${key}`);
-      if (![2, 3, 4, 5, 6].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4, 5 or 6`);
+      if (![2, 3, 4, 5, 6, 7].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4, 5, 6 or 7`);
       for (const key of ["started_at", "ended_at"]) if (!TIMESTAMP_RE.test(String(summary[key]))) problems.push(`${key} is not ISO 8601 with offset`);
       if (summary.completed_at !== null && !TIMESTAMP_RE.test(String(summary.completed_at))) problems.push("completed_at must be null or ISO 8601 with offset");
       if (!Array.isArray(summary.models) || !summary.models.every((m) => typeof m?.model === "string")) problems.push("models must list {model, reasoning_effort}");
@@ -240,18 +240,6 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     rec?.fingerprint
       ? `the recording's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${rec.duration_seconds ? `, and the length must be about ${rec.duration_seconds} s` : ""}`
       : "summary.recording has no fingerprint: nothing ties the published recording to this bundle");
-  if (exists("summary.json")) {
-    try {
-      const bi = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).recording?.black_intervals;
-      if (Array.isArray(bi)) {
-        // Black frames are part of the recording and never fail a run (owner, 2026-09-14). The publisher measures them
-        // at publish time and declares them, so a reader knows where to look; a reader that has only the bundle cannot
-        // recompute them, because the recording is linked, not packed.
-        const where = "measured by the publisher on the recording it made and uploaded; black frames are part of the recording, not a failure";
-        add("black intervals declared", "met", `${bi.length ? bi.map((b) => `${b.file}: black ${b.seconds} s from ${b.start} s${b.game ? " (the game's own)" : ""}`).join("; ") : "no black interval of a second or more"} (${where})`);
-      }
-    } catch { /* summary problems are reported above */ }
-  }
   if (exists("run.jsonl")) add("run.jsonl not published", "unmet", "private log present in the run directory; do not publish it");
 
   // --- manifest ---

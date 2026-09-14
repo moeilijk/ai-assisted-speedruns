@@ -74,14 +74,14 @@ export async function startFakeObs({ password = "secret", inputs = [], specialIn
       case "SetSceneItemIndex": { const list = col().inputs.filter((x) => (x.scenes ?? []).includes(data.sceneName)); const i = list[data.sceneItemId - 1]; if (!i) throw Object.assign(new Error("no such item"), { code: 600 }); i.index = data.sceneItemIndex; return {}; }
       case "GetVideoSettings": return { baseWidth: 3840, baseHeight: 2160, outputWidth: 1920, outputHeight: 1080, fpsNumerator: 60, fpsDenominator: 1 };
       case "SetCurrentProgramScene": if (!col().scenes.includes(data.sceneName)) throw Object.assign(new Error("no such scene"), { code: 600 }); state.scene = data.sceneName; return {};
-      case "GetSourceScreenshot": { if (!col().inputs.find((x) => x.inputName === data.sourceName)) throw Object.assign(new Error("no such source"), { code: 600 }); return { imageData: `data:image/png;base64,${state.screenshot ?? GREY_PNG}` }; }
-      case "GetRecordStatus": return { outputActive: state.recording, outputPaused: false, outputTimecode: "00:00:00.000", outputDuration: 0, outputBytes: 0 };
+      case "GetSourceScreenshot": { if (state.noScreenshot) throw Object.assign(new Error("failed to render"), { code: 702 }); if (!col().inputs.find((x) => x.inputName === data.sourceName)) throw Object.assign(new Error("no such source"), { code: 600 }); return { imageData: `data:image/png;base64,${state.screenshot ?? GREY_PNG}` }; }
+      case "GetRecordStatus": { const ms = state.recording && !state.stalled ? Date.now() - state.recordStartedAt : 0; return { outputActive: state.recording, outputPaused: false, outputTimecode: "00:00:00.000", outputDuration: ms, outputBytes: state.recording ? 1000 + ms * 100 : 0 }; }
       case "SetRecordDirectory": state.recordDirectory = data.recordDirectory; return {};
       case "GetRecordDirectory": return { recordDirectory: state.recordDirectory };
       case "SetProfileParameter": state[`profile:${data.parameterCategory}.${data.parameterName}`] = data.parameterValue; return {};
       case "StartRecord": {
         if (state.recording) throw Object.assign(new Error("already recording"), { code: 500 });
-        state.recording = true; state.outputPath = `${state.recordDirectory}\\${state["profile:Output.FilenameFormatting"] ?? "rec"}.mp4`;
+        state.recording = true; state.recordStartedAt = Date.now(); state.outputPath = `${state.recordDirectory}\\${state["profile:Output.FilenameFormatting"] ?? "rec"}.mp4`;
         setTimeout(() => broadcastEvent("RecordStateChanged", { outputActive: true, outputState: "OBS_WEBSOCKET_OUTPUT_STARTED", outputPath: state.outputPath }), 20);
         return {};
       }
