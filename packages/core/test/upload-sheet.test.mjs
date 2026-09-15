@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { formatDuration, writeUploadSheet } from "../src/upload-sheet.mjs";
@@ -61,6 +62,20 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(part2.includes(`line:  ${fp} · 191 s`));
   assert.ok(part2.includes("0:04 Human: resumed after completed"), "part 2's chapters start from its own 0:00, without the harness's details");
   assert.ok(readFileSync(writeUploadSheet(runDir), "utf8").includes("This run is an example."), "bundle and note are remembered");
+});
+
+test("a cut rendered before this revision is marked out of date: its line would not match it", { skip: spawnSync("ffmpeg", ["-version"]).status !== 0 && "no ffmpeg" }, () => {
+  const root = mkdtempSync(join(tmpdir(), "aas-sheet-stale-"));
+  const runDir = join(root, "run-01");
+  const bundle = join(root, "public", "run-01");
+  mkdirSync(join(runDir, "recording"), { recursive: true });
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(runDir, "recording", "a.mp4"), "");
+  spawnSync("ffmpeg", ["-v", "error", "-f", "lavfi", "-i", "color=c=black:s=64x36:d=2", join(runDir, "recording", "a.cut.mp4")]);
+  writeFileSync(join(bundle, "timeline.json"), JSON.stringify({ segments: [{ index: 0, offset: 0, seconds: 30, file: "recording/a.mp4" }], sections: [], keep: [[0, 10]], totals: { cut_video: 10 }, cut_chapters: [] }));
+  writeFileSync(join(bundle, "summary.json"), JSON.stringify({ schema_version: 7, run_id: "run-01", models: [], category: {}, recording: { fingerprint: "0123456789abcdef", duration_seconds: 30, files: ["recording/a.mp4"] } }));
+  const sheet = readFileSync(writeUploadSheet(runDir, { bundleDir: bundle }), "utf8");
+  assert.match(sheet, /a\.cut\.mp4 {3}\(out of date: this file is 2s, this revision's cut is 10s; aas render /);
 });
 
 test("paths on a WSL drive mount are shown as the Windows drive the file dialog knows", async () => {

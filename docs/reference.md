@@ -104,6 +104,27 @@ publisher's job:
 3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). Its [verify page](https://ai-assisted-speedruns.org/verify/) checks the
    same zip in the browser.
 
+### A new revision
+
+Every `aas publish` of the same run directory is a new revision of that run: the counter in
+`<run-dir>/publish-revision.json` goes up by one, `run_uid` stays the same, and an archive files the zip as a
+new revision of the run it already holds. There are two reasons to publish again: the run went on (`aas resume`),
+or the tooling changed the bundle's shape (a new summary schema). Either way:
+
+1. After a resume, `aas render <run-dir>` again: the cut and its length change with the new segment, and the
+   upload sheet marks a cut rendered before this revision as out of date.
+2. Move the previous bundle out of the way: `aas publish` refuses an `<out-dir>` that is not empty, and writes
+   `<out-dir>.zip` over the old zip. Keep the old ones under another name if you want them.
+3. `aas publish <run-dir> <out-dir>` with the options of the earlier revisions: the same `--sign` key if they were
+   signed, and `--session <log>` if the run directory has moved since it was played (Claude Code keeps the session
+   log under the path the run directory had then).
+4. Compare the lines in the new `recording/UPLOAD.txt` with the descriptions of the videos you already uploaded.
+   The fingerprint is the hash of the bundle's published timeline: publishing an unchanged run again keeps it; a
+   resume changes it, because the timeline has new records, and so can a tooling update that changes the sanitised
+   log. A video whose line changed gets the new line in its description; a video whose length changed (the cut
+   after a resume) is a new video, uploaded with its new line.
+5. Submit the new zip.
+
 What that buys a reader: the video cannot be swapped for another one. A platform re-encodes what you upload,
 so a hash of the file proves nothing about the video anyone can watch; the fingerprint in the description,
 the duration, and a few tool calls spot-checked at their `elapsed_seconds` all have to match the same bundle.

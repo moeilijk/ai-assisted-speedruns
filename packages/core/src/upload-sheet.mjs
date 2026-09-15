@@ -4,6 +4,7 @@
 // an example title and description. `aas publish` and `aas render` write it.
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { ARCHIVE_URL } from "./plugins.mjs";
 import { formatDuration, recordingVideos, withVideoTexts } from "./videos.mjs";
 
@@ -14,6 +15,11 @@ export const shownPath = (p) => (/^\/mnt\/[a-z]\//.test(p) ? p.replace(/^\/mnt\/
 const REVISION_FILE = "publish-revision.json";
 
 export { formatDuration };
+
+/** A video file's length by ffprobe, or null when it cannot be read (no ffprobe, not a video). */
+function videoSeconds(file) {
+  try { return Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()) || null; } catch { return null; }
+}
 
 /** The bundle this sheet describes: an explicit directory, else the one the last `aas publish` of this run wrote. */
 function bundleDirOf(runDir, bundleDir) {
@@ -62,12 +68,16 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
   const rule = "-".repeat(78);
   const one = (v) => {
     const made = v.abs && fs.existsSync(v.abs);
+    // A cut rendered before a resume or before this revision's cut list has another length than its line: its line
+    // would not match it, so the sheet says to render it again.
+    const actual = made && v.kind === "cut" ? videoSeconds(v.abs) : null;
+    const stale = actual !== null && Math.abs(actual - v.seconds) > 1;
     const what = v.kind === "cut" ? "CUT VIDEO  (the recording with the thinking pauses removed)"
       : v.kind === "segment" ? `FULL RECORDING, PART ${v.part} OF ${v.parts}  (the run was resumed; each part is its own video)`
       : "FULL RECORDING";
     return [
       what,
-      `  ${shownPath(v.abs ?? "")}${made ? "" : `   (not made yet: aas render ${runDir})`}`,
+      `  ${shownPath(v.abs ?? "")}${!made ? `   (not made yet: aas render ${runDir})` : stale ? `   (out of date: this file is ${whole(actual)}, this revision's cut is ${whole(v.seconds)}; aas render ${runDir})` : ""}`,
       `  ${whole(v.seconds)}`,
       `  line:  ${v.line}`,
       "",
