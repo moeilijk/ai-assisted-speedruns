@@ -118,8 +118,8 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
-  assert.equal(p.summary.schema_version, 10);
-  for (const m of p.summary.models) assert.deepEqual(Object.keys(m), ["model", "reasoning_effort", "context_window", "max_output_tokens", "provider"], "each model with what the runtime reported, null where it reported nothing");
+  assert.equal(p.summary.schema_version, 11);
+  for (const m of p.summary.models) assert.deepEqual(Object.keys(m), ["model", "parts", "reasoning_effort", "context_window", "max_output_tokens", "provider"], "each model with what the runtime reported, null where it reported nothing");
   assert.ok(Array.isArray(p.summary.harness.plugins.runtime.cli_versions), "the runtime CLI's versions, apart from the plugin's version");
   assert.equal("cli_versions" in p.summary, false);
   assert.ok(Array.isArray(p.summary.recording.videos), "the videos a runner may upload are in the bundle");

@@ -9,6 +9,7 @@ import { verifyBundle } from "./sign.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
 
@@ -185,6 +186,10 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           (Array.isArray(summary.models) ? summary.models : []).forEach((m, i) => {
             for (const key of ["context_window", "max_output_tokens"]) if (!(key in m) || !count(m[key])) problems.push(`models[${i}].${key} must be a positive integer or null`);
             if (!("provider" in m) || !(m.provider === null || (typeof m.provider === "string" && m.provider))) problems.push(`models[${i}].provider must be a string or null`);
+          });
+          // Schema 11: the id split into its parts by the maker's naming (models.mjs), null for an id it does not know.
+          if (summary.schema_version >= 11) (Array.isArray(summary.models) ? summary.models : []).forEach((m, i) => {
+            if (JSON.stringify(m.parts) !== JSON.stringify(modelParts(m.model))) problems.push(`models[${i}].parts must be ${JSON.stringify(modelParts(m.model))} for ${m.model}`);
           });
           const cv = summary.harness?.plugins?.runtime?.cli_versions;
           if (!Array.isArray(cv) || !cv.every((v) => typeof v === "string" && v)) problems.push("schema 10 requires harness.plugins.runtime.cli_versions as a list of versions");

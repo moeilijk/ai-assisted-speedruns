@@ -20,6 +20,7 @@ import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
+import { modelParts } from "./models.mjs";
 import { recordingVideos, withVideoTexts } from "./videos.mjs";
 import { BUNDLE_VERSION, SUMMARY_SCHEMA } from "./versions.mjs";
 
@@ -34,7 +35,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.28";
+export const SPEC_VERSION = "0.29";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -249,7 +250,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   summary.models = summary.models.flatMap((m) => {
     const own = { context_window: m.context_window ?? null, max_output_tokens: m.max_output_tokens ?? null, provider: m.provider ?? null };
     const list = reports?.get(m.model)?.length ? reports.get(m.model) : [own];
-    return list.map((r) => ({ model: m.model, reasoning_effort: m.reasoning_effort ?? null, ...r }));
+    return list.map((r) => ({ model: m.model, parts: modelParts(m.model), reasoning_effort: m.reasoning_effort ?? null, ...r }));
   });
   // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
   // line its description must carry, its chapters on its own clock, and a suggested title and description ending on
