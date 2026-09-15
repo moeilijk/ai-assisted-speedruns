@@ -1,6 +1,6 @@
 // `aas upload-sheet <run-dir>`: what it takes to upload the run's video to a video site, in one plain-text file next to
-// the videos: <run-dir>/recording/UPLOAD.txt. The file to upload, a title, and a description to paste as it stands,
-// with the chapters and the fingerprint line in it. `aas publish` and `aas render` write it.
+// the videos: <run-dir>/recording/UPLOAD.txt. The file to upload, the one requirement (the fingerprint line in the
+// description), and an example title and description. `aas publish` and `aas render` write it.
 import fs from "node:fs";
 import path from "node:path";
 import { probeDuration } from "./render.mjs";
@@ -141,10 +141,16 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "VIDEO FILE",
     ...video,
     "",
-    "TITLE",
-    `  ${title}`,
+    "REQUIRED",
+    "  The video's description must contain this line (or its title, where a site has no description).",
+    "  That is the only requirement: it ties the video to the run's bundle. A line of its own keeps it easy to find.",
     "",
-    "DESCRIPTION  (paste as it stands)",
+    `  ${line}`,
+    "",
+    "EXAMPLE  (not required: a title and a description to use, change or leave out)",
+    "",
+    `  Title: ${title}`,
+    "",
     "-".repeat(78),
     description,
     "-".repeat(78),

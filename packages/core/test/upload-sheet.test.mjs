@@ -14,7 +14,7 @@ test("times read the way the archive shows them", () => {
   assert.equal(formatDuration(3675, { whole: true }), "1h 01m 15s");
 });
 
-test("the sheet holds only the upload: the video file, a title, and a description with the chapters and the fingerprint line", () => {
+test("the sheet holds only the upload: the video file, the one requirement, and an example title and description", () => {
   const root = mkdtempSync(join(tmpdir(), "aas-sheet-"));
   const runDir = join(root, "sts-claude-code-01");
   const bundle = join(root, "public", "sts-claude-code-01");
@@ -34,9 +34,12 @@ test("the sheet holds only the upload: the video file, a title, and a descriptio
   const out = writeUploadSheet(runDir, { bundleDir: bundle, note: "This run is an example." });
   assert.equal(out, join(runDir, "recording", "UPLOAD.txt"));
   const sheet = readFileSync(out, "utf8");
-  assert.deepEqual(sheet.split("\n").filter((l) => /^[A-Z][A-Z ]+(\s{2}\(.*\))?$/.test(l)), ["VIDEO FILE", "TITLE", "DESCRIPTION  (paste as it stands)"]);
+  assert.deepEqual(sheet.split("\n").filter((l) => /^[A-Z][A-Z ]+(\s{2}\(.*\))?$/.test(l)), ["VIDEO FILE", "REQUIRED", "EXAMPLE  (not required: a title and a description to use, change or leave out)"]);
+  const required = sheet.split("REQUIRED")[1].split("EXAMPLE")[0];
+  assert.ok(required.includes("\n  AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s\n"), "the line on its own");
+  assert.match(required, /That is the only requirement/);
   assert.ok(sheet.includes(join(runDir, "recording", "AAS_run_1.mp4")));
-  assert.ok(!/bundle|\.zip|submit/i.test(sheet.split("DESCRIPTION")[0]), "nothing about the bundle upload");
+  assert.ok(!/\.zip|submit/i.test(sheet), "nothing about submitting the bundle");
   assert.ok(sheet.includes("Slay the Spire · Act 1 boss in 2m 57.4s · claude-sonnet-5"));
   const desc = sheet.split("-".repeat(78))[1].trim().split("\n");
   assert.match(desc[0], /^claude-sonnet-5 plays Slay the Spire through Claude Code/);

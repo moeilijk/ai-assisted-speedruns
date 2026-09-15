@@ -210,7 +210,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]",
             "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
             "  aas upload-sheet <run-dir> [--bundle <public-dir>] [--note <text>]",
-            "                                           <run-dir>/recording/UPLOAD.txt: the video file, title and description for the upload",
+            "                                           <run-dir>/recording/UPLOAD.txt: the video file, the fingerprint line it needs, an example title and description",
             "  aas check [--strict] <bundle-dir | bundle.zip>",
             "  aas scan <dir>",
           ].join("\n"),
