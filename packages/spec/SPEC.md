@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.24
+# AI Assisted Speedruns (AAS) — Specification, draft 0.25
 
-Status: draft 0.24, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.25, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -75,7 +75,7 @@ A published run is a directory with these files. Names are fixed.
 | `chapters.txt` | if the recording has chapters | `HH:MM:SS Label` per line, relative to t0 (YouTube format) |
 | `runtime-config/` | yes | the runtime's configuration with machine paths replaced (portal-agent: `config.template.toml`) |
 | `game-config/` | if applicable | game settings changed for the run (cvars, mods, patches, with upstream references) |
-| `timeline.json` | no | timers and sections derived from the playbacks (`aas timeline`): RTA, IGT, thinking time, per-section splits, the cut list |
+| `timeline.json` | when a video of one segment or of the cut is published | timers and sections derived from the playbacks (`aas timeline`): RTA, IGT, thinking time, per-section splits, the segments with their lengths, the cut list |
 | `splits.lss` | no | LiveSplit splits file with the same sections |
 | `run.jsonl` | no | the private, complete log; it stays in the run directory and is never part of a bundle |
 
@@ -195,6 +195,8 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
+**Which videos.** The runner chooses what to upload: the full recording, the cut, or both. The full recording of a run that was resumed is one file per segment, and each file may be its own video; the cut is one video of the kept intervals (`timeline.json` `keep`, the thinking pauses removed), in order, across the segments. Every uploaded video carries the line `AAS <run_id> · fingerprint <16 hex> · <n> s` in its description (or its title, where a platform has no description), with `n` the length of that video in seconds. A verifier matches the length against one of the lengths the bundle states: `recording.duration_seconds` for the whole recording, `timeline.json` `segments[].seconds` for one segment, the sum of `timeline.json` `keep` for the cut. In a cut, a tool call's place is its `elapsed_seconds` mapped through `keep`.
+
 Binding a recording to a bundle is two claims, and they are established differently. **This recording is mine**: only the owner of a recording can write its description, so a line in it that a stranger could not have put there says the channel is the publisher's. An archive that is connected to the publisher's channel through that platform can ask the platform instead, which settles ownership without the publisher editing anything. **This recording is of this bundle**: that is what the fingerprint says, and no platform connection can answer it, because the platform knows nothing about the run. A reader who does not trust the archive can only check the second claim where the fingerprint is readable, so the line stays the route for anyone whose channel an archive cannot ask, and the better practice for everyone else: an archive may accept a connected channel without it, and then carries the binding on its own word.
 
 `seed` is the game's seed of the last run in the game's own notation (Slay the Spire: the seed code the game shows, accepted by its START), null for games without one; `attempts` lists every run of the session with its seed and outcome, so a run can be reproduced. `completed_at` is the timestamp of the `game.over` event with `victory: true`, else of the record in which the goal was reached (completion marker), or null. `elapsed_to_completion_seconds` is the run's headline real time (RTA). `recording.igt_seconds` is the in-game time (sum of played ticks); for `paused-think` runs both are reported and the IGT is the comparable one.
@@ -274,8 +276,8 @@ bundle by the fingerprint in its description instead.
 
 A run is verifiable when all of the following hold:
 
-1. The recording of this run, where the archive holds its link, is continuous from `run.started` to `run.ended`. Pauses are `run.wait` events in the timeline and visible in the recording.
-2. Every `tool_call` can be located in that recording at its `elapsed_seconds`; `chapters.txt` names the sections at the same offsets, so a reader can jump to any of them.
+1. The full recording of this run, where the archive holds its link, is continuous from `run.started` to `run.ended`, one file per segment. Pauses are `run.wait` events in the timeline and visible in the recording. A cut video keeps exactly the intervals of `timeline.json` `keep`, in order.
+2. Every `tool_call` can be located in the full recording at its `elapsed_seconds`, and in a cut through `keep`; `chapters.txt` names the sections at the same offsets, so a reader can jump to any of them.
 3. `human: none` implies no `run.human` record in the published run. Any such record forces `restart-only` or `assisted`. A `run.human` record after `completed_at` that is followed by a `game.goal` belongs to a goal extension that is not published yet (§6) and does not count.
 4. `tools.json`, `AGENTS.md`, `documentation.md` and `runtime-config/` are published; the agent had no tool outside `tools.json`.
 5. The hashes in `manifest.json` match.
@@ -315,3 +317,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.22 | 2026-09-15 | §6 describes `summary.json` as schema 6 writes it: `bundle`, identifiers, `harness_events`, `recording.files` |
 | 0.23 | 2026-09-15 | Schema 7 drops `recording.black_intervals`; §8.8: the recording is checked when the run starts; drafts are numbered |
 | 0.24 | 2026-09-15 | §3: an archive may receive and keep a run that did not reach its goal, and does not rank or compare it |
+| 0.25 | 2026-09-15 | §6: the runner uploads the full recording (one video per segment), the cut, or both; each video's line carries its own length; §4: `timeline.json` is required for a segment or cut video; §8.1–8.2 cover the cut |

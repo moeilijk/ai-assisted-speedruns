@@ -32,7 +32,7 @@ A **game** plugin connects one game, a **runtime** starts the agent, a **recorde
 
 1. **Record.** With the game started by its own launch script, `aas run` starts the recorder, the timer and the agent, and writes everything that happens to one log in the run directory: every tool call, every message, every event of the game. The run directory stays on your machine.
 2. **Bundle.** `aas publish` turns that run directory into a bundle: the sanitised log, the times, the agent's instructions and tools, the configuration, and a hash of every file. It refuses anything the privacy scan flags, and packs the bundle into one zip. The recording is not in it.
-3. **Upload the video, with its fingerprint.** The video is not in the public folder: it stays in the private run directory, under `<run-dir>/recording/` (the cut version is the `.cut.mp4` that `aas render` writes). Next to it, `aas publish` and `aas render` write `recording/UPLOAD.txt` with what the video upload takes: the file, and the one requirement, the fingerprint line `AAS <run-id> · fingerprint <16 hex> · <n> s`, which the video's description has to contain. That line is what ties the video to this bundle; the title and description in the sheet are an example, not a requirement.
+3. **Upload the video, with its fingerprint.** Upload the cut, the full recording, or both: your choice. The videos are not in the public folder: they stay in the private run directory, under `<run-dir>/recording/` (the full recording is one file per segment of a resumed run; the cut is the one `.cut.mp4` that `aas render` writes). Next to them, `aas publish` and `aas render` write `recording/UPLOAD.txt`: per video the file, its length, its chapters and the one requirement, the line `AAS <run-id> · fingerprint <16 hex> · <n> s` with that video's length, which its description has to contain. That line is what ties the video to this bundle; the title and description in the sheet are an example, not a requirement.
 4. **Submit the bundle.** Upload the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). Everything after that happens on the site; [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/) checks a zip in your browser before you send it.
 
 ## Disclaimer: anti-cheat, bans, your own risk
@@ -58,7 +58,7 @@ aas run --runtime claude-code --game games/slay-the-spire/plugin.mjs --run-dir <
         --recorder obs --timer livesplit --overlay-port 8765 --goal act1 --headless --max-minutes 60
 aas render  <runs>/sts-claude-code-01
 aas publish <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
-cat <runs>/sts-claude-code-01/recording/UPLOAD.txt   # the video file and the fingerprint line for the upload
+cat <runs>/sts-claude-code-01/recording/UPLOAD.txt   # the videos you can upload, each with its line and chapters
 ```
 
 ## Documentation

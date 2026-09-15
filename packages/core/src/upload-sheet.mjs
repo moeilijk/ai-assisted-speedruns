@@ -1,6 +1,7 @@
-// `aas upload-sheet <run-dir>`: what it takes to upload the run's video to a video site, in one plain-text file next to
-// the videos: <run-dir>/recording/UPLOAD.txt. The file to upload, the one requirement (the fingerprint line in the
-// description), and an example title and description. `aas publish` and `aas render` write it.
+// `aas upload-sheet <run-dir>`: what it takes to upload the run's videos to a video site, in one plain-text file next to
+// them: <run-dir>/recording/UPLOAD.txt. The runner uploads the cut, the full recording (one video per segment of a
+// resumed run), or both; per video the file, its length, the line its description must contain, and its chapters; then
+// an example title and description. `aas publish` and `aas render` write it.
 import fs from "node:fs";
 import path from "node:path";
 import { probeDuration } from "./render.mjs";
@@ -83,14 +84,32 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
 
   const id = s.run_id;
   const fp = String(s.recording?.fingerprint ?? "").slice(0, 16);
-  const fullSeconds = s.recording?.duration_seconds ?? null;
-  const line = `AAS ${id} · fingerprint ${fp} · ${fullSeconds ?? "?"} s`;
+  const lineFor = (seconds) => `AAS ${id} · fingerprint ${fp} · ${seconds ?? "?"} s`;
+  let timeline = null;
+  try { timeline = JSON.parse(fs.readFileSync(path.join(dir, "timeline.json"), "utf8")); } catch { /* an older bundle */ }
   const raw = (s.recording?.files ?? []).filter((f) => !/\.cut\.mp4$/.test(f));
-  const cutRel = raw.length ? raw[0].replace(/\.(mp4|mkv|mov)$/i, "") + ".cut.mp4" : null;
-  const cutAbs = cutRel && path.join(runDir, cutRel);
+  const fullSeconds = s.recording?.duration_seconds ?? null;
+  const lengthOf = (file, fallback) => {
+    const d = file && fs.existsSync(file) ? probeDuration(file) : null;
+    return typeof d === "number" && d > 0 ? d : fallback;
+  };
+
+  // The videos the runner may upload, any or all of them: the cut (one file, the thinking pauses removed) and the
+  // full recording (one file per segment when the run was resumed). Each gets its own line with its own length.
+  const chaptersCut = readChapters(path.join(runDir, "timeline", "chapters.cut.txt"));
+  const chaptersFull = readChapters(path.join(runDir, "timeline", "chapters.txt"));
+  const segments = (timeline?.segments?.length ? timeline.segments : raw.map((file, index) => ({ index, file, offset: 0, seconds: raw.length === 1 ? fullSeconds : null })))
+    .map((sg, k, all) => {
+      const abs = sg.file ? path.join(runDir, sg.file) : null;
+      const seconds = lengthOf(abs, sg.seconds);
+      const end = all[k + 1]?.offset ?? Infinity;
+      const chapters = chaptersFull.filter((c) => c.at >= (sg.offset ?? 0) && c.at < end).map((c) => ({ at: c.at - (sg.offset ?? 0), label: c.label }));
+      return { abs, seconds, chapters };
+    });
+  const cutAbs = raw.length ? path.join(runDir, raw[0].replace(/\.(mp4|mkv|mov)$/i, "") + ".cut.mp4") : null;
   const hasCut = Boolean(cutAbs && fs.existsSync(cutAbs));
-  const cutSeconds = hasCut ? probeDuration(cutAbs) : null;
-  const chapters = readChapters(path.join(runDir, "timeline", hasCut ? "chapters.cut.txt" : "chapters.txt"));
+  const keepSeconds = timeline?.keep?.length ? timeline.keep.reduce((n, [a, b]) => n + (b - a), 0) : null;
+  const cutSeconds = hasCut ? lengthOf(cutAbs, keepSeconds) : keepSeconds;
 
   const game = s.game?.game ?? s.category?.game ?? "the game";
   const goal = s.category?.goal_end?.label ?? s.category?.goal ?? "its goal";
@@ -100,17 +119,17 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
   const reached = Boolean(s.completed_at && ttc);
   const igt = formatDuration(reached ? ttc.igt_seconds : s.recording?.igt_seconds);
   const real = formatDuration(reached ? ttc.rta_seconds : s.recording?.wall_clock_seconds ?? fullSeconds, { whole: true });
-  const full = formatDuration(fullSeconds, { whole: true });
   const runPage = `${ARCHIVE_URL}/runs/${id}/`;
+  const whole = (x) => formatDuration(x, { whole: true });
+  const secs = (x) => (typeof x === "number" ? Math.round(x) : null);
 
   const title = reached ? `${game} · ${goal} in ${igt} · ${models}` : `${game} · ${goal}, not reached · ${models}`;
   const human = s.category?.human === "restart-only"
     ? "A human resumed the agent after it stopped; no game help was given."
     : s.category?.human === "assisted" ? `A human assisted: ${s.category?.human_notes ?? "see the run page"}.` : null;
   const after = reached && (s.recording?.igt_seconds ?? 0) > (ttc.igt_seconds ?? 0) + 0.05
-    ? "The video goes on after the goal was reached; what was played after it is not part of the run's time."
+    ? "The recording goes on after the goal was reached; what was played after it is not part of the run's time."
     : null;
-  const chapterLines = chapters.map((c) => `${youtubeTime(c.at)} ${viewerLabel(c.label)}`);
   const description = [
     `${models} plays ${game} through ${runtime}, with the goal "${goal}".`,
     reached
@@ -120,34 +139,40 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     ...(human ? [human] : []),
     ...(uploadNote ? [uploadNote] : []),
     "",
-    hasCut
-      ? `This is the cut version (${formatDuration(cutSeconds, { whole: true })}): the pauses while the model was thinking are removed. The full recording runs ${full}.`
-      : `This is the full recording (${full}).`,
-    ...(chapterLines.length ? ["", "Chapters", ...chapterLines] : []),
-    "",
     `The run in the AAS Archive: ${runPage}`,
     `Check a bundle in the browser: ${ARCHIVE_URL}/verify/`,
-    "",
-    line,
   ].join("\n");
 
-  const video = hasCut
-    ? [`  ${shownPath(cutAbs)}`, `  the cut version, ${formatDuration(cutSeconds, { whole: true })}`]
-    : [`  ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n  ") || "(no recording found)"}`, `  the full recording, ${full}${raw.length > 1 ? ` in ${raw.length} files` : ""}; aas render makes one cut video of it`];
+  const block = (heading, items) => [heading, ...items.flatMap((v) => [
+    "",
+    `  ${v.label}${shownPath(v.abs ?? "")}`,
+    `  ${v.what}`,
+    `  line:  ${lineFor(secs(v.seconds))}`,
+    ...(v.chapters.length ? ["  chapters:", ...v.chapters.map((c) => `    ${youtubeTime(c.at)} ${viewerLabel(c.label)}`)] : []),
+  ])];
+  const cutBlock = hasCut
+    ? block("CUT VIDEO  (one file: the recording with the thinking pauses removed)", [{ label: "", abs: cutAbs, seconds: cutSeconds, what: `${whole(cutSeconds)}`, chapters: chaptersCut }])
+    : ["CUT VIDEO", "", `  Not made yet: aas render ${runDir} makes it${keepSeconds ? ` (${whole(keepSeconds)})` : ""} and writes this sheet again.`];
+  const fullBlock = block(
+    segments.length > 1
+      ? `FULL RECORDING  (${segments.length} files: the run and its continuation after a resume; each file is its own video)`
+      : "FULL RECORDING  (one file)",
+    segments.map((v, k) => ({ ...v, label: segments.length > 1 ? `${k + 1}. ` : "", what: `${whole(v.seconds)}${segments.length > 1 ? `, part ${k + 1} of ${segments.length}` : ""}` })),
+  );
+
   const sheet = [
     `Video upload: ${id}`,
     "",
-    "VIDEO FILE",
-    ...video,
+    "Upload the cut video, the full recording, or both: that is the runner's choice.",
+    "REQUIRED: the description of every uploaded video contains that video's line below (or its title, where a site",
+    "has no description). That is the only requirement. A line of its own keeps it easy to find.",
+    "The fingerprint is the start of the sha256 of the run's published timeline; the seconds are that video's length.",
     "",
-    "REQUIRED",
-    "  The video's description must contain this line (or its title, where a site has no description).",
-    "  That is the only requirement: it ties the video to the run's bundle. A line of its own keeps it easy to find.",
-    `  The fingerprint is the start of the sha256 of the run's published timeline; ${fullSeconds} s is the length of the full recording.`,
+    ...cutBlock,
     "",
-    `  ${line}`,
+    ...fullBlock,
     "",
-    "EXAMPLE  (not required: a title and a description to use, change or leave out)",
+    "EXAMPLE  (not required: a title and a description to use, change or leave out; add the video's chapters and its line)",
     "",
     `  Title: ${title}`,
     "",

@@ -237,9 +237,21 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   // What binds a recording to this bundle: the description of the video must carry this fingerprint and the
   // duration must match. A platform re-encodes the file, so its hash cannot do this.
   const runId = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_id ?? null; } catch { return null; } })();
+  // The runner uploads the full recording (one video per segment of a resumed run), the cut, or both: each video's
+  // length is one of these. timeline.json carries the segments and the cut list.
+  const lengths = (() => {
+    const out = [];
+    if (rec?.duration_seconds) out.push(`${rec.duration_seconds} s (the full recording)`);
+    try {
+      const t = JSON.parse(fs.readFileSync(file("timeline.json"), "utf8"));
+      if ((t.segments ?? []).length > 1) out.push(`${t.segments.map((sg) => `${Math.round(sg.seconds)} s`).join(" or ")} (its ${t.segments.length} files)`);
+      if ((t.keep ?? []).length) out.push(`${Math.round(t.keep.reduce((n, [a, b]) => n + (b - a), 0))} s (the cut)`);
+    } catch { /* no timeline.json: only the full recording's length is known */ }
+    return out;
+  })();
   add("recording bound to this bundle", rec?.fingerprint ? "met" : "unmet",
     rec?.fingerprint
-      ? `the recording's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${rec.duration_seconds ? `, and the length must be about ${rec.duration_seconds} s` : ""}`
+      ? `each uploaded video's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${lengths.length ? `, and its length must be about ${lengths.join(", or ")}` : ""}`
       : "summary.recording has no fingerprint: nothing ties the published recording to this bundle");
   if (exists("run.jsonl")) add("run.jsonl not published", "unmet", "private log present in the run directory; do not publish it");
 
