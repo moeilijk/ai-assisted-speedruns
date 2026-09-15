@@ -65,3 +65,10 @@ test("paths on a WSL drive mount are shown as the Windows drive the file dialog 
   assert.equal(shownPath("/mnt/g/OBS/Portal/portal-01/recording/a.cut.mp4"), "G:\\OBS\\Portal\\portal-01\\recording\\a.cut.mp4");
   assert.equal(shownPath("/home/me/runs/x"), "/home/me/runs/x");
 });
+
+test("chapter labels for viewers leave out the save name and the resumed session's exit code, turns and cost", async () => {
+  const { viewerLabel } = await import("../src/upload-sheet.mjs");
+  assert.equal(viewerLabel("Human: resumed from save aas_portal_03_003 after failed (claude -p exited with 1; 410 assistant turns; cost $77.53; success)"), "Human: resumed after failed");
+  assert.equal(viewerLabel("Human: goal extended from act1 to act3"), "Human: goal extended from act1 to act3");
+  assert.equal(viewerLabel("Act 1 boss"), "Act 1 boss");
+});

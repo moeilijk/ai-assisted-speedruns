@@ -41,6 +41,12 @@ function readChapters(file) {
     .map((m) => ({ at: Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]), label: m[4].trim() }));
 }
 
+/**
+ * A chapter label for viewers: the bundle keeps the harness's details (the save's name, the runtime's exit code, turns
+ * and cost of a resumed session), which say nothing to someone watching the video, so they are left out here.
+ */
+export const viewerLabel = (label) => label.replace(/\s*\([^)]*\)\s*$/, "").replace(/ from save \S+/, "");
+
 /** YouTube turns timestamps into chapters only when the first is at 0:00, there are at least three, and each lasts 10 s or more. */
 export function youtubeChapterProblem(chapters, videoSeconds) {
   if (chapters.length < 3) return `${chapters.length} chapter(s); YouTube needs at least three`;
@@ -114,7 +120,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
   const after = reached && (s.recording?.igt_seconds ?? 0) > (ttc.igt_seconds ?? 0) + 0.05
     ? "The video goes on after the goal was reached; what was played after it is not part of the run's time."
     : null;
-  const chapterLines = chapters.map((c) => `${youtubeTime(c.at)} ${c.label}`);
+  const chapterLines = chapters.map((c) => `${youtubeTime(c.at)} ${viewerLabel(c.label)}`);
   const description = [
     `${models} plays ${game} through ${runtime}, with the goal "${goal}".`,
     reached
