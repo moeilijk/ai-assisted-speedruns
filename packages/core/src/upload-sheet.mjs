@@ -8,6 +8,9 @@ import { probeDuration } from "./render.mjs";
 import { ARCHIVE_URL } from "./plugins.mjs";
 
 export const UPLOAD_SHEET = path.join("recording", "UPLOAD.txt");
+
+/** A path as the publisher's file dialog shows it: a WSL drive mount (/mnt/g/...) as its Windows drive (G:\\...). */
+export const shownPath = (p) => (/^\/mnt\/[a-z]\//.test(p) ? p.replace(/^\/mnt\/([a-z])\//, (_, d) => `${d.toUpperCase()}:\\`).replaceAll("/", "\\") : p);
 const REVISION_FILE = "publish-revision.json";
 
 /** Seconds as the archive shows a time: 39.4s, 2m 57.4s; `whole` drops the tenths: 22m 42s, 1h 01m 15s. */
@@ -137,14 +140,14 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
   const rule = "=".repeat(78);
   const videoLines = hasCut
     ? [
-        `  Upload this file:   ${cutAbs}`,
+        `  Upload this file:   ${shownPath(cutAbs)}`,
         `                      the cut version, ${formatDuration(cutSeconds, { whole: true })}: thinking pauses removed (aas render)`,
-        `  Full recording:     ${raw.map((f) => path.join(runDir, f)).join("\n                      ")}`,
+        `  Full recording:     ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n                      ")}`,
         `                      ${full}${raw.length > 1 ? `, in ${raw.length} segments` : ""}; not needed for the upload`,
       ]
     : [
         `  No cut video yet: run  aas render ${runDir}  and this sheet is written again.`,
-        `  Full recording:     ${raw.map((f) => path.join(runDir, f)).join("\n                      ") || "(none found)"}`,
+        `  Full recording:     ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n                      ") || "(none found)"}`,
       ];
   const sheet = [
     rule,
@@ -154,9 +157,9 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "",
     "WHERE THE FILES ARE",
     `  The video is NOT in the public folder. It is in this run's private directory:`,
-    `    ${path.join(runDir, "recording")}`,
+    `    ${shownPath(path.join(runDir, "recording"))}`,
     `  The public folder holds only the bundle for the archive:`,
-    `    ${dir}`,
+    `    ${shownPath(dir)}`,
     "",
     "1. VIDEO  (upload where you publish video)",
     ...videoLines,
@@ -179,7 +182,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
       : "  YouTube turns these into chapters (first at 0:00, at least three, each 10 s or more).",
     "",
     "6. BUNDLE  (upload to the archive)",
-    `  ${dir}.zip`,
+    `  ${shownPath(`${dir}.zip`)}`,
     `  Submit it at ${ARCHIVE_URL}/submit/  (check it first at ${ARCHIVE_URL}/verify/ if you like)`,
     "",
   ].join("\n");

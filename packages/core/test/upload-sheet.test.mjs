@@ -56,3 +56,9 @@ test("the sheet says where the video is, and carries the fingerprint line, title
   const again = readFileSync(writeUploadSheet(runDir), "utf8");
   assert.ok(again.includes("This run is an example."));
 });
+
+test("paths on a WSL drive mount are shown as the Windows drive the file dialog knows", async () => {
+  const { shownPath } = await import("../src/upload-sheet.mjs");
+  assert.equal(shownPath("/mnt/g/OBS/Portal/portal-01/recording/a.cut.mp4"), "G:\\OBS\\Portal\\portal-01\\recording\\a.cut.mp4");
+  assert.equal(shownPath("/home/me/runs/x"), "/home/me/runs/x");
+});
