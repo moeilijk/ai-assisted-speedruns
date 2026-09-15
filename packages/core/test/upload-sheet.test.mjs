@@ -1,0 +1,58 @@
+// The upload sheet: everything for one upload in one file next to the videos, in the private run directory.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { formatDuration, writeUploadSheet, youtubeChapterProblem } from "../src/upload-sheet.mjs";
+
+test("times read the way the archive shows them", () => {
+  assert.equal(formatDuration(39.405), "39.4s");
+  assert.equal(formatDuration(177.48), "2m 57.4s");
+  assert.equal(formatDuration(122.04), "2m 02.0s");
+  assert.equal(formatDuration(1362.641, { whole: true }), "22m 42s");
+  assert.equal(formatDuration(3675, { whole: true }), "1h 01m 15s");
+});
+
+test("YouTube chapters need three, the first at 0:00, each at least 10 s", () => {
+  assert.match(youtubeChapterProblem([{ at: 0, label: "Start" }], 100), /at least three/);
+  assert.match(youtubeChapterProblem([{ at: 0, label: "a" }, { at: 60, label: "b" }, { at: 65, label: "c" }], 100), /"b" lasts less than 10 s/);
+  assert.equal(youtubeChapterProblem([{ at: 0, label: "a" }, { at: 60, label: "b" }, { at: 80, label: "c" }], 100), null);
+});
+
+test("the sheet says where the video is, and carries the fingerprint line, title, description, chapters and the bundle", () => {
+  const root = mkdtempSync(join(tmpdir(), "aas-sheet-"));
+  const runDir = join(root, "sts-claude-code-01");
+  const bundle = join(root, "public", "sts-claude-code-01");
+  mkdirSync(join(runDir, "timeline"), { recursive: true });
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(runDir, "timeline", "chapters.txt"), "00:00:00 Start\n00:22:42 Act 1 boss\n");
+  writeFileSync(join(bundle, "summary.json"), JSON.stringify({
+    schema_version: 7, spec_version: "0.24", run_id: "sts-claude-code-01", completed_at: "2026-09-13T11:14:00.165+02:00",
+    bundle: { revision: 11 }, models: [{ model: "claude-sonnet-5" }],
+    category: { game: "slay_the_spire", goal: "act1", goal_end: { id: "act1", label: "Act 1 boss", final: false }, human: "none" },
+    game: { game: "Slay the Spire" }, harness: { plugins: { runtime: { id: "claude-code", name: "Claude Code" } } },
+    recording: { fingerprint: "36d633208676bfdb0000", duration_seconds: 1559, igt_seconds: 217.26, wall_clock_seconds: 1559, files: ["recording/AAS_run_1.mp4"] },
+    totals_to_completion: { rta_seconds: 1362.641, igt_seconds: 177.48 },
+  }));
+  const out = writeUploadSheet(runDir, { bundleDir: bundle, note: "This run is an example." });
+  assert.equal(out, join(runDir, "recording", "UPLOAD.txt"));
+  const sheet = readFileSync(out, "utf8");
+  assert.match(sheet, /The video is NOT in the public folder/);
+  assert.match(sheet, /No cut video yet: run {2}aas render/);
+  assert.ok(sheet.includes("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s"));
+  assert.ok(sheet.includes("Slay the Spire · Act 1 boss in 2m 57.4s · claude-sonnet-5"));
+  assert.ok(sheet.includes("Result: Act 1 boss reached in 2m 57.4s in-game time, 22m 42s real time."));
+  assert.ok(sheet.includes("The video goes on after the goal was reached"));
+  assert.ok(sheet.includes("This run is an example."));
+  assert.ok(sheet.includes("0:00 Start\n22:42 Act 1 boss"));
+  assert.match(sheet, /timestamps, not as chapters: 2 chapter\(s\)/);
+  assert.ok(sheet.includes(`${bundle}.zip`));
+  assert.ok(sheet.includes("https://ai-assisted-speedruns.org/runs/sts-claude-code-01/"));
+  // The description's first line is the fingerprint line.
+  const desc = sheet.split("-".repeat(78))[1].trim();
+  assert.equal(desc.split("\n")[0], "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s");
+  // Written again without options: the bundle and the note are remembered.
+  const again = readFileSync(writeUploadSheet(runDir), "utf8");
+  assert.ok(again.includes("This run is an example."));
+});

@@ -165,7 +165,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   const revision = (() => {
     try { return Number(JSON.parse(fs.readFileSync(revisionFile, "utf8")).revision) + 1 || 1; } catch { return 1; }
   })();
-  fs.writeFileSync(revisionFile, `${JSON.stringify({ run_id: summary.run_id, revision, published_at: new Date().toISOString() }, null, 2)}\n`);
+  const previous = (() => { try { return JSON.parse(fs.readFileSync(revisionFile, "utf8")); } catch { return {}; } })();
+  // bundle_dir and upload_note are for the upload sheet (aas upload-sheet), which aas render writes again later.
+  fs.writeFileSync(revisionFile, `${JSON.stringify({ run_id: summary.run_id, revision, published_at: new Date().toISOString(), bundle_dir: path.resolve(outDir), upload_note: previous.upload_note ?? null }, null, 2)}\n`);
   summary.bundle = { kind: BUNDLE_KIND, bundle_version: BUNDLE_VERSION, run_id: summary.run_id, run_uid: brief.run_uid ?? null, revision, published_at: new Date().toISOString() };
   // What it takes to play the same thing again: the game's build, the mods with their pins, the run's settings.
   try { summary.game = (await plugin?.build?.({ runDir })) ?? null; } catch (e) { summary.game = null; log(`game build info not available (${e.message})`); }
@@ -287,8 +289,11 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/.`);
     log("");
   }
+  // Everything for the upload in one file next to the videos, in the private run directory.
+  const { writeUploadSheet } = await import("./upload-sheet.mjs");
+  const uploadSheet = writeUploadSheet(runDir, { bundleDir: outDir, log });
   log(formatReport(outDir, check));
-  return { outDir, summary, scan, check, timeline, zip, signature };
+  return { outDir, summary, scan, check, timeline, zip, signature, uploadSheet };
 }
 
 /** Events of run.jsonl that are not published: the operator's plan usage. */

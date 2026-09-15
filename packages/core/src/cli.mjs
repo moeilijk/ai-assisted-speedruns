@@ -173,6 +173,14 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         render(dir, { attempt: opts.attempt, video: opts.video, out: opts.out, burn: String(opts.burn ?? "").split(",").filter(Boolean), cut: !opts["no-cut"], crf: opts.crf, marginBefore: opts["margin-before"], marginAfter: opts["margin-after"] });
         break;
       }
+      case "upload-sheet": {
+        const { writeUploadSheet } = await import("./upload-sheet.mjs");
+        const dir = opts._[0];
+        if (!dir) throw new Error("Usage: aas upload-sheet <run-dir> [--bundle <public-dir>] [--note <text>]");
+        const out = writeUploadSheet(dir, { bundleDir: opts.bundle, note: opts.note, log: console.log });
+        if (!out) process.exitCode = 1;
+        break;
+      }
       case "scan": {
         const { scanPublication } = await import("./publish.mjs");
         const dir = opts._[0];
@@ -201,7 +209,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas key --verify <file|->                a claim as published: does it verify, and which identities does it name",
             "  aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]",
             "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
-            "  aas check [--strict] <run-dir>",
+            "  aas upload-sheet <run-dir> [--bundle <public-dir>] [--note <text>]",
+            "                                           <run-dir>/recording/UPLOAD.txt: the video to upload, fingerprint line, title, description, chapters",
+            "  aas check [--strict] <bundle-dir | bundle.zip>",
             "  aas scan <dir>",
           ].join("\n"),
         );

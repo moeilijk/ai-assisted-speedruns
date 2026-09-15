@@ -200,6 +200,7 @@ itself. `--keep-open` leaves them open. A stopped run continues with `aas resume
 aas timeline <run-dir>                      # RTA, IGT, sections, attempts, cut list, subtitles
 aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thinking pauses
 aas publish <run-dir> <public-dir>          # the bundle + the upload zip; prints the description line
+cat <run-dir>/recording/UPLOAD.txt          # everything for the video upload, in one file
 ```
 
 The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares.
@@ -207,8 +208,10 @@ Publish the video where video is published, and bind the two:
 
 1. `aas publish` prints one line, `AAS <run-id> · fingerprint <16 hex> · <n> s`. The fingerprint is the
    sha256 of this bundle's own published timeline (`session.sanitized.jsonl`).
-2. Upload the recording and put that line in the field the platform lets a viewer read: the description, or
-   the title where there is none.
+2. Upload the video and put that line in the field the platform lets a viewer read: the description, or the
+   title where there is none. The video is in the private run directory (`<run-dir>/recording/`, the cut is the
+   `.cut.mp4`), not in the public folder; `<run-dir>/recording/UPLOAD.txt` names the file and holds the line, a
+   title, a description to paste and the chapters.
 3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). The bundle carries no links.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
