@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { formatDuration, writeUploadSheet, youtubeChapterProblem } from "../src/upload-sheet.mjs";
+import { formatDuration, writeUploadSheet } from "../src/upload-sheet.mjs";
 
 test("times read the way the archive shows them", () => {
   assert.equal(formatDuration(39.405), "39.4s");
@@ -14,18 +14,14 @@ test("times read the way the archive shows them", () => {
   assert.equal(formatDuration(3675, { whole: true }), "1h 01m 15s");
 });
 
-test("YouTube chapters need three, the first at 0:00, each at least 10 s", () => {
-  assert.match(youtubeChapterProblem([{ at: 0, label: "Start" }], 100), /at least three/);
-  assert.match(youtubeChapterProblem([{ at: 0, label: "a" }, { at: 60, label: "b" }, { at: 65, label: "c" }], 100), /"b" lasts less than 10 s/);
-  assert.equal(youtubeChapterProblem([{ at: 0, label: "a" }, { at: 60, label: "b" }, { at: 80, label: "c" }], 100), null);
-});
-
-test("the sheet says where the video is, and carries the fingerprint line, title, description, chapters and the bundle", () => {
+test("the sheet holds only the upload: the video file, a title, and a description with the chapters and the fingerprint line", () => {
   const root = mkdtempSync(join(tmpdir(), "aas-sheet-"));
   const runDir = join(root, "sts-claude-code-01");
   const bundle = join(root, "public", "sts-claude-code-01");
   mkdirSync(join(runDir, "timeline"), { recursive: true });
+  mkdirSync(join(runDir, "recording"), { recursive: true });
   mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(runDir, "recording", "AAS_run_1.mp4"), "");
   writeFileSync(join(runDir, "timeline", "chapters.txt"), "00:00:00 Start\n00:22:42 Act 1 boss\n");
   writeFileSync(join(bundle, "summary.json"), JSON.stringify({
     schema_version: 7, spec_version: "0.24", run_id: "sts-claude-code-01", completed_at: "2026-09-13T11:14:00.165+02:00",
@@ -38,26 +34,19 @@ test("the sheet says where the video is, and carries the fingerprint line, title
   const out = writeUploadSheet(runDir, { bundleDir: bundle, note: "This run is an example." });
   assert.equal(out, join(runDir, "recording", "UPLOAD.txt"));
   const sheet = readFileSync(out, "utf8");
-  assert.match(sheet, /The video is NOT in the public folder/);
-  assert.match(sheet, /No cut video yet: run {2}aas render/);
-  assert.ok(sheet.includes("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s"));
+  assert.deepEqual(sheet.split("\n").filter((l) => /^[A-Z][A-Z ]+(\s{2}\(.*\))?$/.test(l)), ["VIDEO FILE", "TITLE", "DESCRIPTION  (paste as it stands)"]);
+  assert.ok(sheet.includes(join(runDir, "recording", "AAS_run_1.mp4")));
+  assert.ok(!/bundle|\.zip|submit/i.test(sheet.split("DESCRIPTION")[0]), "nothing about the bundle upload");
   assert.ok(sheet.includes("Slay the Spire · Act 1 boss in 2m 57.4s · claude-sonnet-5"));
-  assert.ok(sheet.includes("Result: Act 1 boss reached in 2m 57.4s in-game time, 22m 42s real time."));
-  assert.ok(sheet.includes("The video goes on after the goal was reached"));
-  assert.ok(sheet.includes("This run is an example."));
-  assert.ok(sheet.includes("0:00 Start\n22:42 Act 1 boss"));
-  assert.match(sheet, /timestamps, not as chapters: 2 chapter\(s\)/);
-  assert.ok(sheet.includes(`${bundle}.zip`));
-  assert.ok(sheet.includes("https://ai-assisted-speedruns.org/runs/sts-claude-code-01/"));
-  // The fingerprint line is in the description, exactly as written, below the run's own text: the top lines are the
-  // ones a viewer sees first.
   const desc = sheet.split("-".repeat(78))[1].trim().split("\n");
   assert.match(desc[0], /^claude-sonnet-5 plays Slay the Spire through Claude Code/);
-  assert.ok(desc.includes("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s"));
+  assert.ok(desc.includes("Result: Act 1 boss reached in 2m 57.4s in-game time, 22m 42s real time."));
+  assert.ok(desc.includes("This run is an example."));
+  assert.ok(sheet.includes("0:00 Start\n22:42 Act 1 boss"));
+  assert.ok(desc.includes("https://ai-assisted-speedruns.org/runs/sts-claude-code-01/".replace(/^/, "The run in the AAS Archive: ")));
   assert.ok(desc.indexOf("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s") > desc.indexOf("Chapters"));
   // Written again without options: the bundle and the note are remembered.
-  const again = readFileSync(writeUploadSheet(runDir), "utf8");
-  assert.ok(again.includes("This run is an example."));
+  assert.ok(readFileSync(writeUploadSheet(runDir), "utf8").includes("This run is an example."));
 });
 
 test("paths on a WSL drive mount are shown as the Windows drive the file dialog knows", async () => {

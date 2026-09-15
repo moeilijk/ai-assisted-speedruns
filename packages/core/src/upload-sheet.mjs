@@ -1,7 +1,6 @@
-// `aas upload-sheet <run-dir>`: everything the publisher needs to upload one run, in one plain-text file next to the
-// videos: <run-dir>/recording/UPLOAD.txt. Which files to upload and where they are (the videos stay in the private run
-// directory; the public bundle directory holds only the bundle), the fingerprint line, a title, a description to paste
-// as it stands, the chapters of the cut video, and where the bundle zip goes. `aas publish` and `aas render` write it.
+// `aas upload-sheet <run-dir>`: what it takes to upload the run's video to a video site, in one plain-text file next to
+// the videos: <run-dir>/recording/UPLOAD.txt. The file to upload, a title, and a description to paste as it stands,
+// with the chapters and the fingerprint line in it. `aas publish` and `aas render` write it.
 import fs from "node:fs";
 import path from "node:path";
 import { probeDuration } from "./render.mjs";
@@ -46,15 +45,6 @@ function readChapters(file) {
  * and cost of a resumed session), which say nothing to someone watching the video, so they are left out here.
  */
 export const viewerLabel = (label) => label.replace(/\s*\([^)]*\)\s*$/, "").replace(/ from save \S+/, "");
-
-/** YouTube turns timestamps into chapters only when the first is at 0:00, there are at least three, and each lasts 10 s or more. */
-export function youtubeChapterProblem(chapters, videoSeconds) {
-  if (chapters.length < 3) return `${chapters.length} chapter(s); YouTube needs at least three`;
-  if (chapters[0].at !== 0) return "the first chapter is not at 0:00";
-  const ends = [...chapters.slice(1).map((c) => c.at), videoSeconds ?? Infinity];
-  const short = chapters.find((c, i) => ends[i] - c.at < 10);
-  return short ? `"${short.label}" lasts less than 10 s` : null;
-}
 
 /** The bundle this sheet describes: an explicit directory, else the one the last `aas publish` of this run wrote. */
 function bundleDirOf(runDir, bundleDir) {
@@ -142,54 +132,22 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     `This line ties the video to the run's bundle: the fingerprint is the start of the sha256 of the run's published timeline, and ${fullSeconds} s is the length of the full recording.`,
   ].join("\n");
 
-  const problem = youtubeChapterProblem(chapters, hasCut ? cutSeconds : fullSeconds);
-  const rule = "=".repeat(78);
-  const videoLines = hasCut
-    ? [
-        `  Upload this file:   ${shownPath(cutAbs)}`,
-        `                      the cut version, ${formatDuration(cutSeconds, { whole: true })}: thinking pauses removed (aas render)`,
-        `  Full recording:     ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n                      ")}`,
-        `                      ${full}${raw.length > 1 ? `, in ${raw.length} segments` : ""}; not needed for the upload`,
-      ]
-    : [
-        `  No cut video yet: run  aas render ${runDir}  and this sheet is written again.`,
-        `  Full recording:     ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n                      ") || "(none found)"}`,
-      ];
+  const video = hasCut
+    ? [`  ${shownPath(cutAbs)}`, `  the cut version, ${formatDuration(cutSeconds, { whole: true })}`]
+    : [`  ${raw.map((f) => shownPath(path.join(runDir, f))).join("\n  ") || "(no recording found)"}`, `  the full recording, ${full}${raw.length > 1 ? ` in ${raw.length} files` : ""}; aas render makes one cut video of it`];
   const sheet = [
-    rule,
-    `AAS UPLOAD SHEET  ${id}  (bundle revision ${s.bundle?.revision ?? "?"}, schema ${s.schema_version}, spec ${s.spec_version})`,
-    rule,
-    "Written by the aas tooling. This file stays in the private run directory and is not part of the bundle.",
+    `Video upload: ${id}`,
     "",
-    "WHERE THE FILES ARE",
-    `  The video is NOT in the public folder. It is in this run's private directory:`,
-    `    ${shownPath(path.join(runDir, "recording"))}`,
-    `  The public folder holds only the bundle for the archive:`,
-    `    ${shownPath(dir)}`,
+    "VIDEO FILE",
+    ...video,
     "",
-    "1. VIDEO  (upload where you publish video)",
-    ...videoLines,
-    "",
-    "2. FINGERPRINT LINE  (in the description, exactly as written; the description below has it at the end)",
-    `  ${line}`,
-    "",
-    "3. TITLE",
+    "TITLE",
     `  ${title}`,
     "",
-    "4. DESCRIPTION  (paste everything between the lines as it stands)",
+    "DESCRIPTION  (paste as it stands)",
     "-".repeat(78),
     description,
     "-".repeat(78),
-    "",
-    "5. CHAPTERS",
-    ...(chapterLines.length ? chapterLines.map((l) => `  ${l}`) : ["  (no chapters)"]),
-    problem
-      ? `  YouTube will show these as timestamps, not as chapters: ${problem}.`
-      : "  YouTube turns these into chapters (first at 0:00, at least three, each 10 s or more).",
-    "",
-    "6. BUNDLE  (upload to the archive)",
-    `  ${shownPath(`${dir}.zip`)}`,
-    `  Submit it at ${ARCHIVE_URL}/submit/  (check it first at ${ARCHIVE_URL}/verify/ if you like)`,
     "",
   ].join("\n");
   const out = path.join(runDir, UPLOAD_SHEET);

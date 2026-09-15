@@ -32,7 +32,7 @@ A **game** plugin connects one game, a **runtime** starts the agent, a **recorde
 
 1. **Record.** With the game started by its own launch script, `aas run` starts the recorder, the timer and the agent, and writes everything that happens to one log in the run directory: every tool call, every message, every event of the game. The run directory stays on your machine.
 2. **Bundle.** `aas publish` turns that run directory into a bundle: the sanitised log, the times, the agent's instructions and tools, the configuration, and a hash of every file. It refuses anything the privacy scan flags, and packs the bundle into one zip. The recording is not in it.
-3. **Upload the video, with its fingerprint.** The video is not in the public folder: it stays in the private run directory, under `<run-dir>/recording/` (the cut version is the `.cut.mp4` that `aas render` writes). Next to it, `aas publish` and `aas render` write `recording/UPLOAD.txt` with everything for the upload: which file to upload, the fingerprint line `AAS <run-id> · fingerprint <16 hex> · <n> s`, a title, a description to paste as it stands with that line in it, and the chapters. The fingerprint line is what ties the video to this bundle.
+3. **Upload the video, with its fingerprint.** The video is not in the public folder: it stays in the private run directory, under `<run-dir>/recording/` (the cut version is the `.cut.mp4` that `aas render` writes). Next to it, `aas publish` and `aas render` write `recording/UPLOAD.txt` with what the video upload takes: the file, a title, and a description to paste as it stands, with the chapters and the fingerprint line `AAS <run-id> · fingerprint <16 hex> · <n> s` in it. That line is what ties the video to this bundle.
 4. **Submit the bundle.** Upload the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). Everything after that happens on the site; [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/) checks a zip in your browser before you send it.
 
 ## Disclaimer: anti-cheat, bans, your own risk
@@ -58,7 +58,7 @@ aas run --runtime claude-code --game games/slay-the-spire/plugin.mjs --run-dir <
         --recorder obs --timer livesplit --overlay-port 8765 --goal act1 --headless --max-minutes 60
 aas render  <runs>/sts-claude-code-01
 aas publish <runs>/sts-claude-code-01 <runs>/public/sts-claude-code-01
-cat <runs>/sts-claude-code-01/recording/UPLOAD.txt   # the video to upload, fingerprint line, title, description, chapters
+cat <runs>/sts-claude-code-01/recording/UPLOAD.txt   # the video file, title and description for the upload
 ```
 
 ## Documentation
