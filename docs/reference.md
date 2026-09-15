@@ -156,7 +156,7 @@ Created by `aas run` (or `aas configure`), private; only `aas publish` makes the
 | `saves/` | harness (autosave, every 10 minutes and at chapter milestones and the end) | the game's save states copied through the plugin's `saveState`; `aas resume` restores the last one |
 | `recording/`, `recording.json` | recorder, harness | the recording file(s), one segment per run or resume, with t0, chapters and the timer's result; the cut `<name>.cut.mp4` (`aas render`) and `UPLOAD.txt` (`aas upload-sheet`) sit next to them |
 | `outcome.json` | harness | status (`completed`, `stopped`, `failed`), notes, the runtime's session id, deaths |
-| `claude-result.json`, `session.jsonl` | runtime | the runtime's own result and, for runtimes that keep it here, the private session log (Claude Code keeps its log under `~/.claude/projects/<run dir>/`) |
+| `claude-result.json`, `claude-results.jsonl`, `session.jsonl` | runtime | the runtime's own result (Claude Code: the last invocation's, and every invocation's in `claude-results.jsonl`, which `aas publish` reads for each model's context window, maximum output and provider) and, for runtimes that keep it here, the private session log (Claude Code keeps its log under `~/.claude/projects/<run dir>/`) |
 | `timeline/` | timeline, render | see `aas timeline` |
 | `history/`, `rooms/`, `conformance.jsonl`, `oracle/` | Slay the Spire plugin and bot | game-specific ground truth (never published) |
 
