@@ -20,7 +20,7 @@ import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
-import { recordingVideos } from "./videos.mjs";
+import { recordingVideos, withVideoTexts } from "./videos.mjs";
 import { BUNDLE_VERSION, SUMMARY_SCHEMA } from "./versions.mjs";
 
 const copyTree = (src, dst) => {
@@ -34,7 +34,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.26";
+export const SPEC_VERSION = "0.27";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -219,9 +219,6 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     wall_clock_seconds: recording?.wall_clock_seconds ?? (timeline ? Math.round(timeline.totals.rta) : null),
     thinking_seconds: timeline ? Math.round(timeline.totals.thinking) : null,
   };
-  // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
-  // line its description carries and its chapters on its own clock, so an archive can show them without deriving any.
-  summary.recording.videos = recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline });
   // The run's times to its goal, next to the recording's whole-length figures above: null when the run was not completed.
   const ttc = timeline?.totals_to_completion ?? null;
   summary.totals_to_completion = ttc && { rta_seconds: Math.round(ttc.rta * 1000) / 1000, igt_seconds: Math.round(ttc.igt * 1000) / 1000, thinking_seconds: Math.round(ttc.thinking * 1000) / 1000, playbacks: ttc.playbacks, tool_calls: ttc.tool_calls };
@@ -244,6 +241,13 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     note: brief.reasoningEffort ? null : "the runtime does not set a reasoning effort; it passes only --model",
   };
   if (brief.model && !summary.models.length) summary.models = [{ model: brief.model, reasoning_effort: null }];
+  // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
+  // line its description must carry, its chapters on its own clock, and a suggested title and description ending on
+  // that line: an archive shows them as they are, without deriving or composing any.
+  summary.recording.videos = withVideoTexts(
+    recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline }),
+    summary, { archiveUrl: ARCHIVE_URL, note: previous.upload_note ?? null },
+  );
   fs.writeFileSync(summaryFile, `${JSON.stringify(summary, null, 2)}\n`);
 
   // Runtime configuration for publication, regenerated from the current rules rather than copied from configure

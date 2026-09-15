@@ -118,8 +118,9 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
-  assert.equal(p.summary.schema_version, 8);
+  assert.equal(p.summary.schema_version, 9);
   assert.ok(Array.isArray(p.summary.recording.videos), "the videos a runner may upload are in the bundle");
+  for (const v of p.summary.recording.videos) assert.ok(v.title && v.description.trim().endsWith(v.line), "a suggested title and a description that ends on the line");
   for (const v of p.summary.recording.videos) assert.match(v.line, new RegExp(`^AAS ${p.summary.run_id} · fingerprint ${p.summary.recording.fingerprint.slice(0, 16)} · \\d+ s$`));
   assert.equal("black_intervals" in p.summary.recording, false, "what the video shows is the archive's to judge");
   assert.deepEqual(p.summary.ends, [{ id: "credits", label: "Credits", final: true }], "the game's ends as the plugin declares them");

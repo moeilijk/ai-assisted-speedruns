@@ -197,6 +197,12 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
               const line = `AAS ${summary.run_id} · fingerprint ${fp} · ${Math.round(v.seconds)} s`;
               if (v.line !== line) problems.push(`${at}.line is "${v.line}", expected "${line}"`);
               if (!Array.isArray(v.chapters) || !v.chapters.every((c) => typeof c?.at === "number" && c.at >= 0 && typeof c?.label === "string")) problems.push(`${at}.chapters must list { at, label }`);
+              // Schema 9: a suggested title and description per video, examples the runner may change; the description
+              // carries the line, which is the only requirement.
+              if (summary.schema_version >= 9) {
+                if (typeof v.title !== "string" || !v.title) problems.push(`${at}.title missing (schema 9)`);
+                if (typeof v.description !== "string" || !v.description.includes(line)) problems.push(`${at}.description must contain its line "${line}" (schema 9)`);
+              }
               const expected = v.kind === "whole" ? summary.recording?.duration_seconds
                 : v.kind === "segment" ? t?.segments?.[v.part - 1]?.seconds
                 : t?.totals?.cut_video;
