@@ -38,6 +38,9 @@ test("the sheet holds only the upload: the video file, the one requirement, and 
   const required = sheet.split("REQUIRED")[1].split("EXAMPLE")[0];
   assert.ok(required.includes("\n  AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s\n"), "the line on its own");
   assert.match(required, /That is the only requirement/);
+  assert.match(required, /1559 s is the length of the full recording/);
+  const example = sheet.split("-".repeat(78))[1].trim().split("\n");
+  assert.equal(example.at(-1), "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s", "the example description ends on the line, without explaining it");
   assert.ok(sheet.includes(join(runDir, "recording", "AAS_run_1.mp4")));
   assert.ok(!/\.zip|submit/i.test(sheet), "nothing about submitting the bundle");
   assert.ok(sheet.includes("Slay the Spire · Act 1 boss in 2m 57.4s · claude-sonnet-5"));

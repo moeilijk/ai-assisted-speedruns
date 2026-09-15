@@ -129,7 +129,6 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     `Check a bundle in the browser: ${ARCHIVE_URL}/verify/`,
     "",
     line,
-    `This line ties the video to the run's bundle: the fingerprint is the start of the sha256 of the run's published timeline, and ${fullSeconds} s is the length of the full recording.`,
   ].join("\n");
 
   const video = hasCut
@@ -144,6 +143,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "REQUIRED",
     "  The video's description must contain this line (or its title, where a site has no description).",
     "  That is the only requirement: it ties the video to the run's bundle. A line of its own keeps it easy to find.",
+    `  The fingerprint is the start of the sha256 of the run's published timeline; ${fullSeconds} s is the length of the full recording.`,
     "",
     `  ${line}`,
     "",
