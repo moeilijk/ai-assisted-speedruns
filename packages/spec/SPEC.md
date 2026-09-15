@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.27
+# AI Assisted Speedruns (AAS) — Specification, draft 0.28
 
-Status: draft 0.27, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.28, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -131,7 +131,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 ```json
 {
-  "schema_version": 9,
+  "schema_version": 10,
   "spec_version": "0.27",
   "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
   "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
@@ -139,7 +139,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   "time_zone": "Europe/Amsterdam",
   "run_dates": "2026-09-20 to 2026-09-20",
   "started_at": "...", "completed_at": "...", "ended_at": "...",
-  "models": [{"model": "claude-fable-5-1", "reasoning_effort": "high"}],
+  "models": [{"model": "claude-fable-5-1", "reasoning_effort": "high", "context_window": 1000000, "max_output_tokens": 64000, "provider": "firstParty"}],
   "requested": {"model": "claude-fable-5-1", "reasoning_effort": null, "note": null},
   "synthetic_records": 0, "harness_events": 0,
   "source_records": 0, "exported_records": 0, "omitted_records": 0, "removed_images": 0,
@@ -189,13 +189,13 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   },
   "harness": {
     "name": "ai-assisted-speedruns", "version": "0.1.0", "framework": "ai-assisted-speedruns 0.1.0",
-    "plugins": {"game": {"id": "slay_the_spire", "version": "0.1.0"}, "runtime": {"id": "claude-code", "name": "Claude Code", "version": "0.1.0"},
+    "plugins": {"game": {"id": "slay_the_spire", "version": "0.1.0"}, "runtime": {"id": "claude-code", "name": "Claude Code", "version": "0.1.0", "cli_versions": ["2.1.270"]},
                 "recorder": {"id": "obs", "version": "0.1.0"}, "timer": {"id": "livesplit", "version": "0.1.0"}}
   }
 }
 ```
 
-`models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. `synthetic_records`, where the runtime's session log has them (Claude Code does, Codex does not), counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one. `harness_events` counts the events of the harness, the game plugin and the recorder that were merged into the timeline next to the session log; they are counted in `source_records` and `exported_records` as well.
+`models` lists every model the API actually answered with, one entry per model seen in the session log, and `requested` is what the run asked for when it started (the runtime passes `--model`; it sets no reasoning effort, so `reasoning_effort` is null and `note` says why). The two are separate on purpose: a provider may answer with another model than the one requested — a fallback — and that must be visible in the bundle instead of hidden. `aas check` reports it when a session used a model that was not requested, or more than one model. The effort in `models[]` comes from the session log itself (a runtime that records the effort per assistant message reports it; one that does not reports null), so it is what the provider actually used, not what was asked for. Each entry also carries what the runtime reported about that model, exactly as reported and null where it reported nothing: `context_window` and `max_output_tokens` in tokens, and `provider` (Claude Code reports these in the result record of each invocation, from 2.1.270 on with `provider`; Codex reports the context window and the provider in its rollout, and no maximum output). A model name alone does not say how it was used: the same model under two different reports is listed as two entries. Nothing is derived from a model name, such as a family or a provider. `harness.plugins.runtime.version` is the version of the runtime plugin; `harness.plugins.runtime.cli_versions` lists the versions of the runtime's own CLI that the session log records, in order of first appearance (a resumed session may have continued under a newer CLI). `synthetic_records`, where the runtime's session log has them (Claude Code does, Codex does not), counts records the runtime wrote itself (an API error, an interrupt); they carry no model and are never listed as one. `harness_events` counts the events of the harness, the game plugin and the recorder that were merged into the timeline next to the session log; they are counted in `source_records` and `exported_records` as well.
 
 `ends` lists the game's ends as its plugin declares them, in order, each `{id, label, final}`; exactly one is final, the game's own end. `category.goal` is the published goal, and `category.goal_end` is that end with its label. `goals` lists the goals up to the published one, in order: the goal at the start and each extension by a resume that was reached, each with `declared_at` and `reached_at` (the victory while that goal held). Only the last may be unreached, when the run reached no goal at all. An extension is published once it is reached; until then the bundle keeps the goal that was reached, `completed_at` is its victory, the resume that extended it does not count on the human axis, and the extension's play is post-completion time. A run that won act 1 and was then extended to act 3 without reaching it is published as an act 1 run.
 
@@ -332,3 +332,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.25 | 2026-09-15 | §6: the runner uploads the full recording (one video per segment), the cut, or both; each video's line carries its own length; §4: `timeline.json` is required for a segment or cut video; §8.1–8.2 cover the cut |
 | 0.26 | 2026-09-15 | Schema 8: `recording.videos`, each video a runner may upload with its kind, file, length, line and chapters on its own clock |
 | 0.27 | 2026-09-15 | Schema 9: each video in `recording.videos` has a suggested `title` and `description`, examples that end on the line; the line stays the only requirement |
+| 0.28 | 2026-09-15 | Schema 10: each entry of `models` carries `context_window`, `max_output_tokens` and `provider` as the runtime reported them; `harness.plugins.runtime.cli_versions` lists the runtime CLI's versions from the session log |

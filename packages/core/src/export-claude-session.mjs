@@ -24,6 +24,9 @@ export async function exportClaudeSession(input, destination, { completionTime: 
   const counts = { source_records: 0, exported_records: 0, omitted_records: 0 };
   const ids = new Map();
   const models = new Map();
+  // The CLI versions the session log records on its rows, in order of first appearance: a resumed session may have
+  // continued under a newer Claude Code.
+  const cliVersions = new Set();
   let synthetic = 0;
   const methods = new Map();
   const usage = { input_tokens: 0, cached_input_tokens: 0, cache_write_input_tokens: 0, output_tokens: 0, reasoning_output_tokens: 0, total_tokens: 0 };
@@ -55,6 +58,7 @@ export async function exportClaudeSession(input, destination, { completionTime: 
       firstTime ??= row.timestamp;
       lastTime = row.timestamp;
     }
+    if (typeof row.version === "string" && row.version) cliVersions.add(row.version);
     const m = row.message;
     let exported = 0;
     const parts = contentParts(m.content);
@@ -130,6 +134,7 @@ export async function exportClaudeSession(input, destination, { completionTime: 
     last_reported_thread_token_usage: usage,
     tool_methods_in_exec: Object.fromEntries(methods),
     synthetic_records: synthetic,
+    cli_versions: [...cliVersions],
     export_notes: [
       "Sanitized text export of run messages, tool calls, and results from a Claude Code session log.",
       `Timestamps use ${timeZone} time, with an explicit UTC offset; elapsed seconds are durations.`,

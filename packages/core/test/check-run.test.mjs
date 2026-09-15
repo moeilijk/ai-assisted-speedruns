@@ -54,6 +54,10 @@ test("a model the run did not ask for is reported (silent fallback)", () => {
 
   const honest = report({ ...base, models: [{ model: "claude-opus-5", reasoning_effort: null }], requested: { model: "claude-opus-5", reasoning_effort: null } });
   assert.doesNotMatch(problems(honest), /requested model/);
+
+  // Schema 10: the same model under two runtime reports is two entries, still one model.
+  const twoReports = report({ ...base, models: [{ model: "claude-opus-5", reasoning_effort: null, context_window: 200000 }, { model: "claude-opus-5", reasoning_effort: null, context_window: 1000000 }], requested: { model: "claude-opus-5", reasoning_effort: null } });
+  assert.doesNotMatch(problems(twoReports), /more than one model/);
 });
 
 test("a run made without a recording is invalid", () => {

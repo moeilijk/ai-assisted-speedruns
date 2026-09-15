@@ -127,7 +127,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
       // Monitoring a silent model fallback: the API may answer with another model than the run asked for.
       if (summary.requested && typeof summary.requested === "object") {
         const asked = summary.requested.model;
-        const seen = (summary.models ?? []).map((m) => m.model);
+        const seen = [...new Set((summary.models ?? []).map((m) => m.model))];
         if (asked && seen.length && !seen.includes(asked)) problems.push(`requested model ${asked} but the session used ${seen.join(", ")}`);
         else if (asked && seen.length > 1) problems.push(`requested model ${asked} but the session used more than one model: ${seen.join(", ")}`);
       }
@@ -178,6 +178,16 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           }
           const rn = summary.harness?.plugins?.runtime?.name;
           if (typeof rn !== "string" || !rn) problems.push("schema 6 requires harness.plugins.runtime.name");
+        }
+        if (summary.schema_version >= 10) {
+          // Each model as the runtime reported it (null where it reported nothing), and the runtime CLI's own versions.
+          const count = (v) => v === null || (Number.isInteger(v) && v > 0);
+          (Array.isArray(summary.models) ? summary.models : []).forEach((m, i) => {
+            for (const key of ["context_window", "max_output_tokens"]) if (!(key in m) || !count(m[key])) problems.push(`models[${i}].${key} must be a positive integer or null`);
+            if (!("provider" in m) || !(m.provider === null || (typeof m.provider === "string" && m.provider))) problems.push(`models[${i}].provider must be a string or null`);
+          });
+          const cv = summary.harness?.plugins?.runtime?.cli_versions;
+          if (!Array.isArray(cv) || !cv.every((v) => typeof v === "string" && v)) problems.push("schema 10 requires harness.plugins.runtime.cli_versions as a list of versions");
         }
         if (summary.schema_version >= 8) {
           // The videos a runner may upload: each line names this run and this fingerprint with that video's length, and

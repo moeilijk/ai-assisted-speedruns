@@ -34,7 +34,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.27";
+export const SPEC_VERSION = "0.28";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -228,19 +228,29 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     framework: `ai-assisted-speedruns ${FRAMEWORK_VERSION}`,
     plugins: {
       game: { id: brief.game?.id ?? brief.category.game ?? null, version: brief.game?.version ?? null },
-      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null },
+      // version is the runtime plugin's; cli_versions are the versions of the runtime's own CLI its session log records.
+      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
       recorder: { id: recording?.recorder ?? null, version: recording?.recorder_version ?? null },
       timer: { id: recording?.timer?.id ?? null, version: recording?.timer?.version ?? null },
     },
   };
   // What the run asked for, next to what the API answered with (summary.models, one entry per model seen in the
   // session log). A silent fallback to another model is then visible in the bundle itself; `aas check` reports it.
+  delete summary.cli_versions;
   summary.requested = {
     model: brief.model ?? null,
     reasoning_effort: brief.reasoningEffort ?? null,
     note: brief.reasoningEffort ? null : "the runtime does not set a reasoning effort; it passes only --model",
   };
   if (brief.model && !summary.models.length) summary.models = [{ model: brief.model, reasoning_effort: null }];
+  // Each model as the runtime reported it: its context window, maximum output and provider, null where the runtime
+  // reported nothing. The same model under two different reports is two entries: they are not the same set-up.
+  const reports = (() => { try { return rt?.modelReports?.(runDir) ?? null; } catch { return null; } })();
+  summary.models = summary.models.flatMap((m) => {
+    const own = { context_window: m.context_window ?? null, max_output_tokens: m.max_output_tokens ?? null, provider: m.provider ?? null };
+    const list = reports?.get(m.model)?.length ? reports.get(m.model) : [own];
+    return list.map((r) => ({ model: m.model, reasoning_effort: m.reasoning_effort ?? null, ...r }));
+  });
   // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
   // line its description must carry, its chapters on its own clock, and a suggested title and description ending on
   // that line: an archive shows them as they are, without deriving or composing any.

@@ -26,14 +26,19 @@ if (!input || !destination) throw new Error('Usage: node export-codex-rollout.mj
 fs.mkdirSync(destination,{recursive:true});
 const output=fs.createWriteStream(path.join(destination,'session.sanitized.jsonl'),{flags:'wx'});
 const counts={source_records:0,exported_records:0,omitted_records:0};
-const ids=new Map();const calls=new Map();const models=new Set();const methods=new Map();
+const ids=new Map();const calls=new Map();const models=new Map();const methods=new Map();
+// What the rollout itself reports, per model: its provider (session_meta), its context window (token_count, for the
+// model of the turn it follows) and the Codex CLI version. Codex reports no maximum output.
+let provider=null,currentModel=null;const cliVersions=new Set();
 let firstTime, lastTime, completionTime, finalUsage, sequence=0;
 const {cleanText,clean,counts:imageCounts,redactions}=createSanitizer();
 function contentText(content){return (content??[]).filter(c=>typeof c.text==='string').map(c=>c.text).join('\n');}
 for await(const line of readline.createInterface({input:fs.createReadStream(input),crlfDelay:Infinity})){
  const row=JSON.parse(line),p=row.payload??{};counts.source_records++;
  firstTime??=row.timestamp;lastTime=row.timestamp;
- if(row.type==='turn_context')models.add(JSON.stringify({model:p.model,reasoning_effort:p.effort}));
+ if(row.type==='session_meta'){if(typeof p.cli_version==='string'&&p.cli_version)cliVersions.add(p.cli_version);provider=p.model_provider??provider;}
+ if(row.type==='turn_context'){currentModel=JSON.stringify({model:p.model,reasoning_effort:p.effort??null});if(!models.has(currentModel))models.set(currentModel,{provider,context_window:null});}
+ if(row.type==='event_msg'&&p.type==='token_count'&&currentModel&&Number.isInteger(p.info?.model_context_window))models.get(currentModel).context_window=p.info.model_context_window;
  if(row.type==='token_usage_record')finalUsage=p.thread_token_usage;
  if(row.type==='event_msg'&&p.type==='task_complete'&&COMPLETION_MARKER&&p.last_agent_message?.startsWith(COMPLETION_MARKER))completionTime=row.timestamp;
  let item;
@@ -57,6 +62,6 @@ for await(const line of readline.createInterface({input:fs.createReadStream(inpu
  else counts.omitted_records++;
 }
 output.end();await once(output,'finish');
-const summary={schema_version:2,time_zone:TIME_ZONE,run_dates:`${ts(firstTime).slice(0,10)} to ${ts(lastTime).slice(0,10)}`,started_at:ts(firstTime),completed_at:completionTime?ts(completionTime):null,ended_at:ts(lastTime),models:[...models].map(JSON.parse),...counts,removed_images:imageCounts.removed_images,redactions,elapsed_to_completion_seconds:completionTime?Math.round((Date.parse(completionTime)-Date.parse(firstTime))/1000):null,elapsed_including_post_completion_seconds:Math.round((Date.parse(lastTime)-Date.parse(firstTime))/1000),last_reported_thread_token_usage:finalUsage,tool_methods_in_exec:Object.fromEntries(methods),export_notes:['Sanitized text export of run messages, tool calls, and results.',`Timestamps use ${TIME_ZONE} time, with an explicit UTC offset; elapsed seconds are durations.`,'Host/system/developer context, world state, context-compaction/history/note tool records, reasoning payloads, opaque data and original identifiers are omitted.','Embedded images are omitted from this text release.','Token counts are cumulative reported usage and include cached input.']};
+const summary={schema_version:2,time_zone:TIME_ZONE,run_dates:`${ts(firstTime).slice(0,10)} to ${ts(lastTime).slice(0,10)}`,started_at:ts(firstTime),completed_at:completionTime?ts(completionTime):null,ended_at:ts(lastTime),models:[...models].map(([k,r])=>({...JSON.parse(k),context_window:r.context_window,max_output_tokens:null,provider:r.provider??null})),...counts,removed_images:imageCounts.removed_images,redactions,elapsed_to_completion_seconds:completionTime?Math.round((Date.parse(completionTime)-Date.parse(firstTime))/1000):null,elapsed_including_post_completion_seconds:Math.round((Date.parse(lastTime)-Date.parse(firstTime))/1000),last_reported_thread_token_usage:finalUsage,tool_methods_in_exec:Object.fromEntries(methods),cli_versions:[...cliVersions],export_notes:['Sanitized text export of run messages, tool calls, and results.',`Timestamps use ${TIME_ZONE} time, with an explicit UTC offset; elapsed seconds are durations.`,'Host/system/developer context, world state, context-compaction/history/note tool records, reasoning payloads, opaque data and original identifiers are omitted.','Embedded images are omitted from this text release.','Token counts are cumulative reported usage and include cached input.']};
 fs.writeFileSync(path.join(destination,'summary.json'),JSON.stringify(summary,null,2)+'\n',{flag:'wx'});
 console.log(JSON.stringify({records:counts,redactions}));

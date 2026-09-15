@@ -50,6 +50,30 @@ export function findClaudeSession(runDir) {
   return logs.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0] ?? null;
 }
 
+/**
+ * What Claude Code reported about each model at the end of its invocations (the result record's modelUsage): the
+ * context window, the maximum output and, from 2.1.270 on, the provider. Every invocation's result is kept in
+ * claude-results.jsonl; a run from before that kept only the last one, in claude-result.json.
+ * @returns {Map<string, {context_window: number|null, max_output_tokens: number|null, provider: string|null}[]>}
+ */
+export function claudeModelReports(runDir) {
+  const all = path.join(runDir, "claude-results.jsonl");
+  const last = path.join(runDir, "claude-result.json");
+  const results = fs.existsSync(all)
+    ? fs.readFileSync(all, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean)
+    : fs.existsSync(last) ? [JSON.parse(fs.readFileSync(last, "utf8"))] : [];
+  const reports = new Map();
+  for (const r of results) {
+    for (const [model, u] of Object.entries(r.modelUsage ?? {})) {
+      const report = { context_window: Number.isInteger(u?.contextWindow) ? u.contextWindow : null, max_output_tokens: Number.isInteger(u?.maxOutputTokens) ? u.maxOutputTokens : null, provider: typeof u?.provider === "string" ? u.provider : null };
+      const list = reports.get(model) ?? [];
+      if (!list.some((x) => JSON.stringify(x) === JSON.stringify(report))) list.push(report);
+      reports.set(model, list);
+    }
+  }
+  return reports;
+}
+
 export default {
   id: "claude-code",
   name: "Claude Code",
@@ -70,6 +94,7 @@ export default {
   },
   /** The private session log of a run, for `aas publish`. */
   findSession(runDir) { return findClaudeSession(runDir); },
+  modelReports(runDir) { return claudeModelReports(runDir); },
   /** Exports the private log into the public timeline and summary (schema 2; publish adds schema 3). */
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
@@ -222,7 +247,10 @@ export default {
     if (deadline) clearTimeout(deadline);
     if (budgetPoll) clearInterval(budgetPoll);
     interruptChild = null;
-    if (last) fs.writeFileSync(path.join(runDir, "claude-result.json"), `${JSON.stringify(last, null, 2)}\n`);
+    if (last) {
+      fs.writeFileSync(path.join(runDir, "claude-result.json"), `${JSON.stringify(last, null, 2)}\n`);
+      fs.appendFileSync(path.join(runDir, "claude-results.jsonl"), `${JSON.stringify(last)}\n`);
+    }
     const notesBase = headless ? `claude -p exited with ${code}; ${turns} assistant turns; cost $${last?.total_cost_usd?.toFixed(2) ?? "?"}; ${last?.subtype ?? ""}` : `claude exited with ${code}`;
     // A turn or time budget that ran out, or Claude's usage/session limit, is a stop, not a
     // failure: the session and the game state survive, so the run can be resumed later.
