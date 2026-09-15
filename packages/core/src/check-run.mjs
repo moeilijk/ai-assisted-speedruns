@@ -179,6 +179,31 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           const rn = summary.harness?.plugins?.runtime?.name;
           if (typeof rn !== "string" || !rn) problems.push("schema 6 requires harness.plugins.runtime.name");
         }
+        if (summary.schema_version >= 8) {
+          // The videos a runner may upload: each line names this run and this fingerprint with that video's length, and
+          // each length is one the bundle states elsewhere (the whole recording, a segment of timeline.json, the cut).
+          const videos = summary.recording?.videos;
+          let t = null;
+          try { t = JSON.parse(fs.readFileSync(file("timeline.json"), "utf8")); } catch { /* reported where it matters */ }
+          const fp = String(summary.recording?.fingerprint ?? "").slice(0, 16);
+          const near = (a, b) => typeof a === "number" && typeof b === "number" && Math.abs(a - b) <= 1;
+          if (!Array.isArray(videos)) problems.push("schema 8 requires recording.videos as a list");
+          else {
+            videos.forEach((v, i) => {
+              const at = `recording.videos[${i}]`;
+              if (!["whole", "segment", "cut"].includes(v?.kind)) { problems.push(`${at}.kind "${v?.kind}" is not whole, segment or cut`); return; }
+              if (typeof v.file !== "string" || !v.file) problems.push(`${at}.file missing`);
+              if (typeof v.seconds !== "number" || !(v.seconds > 0)) { problems.push(`${at}.seconds must be a positive number`); return; }
+              const line = `AAS ${summary.run_id} · fingerprint ${fp} · ${Math.round(v.seconds)} s`;
+              if (v.line !== line) problems.push(`${at}.line is "${v.line}", expected "${line}"`);
+              if (!Array.isArray(v.chapters) || !v.chapters.every((c) => typeof c?.at === "number" && c.at >= 0 && typeof c?.label === "string")) problems.push(`${at}.chapters must list { at, label }`);
+              const expected = v.kind === "whole" ? summary.recording?.duration_seconds
+                : v.kind === "segment" ? t?.segments?.[v.part - 1]?.seconds
+                : t?.totals?.cut_video;
+              if (!near(v.seconds, expected)) problems.push(`${at} (${v.kind}${v.part ? ` ${v.part}` : ""}) lasts ${v.seconds} s, but the bundle states ${expected ?? "no such length"}`);
+            });
+          }
+        }
       } else if (humanBefore(summary) && summary.category?.human === "none") problems.push("run.human records with human: none");
     }
     add("summary.json", problems.length ? "invalid" : "met", problems.join("; ") || `schema ${summary.schema_version}`);

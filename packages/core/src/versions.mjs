@@ -2,7 +2,7 @@
 // in a server or in a browser.
 
 /** The summary.json schemas the checker reads. */
-export const SUMMARY_SCHEMAS = [2, 3, 4, 5, 6, 7];
+export const SUMMARY_SCHEMAS = [2, 3, 4, 5, 6, 7, 8];
 /** The bundle packagings the checker reads (`bundle.bundle_version`). */
 export const BUNDLE_VERSIONS = [1];
 /** The shape of summary.json this tooling writes. */

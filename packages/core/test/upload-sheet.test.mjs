@@ -26,7 +26,9 @@ test("the sheet offers the cut and the full recording per segment, each with its
   writeFileSync(join(runDir, "timeline", "chapters.cut.txt"), "00:00:00 Start\n00:11:15 Act 1 boss\n");
   writeFileSync(join(bundle, "timeline.json"), JSON.stringify({
     segments: [{ index: 0, offset: 0, seconds: 1368.498, file: "recording/AAS_run_1.mp4" }, { index: 1, offset: 1368.498, seconds: 190.949, file: "recording/AAS_run_2.mp4" }],
-    keep: [[0, 700], [800, 869.134]],
+    sections: [{ label: "Start", start_rta: 0 }, { label: "Act 1 boss", start_rta: 1362.6 }, { label: "Human: resumed from save s1 after completed (claude -p exited with 0; cost $9.98)", start_rta: 1373 }],
+    keep: [[0, 700], [800, 869.134]], totals: { cut_video: 769.134 },
+    cut_chapters: [{ at: 0, label: "Start" }, { at: 675.2, label: "Act 1 boss" }],
   }));
   writeFileSync(join(bundle, "summary.json"), JSON.stringify({
     schema_version: 7, spec_version: "0.25", run_id: "sts-claude-code-01", completed_at: "2026-09-13T11:14:00.165+02:00",
@@ -67,9 +69,3 @@ test("paths on a WSL drive mount are shown as the Windows drive the file dialog 
   assert.equal(shownPath("/home/me/runs/x"), "/home/me/runs/x");
 });
 
-test("chapter labels for viewers leave out the save name and the resumed session's exit code, turns and cost", async () => {
-  const { viewerLabel } = await import("../src/upload-sheet.mjs");
-  assert.equal(viewerLabel("Human: resumed from save aas_portal_03_003 after failed (claude -p exited with 1; 410 assistant turns; cost $77.53; success)"), "Human: resumed after failed");
-  assert.equal(viewerLabel("Human: goal extended from act1 to act3"), "Human: goal extended from act1 to act3");
-  assert.equal(viewerLabel("Act 1 boss"), "Act 1 boss");
-});

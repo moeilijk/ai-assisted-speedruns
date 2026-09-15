@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.25
+# AI Assisted Speedruns (AAS) — Specification, draft 0.26
 
-Status: draft 0.25, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.26, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -127,7 +127,7 @@ Where a recording is published is not in the bundle. A run may be published in m
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7, what `aas publish` writes, drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8, what `aas publish` writes, adds `recording.videos`: the videos a runner may upload.
 
 ```json
 {
@@ -167,7 +167,15 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   "recording": {
     "recorder": "obs", "t0": "...",
     "duration_seconds": 0, "fingerprint": "sha256 of session.sanitized.jsonl",
-    "files": ["recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4"],
+    "files": ["recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4", "recording/AAS_sts-claude-code-01_2026-09-20_15-42-18.mp4"],
+    "videos": [
+      {"kind": "segment", "part": 1, "parts": 2, "file": "recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.mp4", "seconds": 1368.498,
+       "line": "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1368 s", "chapters": [{"at": 0, "label": "Start"}, {"at": 1362.6, "label": "Act 1 boss"}]},
+      {"kind": "segment", "part": 2, "parts": 2, "file": "recording/AAS_sts-claude-code-01_2026-09-20_15-42-18.mp4", "seconds": 190.949,
+       "line": "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 191 s", "chapters": [{"at": 4.5, "label": "Human: resumed after completed"}]},
+      {"kind": "cut", "part": null, "parts": null, "file": "recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.cut.mp4", "seconds": 769.134,
+       "line": "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 769 s", "chapters": [{"at": 0, "label": "Start"}, {"at": 675.2, "label": "Act 1 boss"}]}
+    ],
     "chapters": "chapters.txt",
     "igt_seconds": null, "wall_clock_seconds": 0, "thinking_seconds": 0
   },
@@ -196,6 +204,8 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 `recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
 **Which videos.** The runner chooses what to upload: the full recording, the cut, or both. The full recording of a run that was resumed is one file per segment, and each file may be its own video; the cut is one video of the kept intervals (`timeline.json` `keep`, the thinking pauses removed), in order, across the segments. Every uploaded video carries the line `AAS <run_id> · fingerprint <16 hex> · <n> s` in its description (or its title, where a platform has no description), with `n` the length of that video in seconds. A verifier matches the length against one of the lengths the bundle states: `recording.duration_seconds` for the whole recording, `timeline.json` `segments[].seconds` for one segment, the sum of `timeline.json` `keep` for the cut. In a cut, a tool call's place is its `elapsed_seconds` mapped through `keep`.
+
+`recording.videos` lists those videos so that a reader need not derive them: for a run in one file `whole` (its length `recording.duration_seconds`), for a resumed run one `segment` per file with `part` and `parts` (its length `timeline.json` `segments[part-1].seconds`), and the `cut` (its length `timeline.json` `totals.cut_video`, the sum of `keep`; `file` is the name `aas render` gives it, whether or not it has been made yet). Each has `file` (relative to the run directory, which the bundle does not carry), `seconds`, `line`, exactly the line its description carries with `seconds` rounded, and `chapters`, `{at, label}` on that video's own clock, the labels without the harness's details (a save's name, a resumed session's exit code, turns and cost), which `chapters.txt` and the log keep. A title or a description for a video is not part of the bundle: those are the runner's, or the archive's to suggest.
 
 Binding a recording to a bundle is two claims, and they are established differently. **This recording is mine**: only the owner of a recording can write its description, so a line in it that a stranger could not have put there says the channel is the publisher's. An archive that is connected to the publisher's channel through that platform can ask the platform instead, which settles ownership without the publisher editing anything. **This recording is of this bundle**: that is what the fingerprint says, and no platform connection can answer it, because the platform knows nothing about the run. A reader who does not trust the archive can only check the second claim where the fingerprint is readable, so the line stays the route for anyone whose channel an archive cannot ask, and the better practice for everyone else: an archive may accept a connected channel without it, and then carries the binding on its own word.
 
@@ -318,3 +328,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.23 | 2026-09-15 | Schema 7 drops `recording.black_intervals`; §8.8: the recording is checked when the run starts; drafts are numbered |
 | 0.24 | 2026-09-15 | §3: an archive may receive and keep a run that did not reach its goal, and does not rank or compare it |
 | 0.25 | 2026-09-15 | §6: the runner uploads the full recording (one video per segment), the cut, or both; each video's line carries its own length; §4: `timeline.json` is required for a segment or cut video; §8.1–8.2 cover the cut |
+| 0.26 | 2026-09-15 | Schema 8: `recording.videos`, each video a runner may upload with its kind, file, length, line and chapters on its own clock |

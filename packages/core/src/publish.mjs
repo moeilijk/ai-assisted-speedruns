@@ -20,6 +20,7 @@ import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
+import { recordingVideos } from "./videos.mjs";
 import { BUNDLE_VERSION, SUMMARY_SCHEMA } from "./versions.mjs";
 
 const copyTree = (src, dst) => {
@@ -33,7 +34,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.25";
+export const SPEC_VERSION = "0.26";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -218,6 +219,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     wall_clock_seconds: recording?.wall_clock_seconds ?? (timeline ? Math.round(timeline.totals.rta) : null),
     thinking_seconds: timeline ? Math.round(timeline.totals.thinking) : null,
   };
+  // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
+  // line its description carries and its chapters on its own clock, so an archive can show them without deriving any.
+  summary.recording.videos = recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline });
   // The run's times to its goal, next to the recording's whole-length figures above: null when the run was not completed.
   const ttc = timeline?.totals_to_completion ?? null;
   summary.totals_to_completion = ttc && { rta_seconds: Math.round(ttc.rta * 1000) / 1000, igt_seconds: Math.round(ttc.igt * 1000) / 1000, thinking_seconds: Math.round(ttc.thinking * 1000) / 1000, playbacks: ttc.playbacks, tool_calls: ttc.tool_calls };
