@@ -116,8 +116,6 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     : null;
   const chapterLines = chapters.map((c) => `${youtubeTime(c.at)} ${c.label}`);
   const description = [
-    line,
-    "",
     `${models} plays ${game} through ${runtime}, with the goal "${goal}".`,
     reached
       ? `Result: ${goal} reached in ${igt} in-game time, ${real} real time.`
@@ -127,13 +125,15 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     ...(uploadNote ? [uploadNote] : []),
     "",
     hasCut
-      ? `This is the cut version (${formatDuration(cutSeconds, { whole: true })}): the pauses while the model was thinking are removed. The full recording runs ${full}, the ${fullSeconds} s in the first line.`
-      : `This is the full recording (${full}), the ${fullSeconds} s in the first line.`,
+      ? `This is the cut version (${formatDuration(cutSeconds, { whole: true })}): the pauses while the model was thinking are removed. The full recording runs ${full}.`
+      : `This is the full recording (${full}).`,
     ...(chapterLines.length ? ["", "Chapters", ...chapterLines] : []),
     "",
-    "The first line ties this video to the run's bundle: the fingerprint is the start of the sha256 of the run's published timeline.",
     `The run in the AAS Archive: ${runPage}`,
     `Check a bundle in the browser: ${ARCHIVE_URL}/verify/`,
+    "",
+    line,
+    `This line ties the video to the run's bundle: the fingerprint is the start of the sha256 of the run's published timeline, and ${fullSeconds} s is the length of the full recording.`,
   ].join("\n");
 
   const problem = youtubeChapterProblem(chapters, hasCut ? cutSeconds : fullSeconds);
@@ -164,7 +164,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "1. VIDEO  (upload where you publish video)",
     ...videoLines,
     "",
-    "2. FINGERPRINT LINE  (the first line of the description, exactly as written)",
+    "2. FINGERPRINT LINE  (in the description, exactly as written; the description below has it at the end)",
     `  ${line}`,
     "",
     "3. TITLE",

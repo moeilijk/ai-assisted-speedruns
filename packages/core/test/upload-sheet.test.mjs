@@ -49,9 +49,12 @@ test("the sheet says where the video is, and carries the fingerprint line, title
   assert.match(sheet, /timestamps, not as chapters: 2 chapter\(s\)/);
   assert.ok(sheet.includes(`${bundle}.zip`));
   assert.ok(sheet.includes("https://ai-assisted-speedruns.org/runs/sts-claude-code-01/"));
-  // The description's first line is the fingerprint line.
-  const desc = sheet.split("-".repeat(78))[1].trim();
-  assert.equal(desc.split("\n")[0], "AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s");
+  // The fingerprint line is in the description, exactly as written, below the run's own text: the top lines are the
+  // ones a viewer sees first.
+  const desc = sheet.split("-".repeat(78))[1].trim().split("\n");
+  assert.match(desc[0], /^claude-sonnet-5 plays Slay the Spire through Claude Code/);
+  assert.ok(desc.includes("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s"));
+  assert.ok(desc.indexOf("AAS sts-claude-code-01 · fingerprint 36d633208676bfdb · 1559 s") > desc.indexOf("Chapters"));
   // Written again without options: the bundle and the note are remembered.
   const again = readFileSync(writeUploadSheet(runDir), "utf8");
   assert.ok(again.includes("This run is an example."));
