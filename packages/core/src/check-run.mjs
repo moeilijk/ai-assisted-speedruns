@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `aas check <bundle>`: conformance check of a published bundle, its directory or the upload zip,
 // against the AAS specification (packages/spec/SPEC.md). Validates the
-// timeline (session.sanitized.jsonl), summary.json (schema 2 or 3), manifest
+// timeline (session.sanitized.jsonl), summary.json (the schemas in versions.mjs), manifest
 // hashes, and the presence of the other required files. Exit code 1 when the
 // timeline or summary is invalid, or with --strict when any requirement is unmet.
 import { createHash } from "node:crypto";
@@ -10,6 +10,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { readZipEntries } from "./zip-read.mjs";
+import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
@@ -119,7 +120,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     }
     if (summary) {
       for (const key of SUMMARY_V2_KEYS) if (!(key in summary)) problems.push(`missing ${key}`);
-      if (![2, 3, 4, 5, 6, 7].includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not 2, 3, 4, 5, 6 or 7`);
+      if (!SUMMARY_SCHEMAS.includes(summary.schema_version)) problems.push(`schema_version ${summary.schema_version} is not one of ${SUMMARY_SCHEMAS.join(", ")}`);
       for (const key of ["started_at", "ended_at"]) if (!TIMESTAMP_RE.test(String(summary[key]))) problems.push(`${key} is not ISO 8601 with offset`);
       if (summary.completed_at !== null && !TIMESTAMP_RE.test(String(summary.completed_at))) problems.push("completed_at must be null or ISO 8601 with offset");
       if (!Array.isArray(summary.models) || !summary.models.every((m) => typeof m?.model === "string")) problems.push("models must list {model, reasoning_effort}");
@@ -152,7 +153,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
         if (!b || typeof b !== "object") problems.push("schema 4 and later require a bundle block");
         else {
           if (b.kind !== "aas-public") problems.push(`bundle.kind "${b.kind}" is not "aas-public"`);
-          if (!Number.isInteger(b.bundle_version)) problems.push("bundle.bundle_version must be an integer");
+          if (!BUNDLE_VERSIONS.includes(b.bundle_version)) problems.push(`bundle.bundle_version ${b.bundle_version} is not one of ${BUNDLE_VERSIONS.join(", ")}`);
           if (!Number.isInteger(b.revision) || b.revision < 1) problems.push("bundle.revision must be a positive integer");
           if (typeof b.run_id !== "string" || !b.run_id) problems.push("bundle.run_id missing");
           if (!TIMESTAMP_RE.test(String(b.published_at))) problems.push("bundle.published_at is not ISO 8601 with offset");

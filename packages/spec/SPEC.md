@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.23
+# AI Assisted Speedruns (AAS) — Specification, draft 0.24
 
-Status: draft 0.23, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.24, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -53,8 +53,8 @@ that moment. The extended goal is published only once it is reached: until then 
 reached, and what came after is post-completion time on the timeline (§6).
 
 **A run that did not reach its goal is not an entry.** A session that was stopped (a budget, a limit, a
-runtime error) is a valid recording of an attempt and may be published as such, but it is not comparable and an
-archive does not accept it as a run. In the bundle this is visible without reading the log: `completed_at` is
+runtime error) is a valid recording of an attempt and may be published as such, but it is not comparable: an archive
+may receive and keep it, and does not rank it or compare it with runs. In the bundle this is visible without reading the log: `completed_at` is
 null and no `game.over` with `victory: true` is on the timeline.
 
 ## 4. The run directory and the published bundle
@@ -132,7 +132,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 ```json
 {
   "schema_version": 7,
-  "spec_version": "0.23",
+  "spec_version": "0.24",
   "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
   "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
              "revision": 10, "published_at": "..."},
@@ -314,3 +314,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.21 | 2026-09-14 | Credit to cozyblaze for the run, the design and the code |
 | 0.22 | 2026-09-15 | §6 describes `summary.json` as schema 6 writes it: `bundle`, identifiers, `harness_events`, `recording.files` |
 | 0.23 | 2026-09-15 | Schema 7 drops `recording.black_intervals`; §8.8: the recording is checked when the run starts; drafts are numbered |
+| 0.24 | 2026-09-15 | §3: an archive may receive and keep a run that did not reach its goal, and does not rank or compare it |
