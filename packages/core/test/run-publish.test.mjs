@@ -162,7 +162,9 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const strange = checkRun(outDir).results.find((r) => r.requirement === "witnessed");
   assert.equal(strange.status, "invalid");
   assert.match(strange.detail, /not signed by a witness key of the archive/);
-  assert.equal(p.summary.schema_version, 12);
+  assert.equal(p.summary.schema_version, 13);
+  assert.deepEqual(p.summary.recording.overlay, { shown: false, keys: false }, "no --overlay-port in this run: the picture has no overlay, and the text does not describe one");
+  assert.ok(p.summary.recording.videos.every((v) => !/Bottom left/.test(v.description)));
   assert.deepEqual(p.summary.game.mods.map((m) => [m.name, m.details]), [["SourcePauseTool", "portal-agent's IPC patch"]], "the mod's own name, the patch in details");
   for (const m of p.summary.models) assert.deepEqual(Object.keys(m), ["model", "parts", "reasoning_effort", "context_window", "max_output_tokens", "provider"], "each model with what the runtime reported, null where it reported nothing");
   assert.ok(Array.isArray(p.summary.harness.plugins.runtime.cli_versions), "the runtime CLI's versions, apart from the plugin's version");

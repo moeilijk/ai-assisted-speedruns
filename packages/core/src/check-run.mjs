@@ -192,6 +192,11 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           if (summary.schema_version >= 11) (Array.isArray(summary.models) ? summary.models : []).forEach((m, i) => {
             if (JSON.stringify(m.parts) !== JSON.stringify(modelParts(m.model))) problems.push(`models[${i}].parts must be ${JSON.stringify(modelParts(m.model))} for ${m.model}`);
           });
+          // Schema 13: whether the picture shows the harness's overlay, and keys in it; null when a session did not say.
+          if (summary.schema_version >= 13) {
+            const o = summary.recording?.overlay;
+            if (o === undefined || !(o === null || (typeof o?.shown === "boolean" && typeof o?.keys === "boolean"))) problems.push("schema 13 requires recording.overlay as { shown, keys } or null");
+          }
           // Schema 12: a mod carries its own name, and what was done to it in details.
           if (summary.schema_version >= 12) (summary.game?.mods ?? []).forEach((m, i) => {
             if (typeof m?.name !== "string" || !m.name) problems.push(`game.mods[${i}].name missing`);

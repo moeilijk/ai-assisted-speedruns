@@ -2,10 +2,11 @@
 // writes them into the bundle (summary.recording.videos[].title/description) and an archive may make them for a
 // bundle that has none, with this same module. Imports only modules without imports, so an archive can carry it.
 //
-// What a viewer sees decides the order: YouTube shows the first lines before "more", and a link in a description is
-// not clickable on every channel and is shortened in view, so the result comes first, then the archive's domain and
-// the run id as plain text. Timestamps are called chapters only when YouTube makes chapters of them. The line that
-// binds the video to the bundle is the last line.
+// Written for a viewer, in plain sentences: who plays what and how it ended first (YouTube shows only the first
+// lines before "more"), then what the picture shows, then what happens in this video and nothing it does not show.
+// No links: a link in a description is not clickable on every channel and is shortened in view, so the archive's
+// domain and the run id are plain text. Timestamps are called chapters only when YouTube makes chapters of them. The
+// line that binds the video to the bundle is the last line.
 import { formatDuration, youtubeTime } from "./videos.mjs";
 import { modelDisplayName } from "./models.mjs";
 
@@ -55,63 +56,100 @@ export function videoMoments(chapters, summary = {}) {
   return moments.length === 1 && moments[0].label === "Start" ? [] : moments;
 }
 
+/** A goal's label as it reads in a sentence: "the end credits", "the Act 1 boss". */
+const goalPhrase = (label) => `the ${/^[A-Z][a-z]* \d/.test(label) ? label : label.charAt(0).toLowerCase() + label.slice(1)}`;
+
 const facts = (s) => {
   const game = s.game?.game ?? s.category?.game ?? "the game";
   const goal = s.category?.goal_end?.label ?? s.category?.goal ?? "its goal";
-  const models = [...new Set((s.models ?? []).map((m) => m.model))].map(modelDisplayName).join(", ") || "a model";
-  const runtime = s.harness?.plugins?.runtime?.name ?? s.harness?.plugins?.runtime?.id ?? "its runtime";
+  const names = [...new Set((s.models ?? []).map((m) => m.model))].map(modelDisplayName);
+  const models = names.join(" and ") || "A language model";
   const ttc = s.totals_to_completion;
   const reached = Boolean(s.completed_at && ttc);
   const igt = formatDuration(reached ? ttc.igt_seconds : s.recording?.igt_seconds);
   const real = formatDuration(reached ? ttc.rta_seconds : s.recording?.wall_clock_seconds ?? s.recording?.duration_seconds);
-  return { game, goal, models, runtime, reached, igt, real };
+  return { game, goal, models, several: names.length > 1, reached, igt, real };
 };
 
-/** The suggested title: game, goal and result, model; a part of a resumed run says which part. */
+/** The suggested title: who plays what, which video, and how it ended. */
 export function videoTitle(summary, video) {
   const f = facts(summary);
-  const base = f.reached ? `${f.game} · ${f.goal} in ${f.igt} · ${f.models}` : `${f.game} · ${f.goal}, not reached · ${f.models}`;
-  return video.kind === "segment" ? `${base} · part ${video.part} of ${video.parts}` : base;
+  const which = video.kind === "cut" ? " (cut)" : video.kind === "segment" ? ` (part ${video.part} of ${video.parts})` : "";
+  const result = f.reached ? `reached ${goalPhrase(f.goal)} in ${f.igt}` : `stopped before ${goalPhrase(f.goal)}`;
+  return `${f.models} ${f.several ? "play" : "plays"} ${f.game}${which} — ${result}`;
+}
+
+/** What happened at a moment of this video, as a sentence; null for the start. */
+function momentSentence(moment, summary, video, f) {
+  const at = youtubeTime(moment.at);
+  const labels = moment.raw.map((l) => String(l));
+  const extended = labels.map((l) => /^Human: goal extended from \S+ to (\S+)$/.exec(l)?.[1]).find(Boolean);
+  const resumed = labels.map((l) => /^Human: resumed after (.+)$/.exec(l)?.[1]).find(Boolean);
+  const goalHere = labels.includes(f.goal);
+  const others = labels.filter((l) => l !== "Start" && l !== f.goal && !/^Human: /.test(l));
+  const parts = [];
+  if (goalHere) parts.push(`At ${at} it reached ${goalPhrase(f.goal)}${video.seconds - moment.at > 10 && !extended ? "; what follows does not count toward the run's time" : ""}.`);
+  if (extended) parts.push(`${goalHere ? "Then" : `At ${at}`} a person started the model again with a new goal, ${goalPhrase(endLabel(summary, extended))}, which it did not reach. This part does not count toward the run's time.`);
+  else if (resumed) {
+    const help = summary.category?.human === "assisted" ? `The person helped: ${summary.category?.human_notes ?? "see the run in the archive"}.` : "The person did not help with the game.";
+    const had = { failed: "stopped on an error", "a runtime error": "stopped on an error", completed: "reached its goal" }[resumed] ?? "stopped";
+    parts.push(`At ${at} the model had ${had} and a person started it again. ${help}`);
+  }
+  for (const l of labels.filter((x) => /^Human: /.test(x) && !/^Human: (resumed after|goal extended)/.test(x))) parts.push(`At ${at} a person stepped in: ${l.slice(7)}.`);
+  if (others.length) parts.push(`At ${at}: ${others.join("; ")}.`);
+  return parts.join(" ") || null;
 }
 
 /**
- * The suggested description. `archiveUrl` is the archive's address (only its domain is shown); `note` is the
- * publisher's own sentence, or null; `videos` are all videos of the run (default summary.recording.videos), so every
- * one of them names what happened in the run, such as a goal extension, wherever its moment is.
+ * The suggested description, in plain sentences, about this video only. `archiveUrl` is the archive's address (only
+ * its domain is shown); `note` is the publisher's own sentence, or null.
  */
-export function videoDescription(summary, video, { archiveUrl, note = null, videos = summary.recording?.videos ?? [video] }) {
+export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const s = summary;
   const f = facts(s);
-  const full = formatDuration(s.recording?.duration_seconds);
   const domain = String(archiveUrl).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
-  const moments = videoMoments(video.chapters ?? [], s);
-  const extension = videos.flatMap((v) => v.chapters ?? []).map((c) => /Goal extended from .+ to (.+)$/.exec(momentLabel(c.label, s))?.[1]).find(Boolean);
-  const human = s.category?.human === "restart-only"
-    ? "A human restarted the agent after it stopped; no game help was given."
-    : s.category?.human === "assisted" ? `A human assisted: ${s.category?.human_notes ?? "see the run's page in the archive"}.` : null;
-  const after = f.reached && extension
-    ? `After reaching ${f.goal}, the goal was extended to ${extension}, which was not reached: that part is in the recording, not in the run's time.`
-    : f.reached && (s.recording?.igt_seconds ?? 0) > (s.totals_to_completion?.igt_seconds ?? 0) + 0.05
-      ? "The recording goes on after the goal was reached; what was played after it is not part of the run's time."
-      : null;
-  const which = video.kind === "cut"
-    ? `This is the cut version (${formatDuration(video.seconds)}): the pauses while the model was thinking are removed. The full recording runs ${full}.`
-    : video.kind === "segment"
-      ? `This is part ${video.part} of ${video.parts} of the full recording (${formatDuration(video.seconds)} of ${full}): the run was resumed${video.part < video.parts ? ` and continues in part ${video.part + 1}` : ""}.`
-      : `This is the full recording (${full}).`;
-  return [
+  const goal = goalPhrase(f.goal);
+  const intro = [
+    `${f.models}, ${f.several ? "language models, play" : "a language model, plays"} ${f.game} by ${f.several ? "themselves" : "itself"}.`,
     f.reached
-      ? `${f.models} played ${f.game} in ${f.runtime} and reached the goal "${f.goal}" in ${f.igt} in-game time (${f.real} real time).`
-      : `${f.models} played ${f.game} in ${f.runtime} and did not reach the goal "${f.goal}": the run stopped after ${f.igt} in-game time (${f.real} real time).`,
-    `AAS Archive: ${domain} — run ${s.run_id}`,
+      ? `Its goal was ${goal}; it got there in ${f.igt} of game time (${f.real} of real time).`
+      : `Its goal was ${goal}; it stopped after ${f.igt} of game time (${f.real} of real time) without reaching that goal.`,
+  ].join(" ");
+  // What the picture shows: the game, LiveSplit when the OBS recorder recorded it next to the LiveSplit timer, and the
+  // harness's overlay (recorder-obs and overlay-server.mjs place them).
+  const plugins = s.harness?.plugins ?? {};
+  const liveSplit = plugins.recorder?.id === "obs" && plugins.timer?.id === "livesplit";
+  const overlay = s.recording?.overlay;
+  const full = formatDuration(s.recording?.duration_seconds);
+  const view = [
+    "What you see: the game as the model played it.",
+    ...(liveSplit ? ["Top left is LiveSplit, the speedrun timer with its splits."] : []),
+    ...(overlay?.shown ? [`Bottom left are the name of the current section, two clocks, real time (RTA) and game time (IGT)${overlay.keys ? ", the keys the model pressed" : ""}, and the last command the model sent.`] : []),
+    video.kind === "cut"
+      ? `In this cut the pauses while the model was thinking are left out, so ${full} of recording becomes ${formatDuration(video.seconds)}.`
+      : video.kind === "segment"
+        ? `This is part ${video.part} of ${video.parts} of the recording (${formatDuration(video.seconds)} of ${full}): the run was paused${video.part < video.parts ? ` and continues in part ${video.part + 1}` : " and continued here"}.`
+        : `This is the whole recording (${full}).`,
+  ].join(" ");
+  // Only what this video shows: its own moments, in order, merged when less than ten seconds apart.
+  const moments = [];
+  for (const c of [...(video.chapters ?? [])].sort((a, b) => a.at - b.at)) {
+    const last = moments.at(-1);
+    if (last && c.at - last.at < 10) { if (!last.raw.includes(c.label)) last.raw.push(c.label); } else moments.push({ at: c.at, raw: [c.label] });
+  }
+  const told = moments.map((m) => momentSentence(m, s, video, f)).filter(Boolean);
+  const listed = videoMoments(video.chapters ?? [], s);
+  const chapters = youtubeChapters(listed, video.seconds) ? ["Chapters", ...listed.map((m) => `${youtubeTime(m.at)} ${m.label}`)] : [];
+  const about = `This is an AI Assisted Speedrun: a language model plays the game and no person touches the controls; the run is timed in game time and in real time. Run ${s.run_id} is in the AAS Archive: ${domain}`;
+  return [
+    intro,
     "",
-    "An AI Assisted Speedrun: a language model plays the game without a human playing along, timed in-game and in real time.",
-    ...(human ? [human] : []),
-    ...(after ? [after] : []),
-    ...(note ? [note] : []),
+    view,
+    ...(told.length ? ["", told.join(" ")] : []),
+    ...(chapters.length ? ["", ...chapters] : []),
     "",
-    which,
-    ...(moments.length ? ["", youtubeChapters(moments, video.seconds) ? "Chapters" : "Moments", ...moments.map((m) => `${youtubeTime(m.at)} ${m.label}`)] : []),
+    about,
+    ...(note ? ["", note] : []),
     "",
     "Verification line for the AAS Archive:",
     video.line,
@@ -120,4 +158,4 @@ export function videoDescription(summary, video, { archiveUrl, note = null, vide
 
 /** The videos with their suggested title and description, as the bundle carries them. */
 export const withVideoTexts = (videos, summary, { archiveUrl, note = null }) =>
-  videos.map((v) => ({ ...v, title: videoTitle(summary, v), description: videoDescription(summary, v, { archiveUrl, note, videos }) }));
+  videos.map((v) => ({ ...v, title: videoTitle(summary, v), description: videoDescription(summary, v, { archiveUrl, note }) }));

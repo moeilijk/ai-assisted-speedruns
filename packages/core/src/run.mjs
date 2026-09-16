@@ -162,7 +162,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const started = await witnessSegment({ phase: "start", runUid: brief.run_uid, segment: 1, tooling, t0: t0.toISOString() });
   events.append(started.event, started.data);
   if (started.event === "run.unwitnessed") log(`the start of this segment is not witnessed: ${started.data.reason}`);
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling });
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.

@@ -36,7 +36,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.33";
+export const SPEC_VERSION = "0.34";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -258,6 +258,13 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // The videos the runner may upload (the whole recording or one per segment, and the cut), each with its length, the
   // line its description must carry, its chapters on its own clock, and a suggested title and description ending on
   // that line: an archive shows them as they are, without deriving or composing any.
+  // What the picture shows besides the game: the harness's overlay (timers, the keys being played, the model's last
+  // command), when every session had it; null when a session did not say (made before 0.15.0).
+  const starts = readRunEvents(runDir).filter((e) => e.event === "run.started");
+  const shown = starts.map((e) => e.data?.overlay);
+  summary.recording.overlay = starts.length && shown.every((x) => typeof x === "boolean") && new Set(shown).size === 1
+    ? { shown: shown[0], keys: shown[0] && readRunEvents(runDir).some((e) => e.event === "game.playback" && e.data?.phase === "start" && (e.data?.steps ?? []).length > 0) }
+    : null;
   summary.recording.videos = withVideoTexts(
     recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline }),
     summary, { archiveUrl: ARCHIVE_URL, note: previous.upload_note ?? null },

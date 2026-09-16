@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { recordingVideos, viewerLabel } from "../src/videos.mjs";
-import { momentLabel, videoDescription, videoMoments, youtubeChapters } from "../src/youtube-text.mjs";
+import { momentLabel, videoDescription, videoMoments, videoTitle, youtubeChapters } from "../src/youtube-text.mjs";
 import { modelDisplayName } from "../src/models.mjs";
 
 const timeline = {
@@ -69,17 +69,26 @@ test("a model is named for people when its parts are known", () => {
   assert.equal(modelDisplayName("stub-model"), "stub-model");
 });
 
-test("every video of a run names a goal extension, also the part without its moment", () => {
+test("a video's text tells what that video shows, and nothing it does not", () => {
   const summary = {
     run_id: "sts-x", completed_at: "t", totals_to_completion: { igt_seconds: 177.48, rta_seconds: 1362.6 },
-    models: [{ model: "claude-sonnet-5" }], game: { game: "Slay the Spire" }, harness: { plugins: { runtime: { name: "Claude Code" } } },
+    models: [{ model: "claude-sonnet-5" }], game: { game: "Slay the Spire" },
+    harness: { plugins: { runtime: { name: "Claude Code" }, recorder: { id: "obs" }, timer: { id: "livesplit" } } },
     category: { goal_end: { id: "act1", label: "Act 1 boss" }, human: "none" }, ends: [{ id: "act1", label: "Act 1 boss" }, { id: "act3", label: "Act 3 boss" }],
-    recording: { duration_seconds: 1559, igt_seconds: 217.26, videos: [
-      { kind: "segment", part: 1, parts: 2, seconds: 1368, line: "AAS sts-x · fingerprint f · 1368 s", chapters: [{ at: 0, label: "Start" }] },
-      { kind: "segment", part: 2, parts: 2, seconds: 191, line: "AAS sts-x · fingerprint f · 191 s", chapters: [{ at: 5, label: "Human: goal extended from act1 to act3" }] },
-    ] },
+    recording: { duration_seconds: 1559, igt_seconds: 217.26, overlay: { shown: true, keys: false } },
   };
-  const text = videoDescription(summary, summary.recording.videos[0], { archiveUrl: "https://ai-assisted-speedruns.org" });
-  assert.match(text, /After reaching Act 1 boss, the goal was extended to Act 3 boss, which was not reached/);
-  assert.equal(text.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
+  const part1 = { kind: "segment", part: 1, parts: 2, seconds: 1368, line: "AAS sts-x · fingerprint f · 1368 s", chapters: [{ at: 0, label: "Start" }, { at: 1362.6, label: "Act 1 boss" }] };
+  const part2 = { kind: "segment", part: 2, parts: 2, seconds: 191, line: "AAS sts-x · fingerprint f · 191 s", chapters: [{ at: 5, label: "Human: resumed after completed" }, { at: 5, label: "Human: goal extended from act1 to act3" }] };
+  const one = videoDescription(summary, part1, { archiveUrl: "https://ai-assisted-speedruns.org" });
+  const two = videoDescription(summary, part2, { archiveUrl: "https://ai-assisted-speedruns.org" });
+  assert.equal(videoTitle(summary, part1), "Claude Sonnet 5 plays Slay the Spire (part 1 of 2) — reached the Act 1 boss in 2m 57.4s");
+  assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Its goal was the Act 1 boss; it got there in 2m 57\.4s of game time \(22m 42\.6s of real time\)\./);
+  assert.match(one, /Top left is LiveSplit/);
+  assert.match(one, /Bottom left are the name of the current section, two clocks, real time \(RTA\) and game time \(IGT\), and the last command/);
+  assert.match(one, /At 22:42 it reached the Act 1 boss\./);
+  assert.doesNotMatch(one, /Act 3/, "the extension is not in part 1");
+  assert.match(two, /At 0:05 a person started the model again with a new goal, the Act 3 boss, which it did not reach\./);
+  assert.doesNotMatch(two + one, /Claude Code|https?:|Moments/);
+  assert.equal(one.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
+  assert.equal(videoTitle({ ...summary, completed_at: null, category: { goal_end: { id: "credits", label: "End credits" } } }, { kind: "cut" }), "Claude Sonnet 5 plays Slay the Spire (cut) — stopped before the end credits");
 });

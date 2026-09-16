@@ -12,19 +12,20 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
-## 0.14.1 — 2026-09-16
+## 0.15.0 — 2026-09-16
 
-The example video texts, reviewed for viewers (with the archive, which makes the same texts).
+Summary schema 13, SPEC 0.34: the example video texts are written for viewers, and a bundle says what the picture
+shows.
 
-- The texts come from `youtube-text.mjs`, which imports only `videos.mjs` and `models.mjs`, so the archive can
-  carry it and suggest the same texts for a bundle without them.
-- The result first, with the model's name for people (Claude Sonnet 5) and the runtime (in Claude Code); "the run
-  stopped" instead of "the session"; every duration to the tenth.
-- No link: the archive's domain and the run id as text. A line on what an AI Assisted Speedrun is, and
-  "Verification line for the AAS Archive:" before the line, which stays last.
-- Moments in words a viewer knows ("A human restarted the agent after it stopped", "Goal extended from Act 1 boss to
-  Act 3 boss"), moments less than ten seconds apart on one line (the harness's sentences in lower case after the
-  first); a start alone is not listed; a goal extension after the goal is named in the text of every video.
+- `run.started` says whether the harness's overlay was in the picture; `summary.recording.overlay` is `{shown, keys}`,
+  or null for a run from before.
+- The example title and description come from `youtube-text.mjs`, which imports only `videos.mjs` and `models.mjs`,
+  so the archive can carry it and suggest the same texts. In plain sentences: who plays what and how it ended
+  ("Claude Sonnet 5 plays Portal (cut) — stopped before the end credits"), what the picture shows (LiveSplit top
+  left; the overlay bottom left with the section, RTA and IGT, the keys, the last command), what happens in that
+  video only (a restart by a person, a goal reached, a goal extension), and the archive's domain and the run id as
+  text. No links, no runtime name. Timestamps are listed only when YouTube makes chapters of them. The line stays
+  last, after "Verification line for the AAS Archive:".
 - Portal's goal is "End credits".
 
 ## 0.14.0 — 2026-09-16
