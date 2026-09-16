@@ -92,3 +92,8 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   assert.equal(one.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
   assert.equal(videoTitle({ ...summary, completed_at: null, category: { goal_end: { id: "credits", label: "End credits" } } }, { kind: "cut" }), "Claude Sonnet 5 plays Slay the Spire (cut) — stopped before the end credits");
 });
+
+test("a recording without a measured length lists no whole video, whose line nothing could back", () => {
+  const one = { segments: [{ index: 0, offset: 0, seconds: 2.74, file: null }], sections: [], keep: [], totals: {} };
+  assert.deepEqual(recordingVideos({ runId: "x", fingerprint: "f", durationSeconds: null, files: ["recording/a.dem"], timeline: one }), []);
+});

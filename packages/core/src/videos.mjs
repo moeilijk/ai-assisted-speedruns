@@ -49,7 +49,9 @@ export function recordingVideos({ runId, fingerprint, durationSeconds, files = [
   const chapters = (list) => list.map((c) => ({ at: ms(Math.max(0, c.at)), label: viewerLabel(c.label) }));
   const videos = [];
   if (segments.length === 1) {
-    const seconds = durationSeconds ?? segments[0].seconds;
+    // The whole recording is listed only with its measured length (ffprobe at publish): that is the length a
+    // checker holds its line against.
+    const seconds = durationSeconds;
     if (typeof seconds === "number") {
       videos.push({ kind: "whole", part: null, parts: null, file: segments[0].file ?? raw[0] ?? null, seconds: ms(seconds), line: videoLine(runId, fingerprint, seconds),
         chapters: chapters(sections.map((s) => ({ at: s.start_rta, label: s.label }))) });

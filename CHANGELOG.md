@@ -27,6 +27,8 @@ shows.
   text. No links, no runtime name. Timestamps are listed only when YouTube makes chapters of them. The line stays
   last, after "Verification line for the AAS Archive:".
 - Portal's goal is "End credits".
+- A recording whose length could not be measured (no ffprobe, or not a video) lists no whole-recording video: its
+  line would state a length the bundle does not, and `aas check` rejected the bundle `aas publish` had just made.
 
 ## 0.14.0 — 2026-09-16
 
