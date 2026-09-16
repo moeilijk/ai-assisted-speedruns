@@ -7,7 +7,7 @@ import { resolveGoal, goalReached } from "./goal.mjs";
 import path from "node:path";
 import { configure } from "./configure.mjs";
 import { createEventLog, followEvents } from "./events.mjs";
-import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer } from "./plugins.mjs";
+import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 
 /**
@@ -148,7 +148,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     throw error;
   }
   const goal = resolveGoal(plugin, brief.category?.goal);
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id });
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling: toolingIdentity() });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.

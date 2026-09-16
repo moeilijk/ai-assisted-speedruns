@@ -18,7 +18,7 @@ const dotEnv = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..
 if (fs.existsSync(dotEnv)) process.loadEnvFile(dotEnv);
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
-const BOOLEAN_FLAGS = new Set(["strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "help"]);
+const BOOLEAN_FLAGS = new Set(["strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
 function parse(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
@@ -198,7 +198,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [configure options]",
             "                                           when the run ends the game, the timer, the recorder and a Steam the launcher started are closed; --keep-open leaves them",
             "  aas budget [--max <percent>]             the Claude plan usage; runs stay under AAS_BUDGET_WEEKLY_MAX (default 50%)",
-            "  aas resume --run-dir <dir> [--save name] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M]",
+            "  aas resume --run-dir <dir> [--save name] [--allow-breaking] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M]",
             "  aas start --runtime <id> --run-dir <dir>",
             "  aas doctor --game <plugin.mjs> [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]   read-only checks before a run",
             "  aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]",

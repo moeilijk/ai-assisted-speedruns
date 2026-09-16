@@ -87,6 +87,13 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
     writeFileSync(join(runDir, "documentation.md"), documentation);
     const resumed = await resume({ "run-dir": runDir, recorder: "source-demo", timer: "livesplit", "no-autosave": true, "keep-open": true }, { log: () => {} });
     assert.equal(resumed.segment, 2);
+    const starts = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data.tooling);
+    assert.equal(starts.length, 2, "each session says which tooling ran it");
+    for (const t of starts) {
+      assert.equal(t.version, JSON.parse(readFileSync(join(root, "packages", "core", "package.json"), "utf8")).version);
+      assert.match(t.commit, /^[0-9a-f]{40}$/);
+      assert.equal(typeof t.modified, "boolean");
+    }
     assert.equal(resumed.outcome.status, "completed");
     assert.ok(spt.seen.some((m) => m.type === "cmd" && /^load aas_/.test(m.cmd)), "load sent");
   } finally {
@@ -164,6 +171,9 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const timeline = readFileSync(join(outDir, "session.sanitized.jsonl"), "utf8");
   assert.doesNotMatch(timeline, /data:image/);
   assert.match(timeline, /image_omitted/);
+  const published = timeline.split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data.tooling);
+  assert.equal(published.length, 2);
+  assert.ok(published.every((t) => /^[0-9a-f]{40}$/.test(t.commit) && t.version), "the bundle shows per segment which tooling ran it");
   assert.match(readFileSync(join(outDir, "splits.lss"), "utf8"), /<GameName>Portal<\/GameName>/);
   assert.ok(existsSync(join(runDir, "timeline", "cut.sh")) && existsSync(join(runDir, "timeline", "timers.srt")));
   assert.match(readFileSync(join(runDir, "timeline", "inputs.srt"), "utf8"), /forward/);

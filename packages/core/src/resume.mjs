@@ -9,10 +9,11 @@ import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
 import path from "node:path";
 import { createEventLog, followEvents, readRunLog } from "./events.mjs";
-import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer } from "./plugins.mjs";
+import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { createAutosave, writeRecordingSegment } from "./run.mjs";
+import { resumeToolingCheck } from "./tooling-check.mjs";
 
 export async function resume(opts, { log = (t) => process.stderr.write(`[aas resume] ${t}\n`) } = {}) {
   if (!opts["run-dir"]) throw new Error("--run-dir is required");
@@ -46,6 +47,14 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   if (opts["max-turns"]) brief.budget = { ...(brief.budget ?? {}), toolCalls: Number(opts["max-turns"]) };
   if (opts["max-minutes"]) brief.budget = { ...(brief.budget ?? {}), minutes: Number(opts["max-minutes"]) };
   if (opts.headless) brief.headless = true;
+  // The tooling may have been updated since the last session: forward within a release line, never back, and past a
+  // breaking release only when the runner says so (that choice goes into run.started).
+  const tooling = toolingIdentity();
+  const earlier = previous.filter((r) => r.kind === "event" && r.event === "run.started").map((r) => r.data?.tooling?.version ?? null);
+  const verdict = resumeToolingCheck({ earlier, installed: tooling.version, allowBreaking: opts["allow-breaking"] === true });
+  if (!verdict.ok) throw new Error(`This run cannot be resumed with the installed tooling: ${verdict.problem}.`);
+  if (verdict.breaking.length) tooling.allowed_breaking = verdict.breaking;
+  if (earlier.some(Boolean) && earlier.filter(Boolean).at(-1) !== tooling.version) log(`this run's last session ran tooling ${earlier.filter(Boolean).at(-1)}; this session runs ${tooling.version}`);
   const spec = await brokerSpec({ gameModule, runDir, timeZone: process.env.AAS_TIME_ZONE });
   // The agent continues its own session, so it must get the tools and documentation it had: tooling or a game plugin
   // updated between two sessions may not change them. Checked before anything starts.
@@ -106,7 +115,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("run.human", { note: `goal extended from ${goalExtended.from} to ${goalExtended.to}`, segment });
     events.append("game.goal", { from: goalExtended.from, to: goalExtended.to, segment });
   }
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment });
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   let over = null;
   let deaths = 0;

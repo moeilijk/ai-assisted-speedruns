@@ -5,6 +5,8 @@
 export const SUMMARY_SCHEMAS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 /** The bundle packagings the checker reads (`bundle.bundle_version`). */
 export const BUNDLE_VERSIONS = [1];
+/** Tooling releases after which a run may not simply go on with the new release (CHANGELOG.md, BREAKING). */
+export const BREAKING_RELEASES = [];
 /** The shape of summary.json this tooling writes. */
 export const SUMMARY_SCHEMA = SUMMARY_SCHEMAS.at(-1);
 /** The bundle's packaging this tooling writes: which files it holds and how they are named. */

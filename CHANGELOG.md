@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.13.0 — 2026-09-16
+
+SPEC 0.32: each session says which tooling ran it.
+
+- `run.started` carries `tooling`: the version, the commit of the clone, and whether tracked files were modified.
+  The published timeline keeps it, so a bundle shows per segment which release recorded it.
+- `aas resume` refuses tooling older than an earlier session of the run, and a breaking release between the run's
+  last session and the installed tooling unless `--allow-breaking` is given; that choice is logged in `run.started`.
+  `versions.mjs` lists the breaking releases (none so far).
+
 ## 0.12.0 — 2026-09-16
 
 SPEC 0.31: a run keeps the tool interface it started with.
