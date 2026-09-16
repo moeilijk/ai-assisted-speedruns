@@ -1,7 +1,7 @@
 // The videos a runner may upload, as the bundle lists them (summary.recording.videos, schema 8).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recordingVideos, viewerLabel } from "../src/videos.mjs";
+import { recordingVideos, viewerLabel, youtubeChapters } from "../src/videos.mjs";
 
 const timeline = {
   segments: [{ index: 0, offset: 0, seconds: 302.936, file: "recording/AAS_portal-02_1.mp4" }, { index: 1, offset: 302.936, seconds: 328.585, file: "recording/AAS_portal-02_2.mp4" }],
@@ -33,4 +33,13 @@ test("a run in one file lists the whole recording and the cut", () => {
 test("viewer labels drop the save name and the resumed session's details", () => {
   assert.equal(viewerLabel("Human: resumed from save x after failed (claude -p exited with 1; cost $77.53; success)"), "Human: resumed after failed");
   assert.equal(viewerLabel("Act 1 boss"), "Act 1 boss");
+});
+
+test("timestamps are called chapters only when YouTube makes chapters of them", () => {
+  const at = (...xs) => xs.map((x, i) => ({ at: x, label: `c${i}` }));
+  assert.equal(youtubeChapters(at(0, 130), 199), false, "two timestamps are not enough");
+  assert.equal(youtubeChapters(at(0, 60, 120), 199), true);
+  assert.equal(youtubeChapters(at(5, 60, 120), 199), false, "the first is not 0:00");
+  assert.equal(youtubeChapters(at(0, 60, 65), 199), false, "a chapter shorter than ten seconds");
+  assert.equal(youtubeChapters(at(0, 60, 195), 199), false, "the last chapter is shorter than ten seconds");
 });

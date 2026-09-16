@@ -12,6 +12,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.13.1 — 2026-09-16
+
+The example video description reads well on YouTube.
+
+- The run's page comes first, with the run id in plain text (YouTube shortens long links and shows only the first
+  lines), then the model, the game and the result in one sentence. The line stays last.
+- No link to the bundle checker: a viewer has no bundle.
+- Timestamps are headed "Chapters" only when YouTube makes chapters of them (at least three, the first at 0:00, each
+  at least ten seconds); otherwise "Moments".
+- The upload sheet says that the run's page is found only once the archive has put the run online.
+
 ## 0.13.0 — 2026-09-16
 
 SPEC 0.32: each session says which tooling ran it.

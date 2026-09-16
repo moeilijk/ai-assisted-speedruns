@@ -97,6 +97,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "description). That is the only requirement. A line of its own keeps it easy to find.",
     "The fingerprint is the start of the sha256 of the run's published timeline; the seconds are that video's length.",
     "Each video below has a suggested title and description, ending on its line: use, change or leave them out.",
+    "The link to the run's page works once the archive has accepted the run and put it online; until then it is not found.",
     "",
     ...[...videos.filter((v) => v.kind === "cut"), ...videos.filter((v) => v.kind !== "cut")].flatMap(one),
   ].join("\n");

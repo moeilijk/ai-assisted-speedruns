@@ -55,6 +55,11 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(cut.includes("11:15 Act 1 boss"));
   assert.ok(cut.includes("This run is an example."));
   assert.ok(cut.trim().split("\n").at(-2).startsWith(`${fp} · 769 s`), "the description ends on the cut's line");
+  const cutText = cut.split("-".repeat(78))[1].trim().split("\n");
+  assert.equal(cutText[0], "sts-claude-code-01 in the AAS Archive: https://ai-assisted-speedruns.org/runs/sts-claude-code-01/", "the run's page first, with its id");
+  assert.match(cutText[1], /^claude-sonnet-5 played Slay the Spire through .+ and reached "Act 1 boss" in 2m 57\.4s in-game time/);
+  assert.ok(!cut.includes("/verify/"), "no verifier link: a viewer has no bundle to check");
+  assert.match(sheet, /works once the archive has accepted the run/);
   const part2 = sheet.split("FULL RECORDING, PART 2 OF 2")[1];
   const part1 = sheet.split("FULL RECORDING, PART 1 OF 2")[1].split("FULL RECORDING, PART 2")[0];
   assert.ok(part1.includes(`line:  ${fp} · 1368 s`) && part1.includes("22:42 Act 1 boss"));

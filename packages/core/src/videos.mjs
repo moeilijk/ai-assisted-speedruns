@@ -72,8 +72,20 @@ export function recordingVideos({ runId, fingerprint, durationSeconds, files = [
 }
 
 /**
- * The suggested title and description of each video, from the bundle's own summary: the run's text, which video it
- * is, its chapters, the run's page and the line. `note` is the publisher's sentence (for the example runs: that they
+ * Whether YouTube turns these timestamps into chapters: at least three, the first at 0:00, and every chapter at least
+ * ten seconds long, the last one up to the end of the video.
+ */
+export function youtubeChapters(chapters, seconds) {
+  if (chapters.length < 3 || youtubeTime(chapters[0].at) !== "0:00") return false;
+  const ends = [...chapters.slice(1).map((c) => c.at), seconds ?? Infinity];
+  return chapters.every((c, i) => ends[i] - c.at >= 10);
+}
+
+/**
+ * The suggested title and description of each video, from the bundle's own summary. YouTube shows only the first
+ * lines before "more" and shortens long links, so the run's page comes first with the run id in plain text, then
+ * the model, the game and the result in one sentence; then which video this is, its moments (as chapters when
+ * YouTube makes chapters of them), and at the end the line. `note` is the publisher's sentence (for the example runs: that they
  * are examples). The runner may use, change or drop them; the line is the only requirement.
  */
 export function withVideoTexts(videos, summary, { archiveUrl, note = null } = {}) {
@@ -102,19 +114,16 @@ export function withVideoTexts(videos, summary, { archiveUrl, note = null } = {}
         ? `This is part ${v.part} of ${v.parts} of the full recording (${whole(v.seconds)} of ${full}): the run was resumed${v.part < v.parts ? ` and continues in part ${v.part + 1}` : ""}.`
         : `This is the full recording (${full}).`;
     const description = [
-      `${models} plays ${game} through ${runtime}, with the goal "${goal}".`,
+      `${s.run_id} in the AAS Archive: ${archiveUrl}/runs/${s.run_id}/`,
       reached
-        ? `Result: ${goal} reached in ${igt} in-game time, ${real} real time.`
-        : `Result: ${goal} not reached. The session stopped after ${igt} in-game time and ${real} real time.`,
+        ? `${models} played ${game} through ${runtime} and reached "${goal}" in ${igt} in-game time (${real} real time).`
+        : `${models} played ${game} through ${runtime} and did not reach "${goal}": the session stopped after ${igt} in-game time (${real} real time).`,
       ...(after ? [after] : []),
       ...(human ? [human] : []),
       ...(note ? [note] : []),
       "",
       which,
-      ...(v.chapters.length ? ["", "Chapters", ...v.chapters.map((c) => `${youtubeTime(c.at)} ${c.label}`)] : []),
-      "",
-      `The run in the AAS Archive: ${archiveUrl}/runs/${s.run_id}/`,
-      `Check a bundle in the browser: ${archiveUrl}/verify/`,
+      ...(v.chapters.length ? ["", youtubeChapters(v.chapters, v.seconds) ? "Chapters" : "Moments", ...v.chapters.map((c) => `${youtubeTime(c.at)} ${c.label}`)] : []),
       "",
       v.line,
     ].join("\n");
