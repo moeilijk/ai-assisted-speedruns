@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.18.0 — 2026-09-16
+
+SPEC 0.37: the example video texts in the wording the owner approved on 2026-09-16 for the cut of portal-02.
+
+- Title: "Claude Sonnet 5 plays Portal (cut): stopped before the credits", with a colon.
+- Description: the goal and how the run ended, which video this is, what the picture shows ("Top left: … Bottom
+  left: …"), what happens in the video as "m:ss what happens" ("2:10 The run is resumed."), the AAS paragraph, and
+  "Verification code for the AAS Archive:" with the code on its own line. How a person restarted the run is left to
+  the archive.
+
 ## 0.17.0 — 2026-09-16
 
 SPEC 0.36, schema 14: one code to copy (owner 16-09: lines with spaces, special characters and capitals make

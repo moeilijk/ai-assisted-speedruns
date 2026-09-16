@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.36
+# AI Assisted Speedruns (AAS) — Specification, draft 0.37
 
-Status: draft 0.36, 2026-09-16. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.37, 2026-09-16. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -132,7 +132,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 ```json
 {
   "schema_version": 13,
-  "spec_version": "0.36",
+  "spec_version": "0.37",
   "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
   "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
              "revision": 10, "published_at": "..."},
@@ -175,8 +175,8 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
        "line": "aas36d633208676bfdb5e1c0a47b93f2d8e", "chapters": [{"at": 4.5, "label": "Human: resumed after completed"}]},
       {"kind": "cut", "part": null, "parts": null, "file": "recording/AAS_sts-claude-code-01_2026-09-20_10-51-17.cut.mp4", "seconds": 769.134,
        "line": "aas36d633208676bfdb5e1c0a47b93f2d8e", "chapters": [{"at": 0, "label": "Start"}, {"at": 675.2, "label": "Act 1 boss"}],
-       "title": "Claude Sonnet 5 plays Slay the Spire (cut) — reached the Act 1 boss in 00:02:57.4",
-       "description": "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Its goal was the Act 1 boss; it got there in 00:02:57.4 of game time (00:22:42 of real time).\n\nWhat you see: …\n\nAt 11:15 it reached the Act 1 boss. …\n\nThis is an AI Assisted Speedrun: …\n\nVerification line for the AAS Archive:\naas36d633208676bfdb5e1c0a47b93f2d8e"}
+       "title": "Claude Sonnet 5 plays Slay the Spire (cut): reached the Act 1 boss in 00:02:57.4",
+       "description": "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Goal: the Act 1 boss. The run reached the Act 1 boss after 00:02:57.4 of game time and 00:22:42 of real time.\n\nThis cut leaves out the pauses while the model was thinking: 00:25:59 of recording in 00:12:49.\n\nTop left: LiveSplit, the speedrun timer. Bottom left: …\n\n11:15 The run reaches the Act 1 boss. …\n\nAn AI Assisted Speedrun (AAS): …\n\nVerification code for the AAS Archive:\naas36d633208676bfdb5e1c0a47b93f2d8e"}
     ],
     "overlay": {"shown": true, "keys": false},
     "chapters": "chapters.txt",
@@ -345,3 +345,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.34 | 2026-09-16 | Schema 13: `recording.overlay`; `run.started` says whether the overlay was in the picture; the example video texts are written for viewers |
 | 0.35 | 2026-09-16 | §6: durations for people in ISO 8601 hh:mm:ss |
 | 0.36 | 2026-09-16 | Schema 14: a video carries the code `aas<32 hex>`, one word and the same for every video of a revision, instead of the line with run id, fingerprint and length |
+| 0.37 | 2026-09-16 | §6: the example video description in the wording the owner approved (goal, which video, what the picture shows, moments as `m:ss`, verification code) |

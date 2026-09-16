@@ -36,7 +36,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.36";
+export const SPEC_VERSION = "0.37";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
