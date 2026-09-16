@@ -19,11 +19,12 @@ The example video texts, reviewed for viewers (with the archive, which makes the
 - The texts come from `youtube-text.mjs`, which imports only `videos.mjs` and `models.mjs`, so the archive can
   carry it and suggest the same texts for a bundle without them.
 - The result first, with the model's name for people (Claude Sonnet 5) and the runtime (in Claude Code); "the run
-  stopped" instead of "the session", both times to the tenth.
+  stopped" instead of "the session"; every duration to the tenth.
 - No link: the archive's domain and the run id as text. A line on what an AI Assisted Speedrun is, and
   "Verification line for the AAS Archive:" before the line, which stays last.
 - Moments in words a viewer knows ("A human restarted the agent after it stopped", "Goal extended from Act 1 boss to
-  Act 3 boss"), moments less than ten seconds apart on one line; a goal extension after the goal is named in the text.
+  Act 3 boss"), moments less than ten seconds apart on one line (the harness's sentences in lower case after the
+  first); a start alone is not listed; a goal extension after the goal is named in the text of every video.
 - Portal's goal is "End credits".
 
 ## 0.14.0 — 2026-09-16

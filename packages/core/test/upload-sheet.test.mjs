@@ -51,7 +51,7 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(cut.includes(join(runDir, "recording", "AAS_run_1.cut.mp4")));
   assert.ok(cut.includes(`line:  ${fp} · 769 s`), "the cut's own length");
   assert.ok(cut.includes("Title: Slay the Spire · Act 1 boss in 2m 57.4s · Claude Sonnet 5"));
-  assert.ok(cut.includes("This is the cut version (12m 49s)"));
+  assert.ok(cut.includes("This is the cut version (12m 49.1s)"));
   assert.ok(cut.includes("11:15 Act 1 boss"));
   assert.ok(cut.includes("This run is an example."));
   assert.ok(cut.trim().split("\n").at(-2).startsWith(`${fp} · 769 s`), "the description ends on the cut's line");

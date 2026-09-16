@@ -35,16 +35,24 @@ export function momentLabel(label, summary = {}) {
   return text;
 }
 
-/** The moments of a video for its description: labels for viewers, moments less than ten seconds apart on one line. */
+/**
+ * The moments of a video for its description: labels for viewers, moments less than ten seconds apart on one line
+ * (a sentence the harness wrote goes on in lower case there; a game's own name keeps its capital). A video whose only
+ * moment is its start has none worth listing.
+ */
 export function videoMoments(chapters, summary = {}) {
   const out = [];
   for (const c of [...chapters].sort((a, b) => a.at - b.at)) {
     const label = momentLabel(c.label, summary);
+    const sentence = label !== String(c.label);
     const last = out.at(-1);
-    if (last && c.at - last.at < 10) { if (!last.labels.includes(label)) last.labels.push(label); }
-    else out.push({ at: c.at, labels: [label] });
+    if (last && c.at - last.at < 10) {
+      const joined = sentence ? label.charAt(0).toLowerCase() + label.slice(1) : label;
+      if (!last.labels.includes(label) && !last.labels.includes(joined)) last.labels.push(joined);
+    } else out.push({ at: c.at, labels: [label] });
   }
-  return out.map((m) => ({ at: m.at, label: m.labels.join("; ") }));
+  const moments = out.map((m) => ({ at: m.at, label: m.labels.join("; ") }));
+  return moments.length === 1 && moments[0].label === "Start" ? [] : moments;
 }
 
 const facts = (s) => {
@@ -74,8 +82,7 @@ export function videoTitle(summary, video) {
 export function videoDescription(summary, video, { archiveUrl, note = null, videos = summary.recording?.videos ?? [video] }) {
   const s = summary;
   const f = facts(s);
-  const whole = (x) => formatDuration(x, { whole: true });
-  const full = whole(s.recording?.duration_seconds);
+  const full = formatDuration(s.recording?.duration_seconds);
   const domain = String(archiveUrl).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const moments = videoMoments(video.chapters ?? [], s);
   const extension = videos.flatMap((v) => v.chapters ?? []).map((c) => /Goal extended from .+ to (.+)$/.exec(momentLabel(c.label, s))?.[1]).find(Boolean);
@@ -88,9 +95,9 @@ export function videoDescription(summary, video, { archiveUrl, note = null, vide
       ? "The recording goes on after the goal was reached; what was played after it is not part of the run's time."
       : null;
   const which = video.kind === "cut"
-    ? `This is the cut version (${whole(video.seconds)}): the pauses while the model was thinking are removed. The full recording runs ${full}.`
+    ? `This is the cut version (${formatDuration(video.seconds)}): the pauses while the model was thinking are removed. The full recording runs ${full}.`
     : video.kind === "segment"
-      ? `This is part ${video.part} of ${video.parts} of the full recording (${whole(video.seconds)} of ${full}): the run was resumed${video.part < video.parts ? ` and continues in part ${video.part + 1}` : ""}.`
+      ? `This is part ${video.part} of ${video.parts} of the full recording (${formatDuration(video.seconds)} of ${full}): the run was resumed${video.part < video.parts ? ` and continues in part ${video.part + 1}` : ""}.`
       : `This is the full recording (${full}).`;
   return [
     f.reached
@@ -98,7 +105,7 @@ export function videoDescription(summary, video, { archiveUrl, note = null, vide
       : `${f.models} played ${f.game} in ${f.runtime} and did not reach the goal "${f.goal}": the run stopped after ${f.igt} in-game time (${f.real} real time).`,
     `AAS Archive: ${domain} — run ${s.run_id}`,
     "",
-    "An AI Assisted Speedrun: a language model plays the game on its own, timed in-game and in real time.",
+    "An AI Assisted Speedrun: a language model plays the game without a human playing along, timed in-game and in real time.",
     ...(human ? [human] : []),
     ...(after ? [after] : []),
     ...(note ? [note] : []),

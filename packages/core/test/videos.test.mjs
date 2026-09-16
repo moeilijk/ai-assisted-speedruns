@@ -57,8 +57,9 @@ test("moments read as sentences, and moments close together share a line", () =>
     { at: 678.031, label: "Human: resumed after completed" }, { at: 678.031, label: "Human: goal extended from act1 to act3" },
   ], summary), [
     { at: 0, label: "Start" },
-    { at: 675.516, label: "Act 1 boss; A human restarted the agent after it reached its goal; Goal extended from Act 1 boss to Act 3 boss" },
+    { at: 675.516, label: "Act 1 boss; a human restarted the agent after it reached its goal; goal extended from Act 1 boss to Act 3 boss" },
   ]);
+  assert.deepEqual(videoMoments([{ at: 0, label: "Start" }]), [], "a start alone is not worth listing");
 });
 
 test("a model is named for people when its parts are known", () => {
