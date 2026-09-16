@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.29
+# AI Assisted Speedruns (AAS) — Specification, draft 0.30
 
-Status: draft 0.29, 2026-09-15. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.30, 2026-09-16. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -127,12 +127,12 @@ Where a recording is published is not in the bundle. A run may be published in m
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9, what `aas publish` writes, adds a suggested `title` and `description` to each of them.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9 adds a suggested `title` and `description` to each of them. Schema version 10 adds what the runtime reported about each model (`context_window`, `max_output_tokens`, `provider`) and `harness.plugins.runtime.cli_versions`. Schema version 11 adds `parts` to each model. Schema version 12, what `aas publish` writes, adds `details` to each mod in `game.mods`.
 
 ```json
 {
-  "schema_version": 11,
-  "spec_version": "0.27",
+  "schema_version": 12,
+  "spec_version": "0.30",
   "run_id": "sts-claude-code-01", "run_uid": "e56f4879...32 hex characters...",
   "bundle": {"kind": "aas-public", "bundle_version": 1, "run_id": "sts-claude-code-01", "run_uid": "e56f4879...",
              "revision": 10, "published_at": "..."},
@@ -184,7 +184,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
   "totals_to_completion": {"rta_seconds": 0, "igt_seconds": 0, "thinking_seconds": 0, "playbacks": 0, "tool_calls": 0},
   "game": {
     "game": "Slay the Spire", "version": "build 2022-12-18", "platform": "Steam",
-    "mods": [{"name": "CommunicationMod", "version": "1.2.1", "source": "https://...jar", "sha256": "..."}],
+    "mods": [{"name": "CommunicationMod", "details": null, "version": "1.2.1", "source": "https://...jar", "sha256": "..."}],
     "settings": {"character": "IRONCLAD", "ascension": 0, "seed": "23M", "fast_mode": true}
   },
   "harness": {
@@ -201,7 +201,7 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 
 `totals_to_completion` gives the run's times to its published goal, on the recording's clock from t0: `rta_seconds`, `igt_seconds`, `thinking_seconds`, `playbacks` and `tool_calls` up to `completed_at`, or null when the run was not completed. `recording.igt_seconds`, `recording.thinking_seconds` and `timeline.json` `totals` stay the whole recording, which includes post-completion time (credits, or a goal extension that is not published). In `timeline.json` the same figures are `totals_to_completion`, `completed_rta` is the completion on the recording's clock, and every section carries `post_completion`; `splits.lss` splits only up to completion. Sections after completion stay in `chapters.txt`, because they are in the recording.
 
-`game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
+`game` is what it takes to play the same thing again: the game's own build, every mod that was loaded with the version and the pin it was installed from, and the settings of the run. A mod's `name` is the mod's own name; `details` says what was done to it beyond that name (for Portal, SourcePauseTool with portal-agent's IPC patch), or is null. A game plugin reports it; where the game itself records these (a run-history file, a save), those are the words the bundle carries.
 
 `recording.duration_seconds` is the length of the recording and `recording.fingerprint` the sha256 of `session.sanitized.jsonl`. `recording.files` names the recording's files in the run directory, one per segment, which the bundle does not carry; `recording.chapters` is `chapters.txt`, or null when the recording has no chapters. The fingerprint is unique to a bundle, so an archive treats a fingerprint it already holds as a resubmission of that run and not as a new entry. A platform re-encodes an upload, so the file's own hash says nothing about the video anyone can watch: the publisher puts the run id and the fingerprint in the video's description, and a verifier matches those, the duration, and a few tool calls at their `elapsed_seconds`.
 
@@ -334,3 +334,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.27 | 2026-09-15 | Schema 9: each video in `recording.videos` has a suggested `title` and `description`, examples that end on the line; the line stays the only requirement |
 | 0.28 | 2026-09-15 | Schema 10: each entry of `models` carries `context_window`, `max_output_tokens` and `provider` as the runtime reported them; `harness.plugins.runtime.cli_versions` lists the runtime CLI's versions from the session log |
 | 0.29 | 2026-09-15 | Schema 11: each entry of `models` carries `parts`, the model id split into `name`, `variant`, `version` and `snapshot` by its maker's naming; null for an id the tooling does not know |
+| 0.30 | 2026-09-16 | Schema 12: each mod in `game.mods` carries `details`, what was done to it beyond its own `name` (a patch), or null |

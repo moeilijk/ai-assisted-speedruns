@@ -35,7 +35,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.29";
+export const SPEC_VERSION = "0.30";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -173,6 +173,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   summary.bundle = { kind: BUNDLE_KIND, bundle_version: BUNDLE_VERSION, run_id: summary.run_id, run_uid: brief.run_uid ?? null, revision, published_at: new Date().toISOString() };
   // What it takes to play the same thing again: the game's build, the mods with their pins, the run's settings.
   try { summary.game = (await plugin?.build?.({ runDir })) ?? null; } catch (e) { summary.game = null; log(`game build info not available (${e.message})`); }
+  // A mod's name is its own; what was done to it (a patch) goes in details, null when there is nothing to add.
+  if (summary.game?.mods) summary.game.mods = summary.game.mods.map(({ name, details = null, ...rest }) => ({ name, details, ...rest }));
   summary.category = { ...brief.category, goal: publishedGoal, human_notes: brief.category.human_notes ?? null };
   // The goal by name, the game's ends as the plugin declares them, and every goal the run had with when it held and
   // when it was reached: the same fields for every game, because every game plugin declares its ends.

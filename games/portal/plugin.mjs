@@ -92,7 +92,7 @@ export default {
       version: "Source Unpack 2.6 (build 5135)",
       platform: "Source Unpack (not the Steam build)",
       mods: [
-        { name: "SourcePauseTool with portal-agent's IPC patch", version: UPSTREAM.commit, source: UPSTREAM.repo ?? "https://github.com/cozyblaze/portal-agent" },
+        { name: "SourcePauseTool", details: "portal-agent's IPC patch", version: UPSTREAM.commit, source: UPSTREAM.repo ?? "https://github.com/cozyblaze/portal-agent" },
       ],
       settings: { resolution: process.env.AAS_PORTAL_RESOLUTION ?? "1920x1080", cvars: "game-config/ (portal_agent.cfg, agent_run.cfg)" },
     };

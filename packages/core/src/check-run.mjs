@@ -191,6 +191,11 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           if (summary.schema_version >= 11) (Array.isArray(summary.models) ? summary.models : []).forEach((m, i) => {
             if (JSON.stringify(m.parts) !== JSON.stringify(modelParts(m.model))) problems.push(`models[${i}].parts must be ${JSON.stringify(modelParts(m.model))} for ${m.model}`);
           });
+          // Schema 12: a mod carries its own name, and what was done to it in details.
+          if (summary.schema_version >= 12) (summary.game?.mods ?? []).forEach((m, i) => {
+            if (typeof m?.name !== "string" || !m.name) problems.push(`game.mods[${i}].name missing`);
+            if (!m || !("details" in m) || !(m.details === null || (typeof m.details === "string" && m.details))) problems.push(`game.mods[${i}].details must be a string or null (schema 12)`);
+          });
           const cv = summary.harness?.plugins?.runtime?.cli_versions;
           if (!Array.isArray(cv) || !cv.every((v) => typeof v === "string" && v)) problems.push("schema 10 requires harness.plugins.runtime.cli_versions as a list of versions");
         }
