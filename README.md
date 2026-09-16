@@ -72,6 +72,7 @@ cat <runs>/sts-claude-code-01/recording/UPLOAD.txt   # the videos you can upload
 | [docs/plugins.md](docs/plugins.md) | how to write a game, runtime, recorder or timer plugin |
 | [docs/design.md](docs/design.md) | the architecture and the decisions behind it |
 | [packages/spec/SPEC.md](packages/spec/SPEC.md) | the standard: what a bundle contains |
+| [CHANGELOG.md](CHANGELOG.md) | the versions, what each one changed, and which ones break earlier runs or bundles |
 
 ## Rules that apply to every game in this repository
 
