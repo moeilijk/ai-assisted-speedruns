@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.13.1",
+  "version": "0.14.0",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -36,7 +36,7 @@
   ],
   "scripts": {
     "check": "for f in packages/core/src/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/index.mjs games/portal/*.mjs; do node --check \"$f\" || exit 1; done",
-    "test": "node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
+    "test": "AAS_WITNESS_URL=off node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
     "portal:fetch": "node --env-file-if-exists=.env games/portal/fetch-portal-agent.mjs",
     "portal:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/portal/plugin.mjs --run-dir runs/portal-check --exercise",
     "portal:install": "node --env-file-if-exists=.env games/portal/install-game-files.mjs",

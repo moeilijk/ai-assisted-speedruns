@@ -16,6 +16,7 @@ import { resume } from "../src/resume.mjs";
 import { publish } from "../src/publish.mjs";
 import { computeTimeline } from "../src/timeline.mjs";
 import { configure } from "../src/configure.mjs";
+import { startFakeWitness } from "./fake-witness.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 process.env.CODEX_HOME = process.env.CODEX_HOME ?? mkdtempSync(join(tmpdir(), "aas-codex-home-"));
@@ -54,6 +55,12 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   process.env.AAS_PORTAL_GAME_ROOT = gameRoot;
   process.env.AAS_LIVESPLIT_PORT = String(ls.port);
   process.env.AAS_TIME_ZONE = "Europe/Amsterdam";
+  // A witness of its own, trusted through AAS_WITNESS_KEYS, and a publisher key made here: nothing reaches the archive.
+  const witness = await startFakeWitness(dirname(runDir));
+  const signKey = join(dirname(runDir), "publisher.pem");
+  writeFileSync(signKey, generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
+  const savedEnv = { AAS_WITNESS_URL: process.env.AAS_WITNESS_URL, AAS_WITNESS_KEYS: process.env.AAS_WITNESS_KEYS, AAS_SIGN_KEY: process.env.AAS_SIGN_KEY };
+  Object.assign(process.env, { AAS_WITNESS_URL: witness.url, AAS_WITNESS_KEYS: witness.keysFile, AAS_SIGN_KEY: signKey });
   let result;
   try {
     // configure first so stub-codes.json can be placed before the run
@@ -95,6 +102,13 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
       assert.equal(typeof t.modified, "boolean");
     }
     assert.equal(resumed.outcome.status, "completed");
+    const witnessed = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.witnessed"')).map((l) => JSON.parse(l).data);
+    assert.deepEqual(witnessed.map((w) => `${w.segment} ${w.phase}`), ["1 start", "1 end", "2 start", "2 end"], "the archive witnessed the start and end of both segments");
+    assert.equal(witness.statements.length, 4);
+    const stops = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"recording.stopped"'));
+    assert.equal(stops.length, 2, "each segment's recording is logged as stopped, the resumed one too");
+    assert.match(witness.statements[0], /^aas-witness v1\nphase: start\nrun_uid: [0-9a-f]{32}\nsegment: 1\ntooling: \d+\.\d+\.\d+ [0-9a-f]{40} (clean|modified)\nat: .+\nt0: .+\nkey: ssh-ed25519 \S+\nsignature: \S+$/);
+    assert.match(witness.statements[1], /\nphase: end\n[\s\S]*\nended_at: .+\nseconds: \d+(\.\d+)?\n/);
     assert.ok(spt.seen.some((m) => m.type === "cmd" && /^load aas_/.test(m.cmd)), "load sent");
   } finally {
     delete process.env.AAS_PORTAL_GAME_ROOT;
@@ -131,11 +145,23 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   // Publish → conforming.
   const outDir = join(dirname(runDir), "public");
   // Signed, because an entry says who published it; a generated PKCS#8 key needs no ssh-keygen here.
-  const signKey = join(dirname(runDir), "publisher.pem");
-  writeFileSync(signKey, generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
-  const p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
+  let p;
+  try {
+    p = await publish(runDir, outDir, { completionMarker: "Reached the end credits", signKey, log: () => {} });
+  } finally {
+    await witness.close();
+  }
+  const witnessCheck = p.check.results.find((r) => r.requirement === "witnessed");
+  assert.equal(witnessCheck.status, "met", witnessCheck.detail);
+  assert.match(witnessCheck.detail, new RegExp(`2 segment\\(s\\), start and end, receipts by ${witness.fingerprint.replace(/[+/]/g, "\\$&")}`));
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
   assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
+  // Without the test witness's key the receipts are not the archive's: the check says so.
+  for (const [k, v] of Object.entries(savedEnv)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
+  const { checkRun } = await import("../src/check-run.mjs");
+  const strange = checkRun(outDir).results.find((r) => r.requirement === "witnessed");
+  assert.equal(strange.status, "invalid");
+  assert.match(strange.detail, /not signed by a witness key of the archive/);
   assert.equal(p.summary.schema_version, 12);
   assert.deepEqual(p.summary.game.mods.map((m) => [m.name, m.details]), [["SourcePauseTool", "portal-agent's IPC patch"]], "the mod's own name, the patch in details");
   for (const m of p.summary.models) assert.deepEqual(Object.keys(m), ["model", "parts", "reasoning_effort", "context_window", "max_output_tokens", "provider"], "each model with what the runtime reported, null where it reported nothing");

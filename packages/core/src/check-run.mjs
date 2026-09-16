@@ -12,6 +12,7 @@ import path from "node:path";
 import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
+import { verifyReceipt } from "./witness-receipt.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
@@ -275,6 +276,31 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   const sig = verifyBundle(runDir);
   if (sig.signed) add("signature", sig.valid ? "met" : "invalid", sig.valid ? `valid for ${sig.fingerprint} (whose key that is, is for an archive to say)` : sig.problem ?? "invalid");
   else add("signature", "met", "not signed (optional: aas publish --sign, for a publisher who wants their bundles tied to one key)");
+  // When each segment ran, by the archive's clock (SPEC §8.9): a statement at the start and at the end of every
+  // segment, each with the archive's receipt. A bundle from before the witness has none; a receipt that is there
+  // must be the archive's and belong to this run.
+  {
+    const events = records.filter((r) => r?.kind === "event");
+    const segments = events.filter((r) => r.event === "run.started").length;
+    const runUid = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_uid ?? null; } catch { return null; } })();
+    const bad = [], seen = new Set(), keys = new Set();
+    for (const w of events.filter((r) => r.event === "run.witnessed")) {
+      const d = w.data ?? {};
+      const at = `segment ${d.segment} ${d.phase}`;
+      const v = verifyReceipt(d);
+      if (!v.valid) { bad.push(`${at}: ${v.problem}`); continue; }
+      const field = (name) => String(d.statement).split("\n").find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2) ?? null;
+      if (field("phase") !== d.phase || Number(field("segment")) !== d.segment) bad.push(`${at}: the statement says ${field("phase")} of segment ${field("segment")}`);
+      else if (runUid && field("run_uid") !== runUid) bad.push(`${at}: the statement belongs to run ${field("run_uid")}`);
+      else { seen.add(`${d.segment} ${d.phase}`); keys.add(v.fingerprint); }
+    }
+    const missing = Array.from({ length: segments }, (_, i) => ["start", "end"].map((p) => `${i + 1} ${p}`)).flat().filter((k) => !seen.has(k));
+    const why = [...new Set(events.filter((r) => r.event === "run.unwitnessed").map((r) => r.data?.reason).filter(Boolean))];
+    if (bad.length) add("witnessed", "invalid", bad.join("; "));
+    else if (!segments) add("witnessed", "unmet", "no run.started in the timeline");
+    else if (missing.length) add("witnessed", "unmet", `the archive did not witness segment ${missing.join(", ")}${why.length ? ` (${why.join("; ")})` : " (made before the witness existed)"}`);
+    else add("witnessed", "met", `${segments} segment(s), start and end, receipts by ${[...keys].join(", ")}`);
+  }
   // Reproduction: the game's build and the mods that were loaded, from the game plugin.
   try {
     const g = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).game ?? null;

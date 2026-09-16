@@ -8,6 +8,7 @@ import path from "node:path";
 import { configure } from "./configure.mjs";
 import { createEventLog, followEvents } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
+import { witnessSegment } from "./witness.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 
 /**
@@ -94,6 +95,14 @@ export function writeRecordingSegment(runDir, segment, { recorder, timer }) {
   return info;
 }
 
+/** The archive witnesses the end of a segment: its end and its length, as recording.json has them. */
+export async function witnessEnd(events, { runUid, segment, tooling, recorded, log }) {
+  const seconds = (Date.parse(recorded.ended_at) - Date.parse(recorded.t0)) / 1000;
+  const ended = await witnessSegment({ phase: "end", runUid, segment, tooling, endedAt: recorded.ended_at, seconds });
+  events.append(ended.event, ended.data);
+  if (ended.event === "run.unwitnessed") log(`the end of this segment is not witnessed: ${ended.data.reason}`);
+}
+
 export async function run(opts, { log = (t) => process.stderr.write(`[aas run] ${t}\n`) } = {}) {
   for (const k of ["runtime", "game", "run-dir"]) if (!opts[k]) throw new Error(`--${k} is required`);
   const runDir = path.resolve(opts["run-dir"]);
@@ -126,6 +135,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   await recorder.preflight(brief, plugin);
   await timer?.preflight?.(brief, plugin);
   let t0 = null;
+  const tooling = toolingIdentity();
   try {
     // The recorder may refuse after StartRecord (the game capture shows nothing): then the recording it began
     // is stopped and discarded below, like a game that fails to come up.
@@ -148,7 +158,11 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     throw error;
   }
   const goal = resolveGoal(plugin, brief.category?.goal);
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling: toolingIdentity() });
+  // The archive witnesses the start once the game is up, so a start that fails is never witnessed.
+  const started = await witnessSegment({ phase: "start", runUid: brief.run_uid, segment: 1, tooling, t0: t0.toISOString() });
+  events.append(started.event, started.data);
+  if (started.event === "run.unwitnessed") log(`the start of this segment is not witnessed: ${started.data.reason}`);
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.
@@ -204,6 +218,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds });
+  await witnessEnd(events, { runUid: brief.run_uid, segment: 1, tooling, recorded: info.segments.at(-1), log });
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify(outcome, null, 2)}\n`);
   log(`run ${outcome.status}; ${files.length} recording file(s); ${info.wall_clock_seconds} s wall clock`);
   // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is

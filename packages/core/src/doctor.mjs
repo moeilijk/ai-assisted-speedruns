@@ -6,6 +6,7 @@ import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer } from "./plugins.mjs";
+import { witnessKeyStatus } from "./witness.mjs";
 
 function probe(host, port, ms = 2500) {
   return new Promise((res) => {
@@ -22,6 +23,8 @@ export async function doctor({ game, recorder = null, timer = null, runtime = nu
   const rows = [];
   const add = (ok, what, detail = "") => rows.push({ ok, what, detail });
   add(Number(process.versions.node.split(".")[0]) >= 22, "Node 22+", process.version);
+  const key = await witnessKeyStatus();
+  add(key.ok, "publisher key known to the witness", key.detail);
   const pluginRows = async (label, loader, id, ctx) => {
     if (!id) return;
     try {

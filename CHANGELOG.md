@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.14.0 — 2026-09-16
+
+SPEC 0.33: the AAS Archive witnesses when each segment ran.
+
+- Once the game is up, and when a segment's recording has stopped, `aas run` and `aas resume` send the archive a
+  statement signed with the publisher key (`aas key`) and log its receipt as `run.witnessed`, which the published
+  timeline keeps. Without a network, a key or an answer the run goes on, logged as `run.unwitnessed`.
+- `aas check` verifies the receipts against the archive's witness keys and reports "witnessed"; a bundle without
+  receipts is not conforming.
+- `AAS_WITNESS_URL` (`off` for none; `npm test` sets it) and `AAS_WITNESS_KEYS` (another witness's keys).
+- `aas doctor` says whether the witness knows the publisher key.
+- `aas resume` logs `recording.stopped` for its segment, as `aas run` does; it was missing.
+
 ## 0.13.1 — 2026-09-16
 
 The example video description reads well on YouTube.
