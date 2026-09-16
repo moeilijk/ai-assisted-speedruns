@@ -206,7 +206,7 @@ cat <run-dir>/recording/UPLOAD.txt          # the videos you can upload, each wi
 The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares.
 Publish the video where video is published, and bind the two:
 
-1. `aas publish` prints the code `aas<16 hex>`: the start of the sha256 of this bundle's own published timeline
+1. `aas publish` prints the code `aas<32 hex>`: the first 32 hex digits of the sha256 of this bundle's own published timeline
    (`session.sanitized.jsonl`), the fingerprint. It is the same for every video of the bundle.
 2. Upload the video and put that code in the field the platform lets a viewer read: the description, or the
    title where there is none. The video is in the private run directory (`<run-dir>/recording/`, the cut is the

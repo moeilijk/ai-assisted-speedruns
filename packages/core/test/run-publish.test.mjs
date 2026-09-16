@@ -171,7 +171,7 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.equal("cli_versions" in p.summary, false);
   assert.ok(Array.isArray(p.summary.recording.videos), "the videos a runner may upload are in the bundle");
   for (const v of p.summary.recording.videos) assert.ok(v.title && v.description.trim().endsWith(v.line), "a suggested title and a description that ends on the code");
-  for (const v of p.summary.recording.videos) assert.equal(v.line, `aas${p.summary.recording.fingerprint.slice(0, 16)}`, "one code for every video, one word to copy");
+  for (const v of p.summary.recording.videos) assert.equal(v.line, `aas${p.summary.recording.fingerprint.slice(0, 32)}`, "one code for every video, one word to copy");
   assert.equal("black_intervals" in p.summary.recording, false, "what the video shows is the archive's to judge");
   assert.deepEqual(p.summary.ends, [{ id: "credits", label: "End credits", final: true }], "the game's ends as the plugin declares them");
   assert.deepEqual(p.summary.category.goal_end, { id: "credits", label: "End credits", final: true });

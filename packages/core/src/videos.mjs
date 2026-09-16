@@ -12,10 +12,14 @@ export const viewerLabel = (label) => String(label).replace(/\s*\([^)]*\)\s*$/, 
 /** The line a video's description carries up to schema 13: the run, the bundle's fingerprint, and that video's length in whole seconds. */
 export const videoLine = (runId, fingerprint, seconds) => `AAS ${runId} · fingerprint ${String(fingerprint ?? "").slice(0, 16)} · ${Math.round(seconds)} s`;
 
-/** From schema 14: one code for every video of a revision, "aas" and the fingerprint's first 16 hex, one word to copy (owner 16-09). */
+/**
+ * From schema 14: one code for every video of a revision, "aas" and the fingerprint's first 32 hex, one word to copy
+ * (owner 16-09). 32 hex is 128 bits: a bundle whose fingerprint starts the same takes about 2^128 hashes to make.
+ */
 export const CODE_SCHEMA = 14;
-export const videoCode = (fingerprint) => `aas${String(fingerprint ?? "").slice(0, 16).toLowerCase()}`;
-/** What a video of a bundle with this schema carries: the code from schema 14, the line before it. */
+export const CODE_HEX = 32;
+export const videoCode = (fingerprint) => `aas${String(fingerprint ?? "").slice(0, CODE_HEX).toLowerCase()}`;
+/** What a video of a bundle with this schema carries: the code from schema 14, the line before it. `fingerprint` is the whole one. */
 export const bindingLine = (schema, runId, fingerprint, seconds) => (schema >= CODE_SCHEMA ? videoCode(fingerprint) : videoLine(runId, fingerprint, seconds));
 /** Whether a description holds the code as a word of its own. */
 export const hasCode = (text, code) => new RegExp(`(^|[^a-z0-9])${code}($|[^a-z0-9])`, "i").test(String(text ?? ""));

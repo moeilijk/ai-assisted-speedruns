@@ -17,8 +17,9 @@ them carries `harness.version` 0.1.0.
 SPEC 0.36, schema 14: one code to copy (owner 16-09: lines with spaces, special characters and capitals make
 copying error-prone).
 
-- Every video of a revision carries the same code, `aas` and the first 16 hex digits of the fingerprint, in
-  lowercase and without separators: `aas36d633208676bfdb`. It replaces the line with run id, fingerprint and
+- Every video of a revision carries the same code, `aas` and the first 32 hex digits of the fingerprint, in
+  lowercase and without separators: `aas36d633208676bfdb5e1c0a47b93f2d8e`. 32 hex is 128 bits: making a bundle whose fingerprint starts
+  the same takes about 2^128 hashes; 16 hex (2^64) is within reach of about 1000 rented GPUs in ten days. It replaces the line with run id, fingerprint and
   length; the archive measures a video's length itself and holds it against the lengths in the bundle, which stay.
 - `aas check` requires the code in each video's description as a word of its own. A bundle of schema 8 to 13 keeps
   its line, and a video that carries it stays bound to that bundle.

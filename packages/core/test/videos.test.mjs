@@ -33,18 +33,18 @@ test("a run in one file lists the whole recording and the cut", () => {
 });
 
 test("from schema 14 every video of a revision carries one code, one word to copy; an older bundle keeps its lines", () => {
-  const args = { runId: "portal-02", fingerprint: "BC91C3B4666F43A9ffff", durationSeconds: 632, files: ["recording/AAS_portal-02_1.mp4", "recording/AAS_portal-02_2.mp4"], timeline };
+  const args = { runId: "portal-02", fingerprint: "BC91C3B4666F43A9ffff0123456789abcdef", durationSeconds: 632, files: ["recording/AAS_portal-02_1.mp4", "recording/AAS_portal-02_2.mp4"], timeline };
   assert.deepEqual(recordingVideos({ ...args, schema: 14 }).map((v) => [v.kind, v.seconds, v.line]), [
-    ["segment", 302.936, "aasbc91c3b4666f43a9"], ["segment", 328.585, "aasbc91c3b4666f43a9"], ["cut", 199.354, "aasbc91c3b4666f43a9"],
+    ["segment", 302.936, "aasbc91c3b4666f43a9ffff0123456789ab"], ["segment", 328.585, "aasbc91c3b4666f43a9ffff0123456789ab"], ["cut", 199.354, "aasbc91c3b4666f43a9ffff0123456789ab"],
   ], "the lengths stay in the bundle; the archive measures the video");
   assert.equal(recordingVideos({ ...args, schema: 13 })[2].line, "AAS portal-02 · fingerprint BC91C3B4666F43A9 · 199 s");
-  assert.equal(videoCode("bc91c3b4666f43a9ffff"), "aasbc91c3b4666f43a9");
+  assert.equal(videoCode("bc91c3b4666f43a9ffff0123456789abcdef"), "aasbc91c3b4666f43a9ffff0123456789ab", "the first 32 hex, 128 bits");
 });
 
 test("the code counts only as a word of its own", () => {
-  const code = "aasbc91c3b4666f43a9";
+  const code = "aasbc91c3b4666f43a9ffff0123456789ab";
   for (const text of [code, `Verification line for the AAS Archive:\n${code}`, `code: ${code}.`, `(${code})`]) assert.ok(hasCode(text, code), text);
-  for (const text of [`${code}0`, `x${code}`, "aasbc91c3b4666f43a", "", undefined]) assert.ok(!hasCode(text, code), String(text));
+  for (const text of [`${code}0`, `x${code}`, "aasbc91c3b4666f43a9ffff0123456789a", "", undefined]) assert.ok(!hasCode(text, code), String(text));
 });
 
 test("viewer labels drop the save name and the resumed session's details", () => {

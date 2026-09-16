@@ -223,7 +223,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
               if (typeof v.seconds !== "number" || !(v.seconds > 0)) { problems.push(`${at}.seconds must be a positive number`); return; }
               // Up to schema 13 a line with the run, the fingerprint and the video's length; from 14 one code for every video.
               const code = summary.schema_version >= CODE_SCHEMA;
-              const line = bindingLine(summary.schema_version, summary.run_id, fp, v.seconds);
+              const line = bindingLine(summary.schema_version, summary.run_id, summary.recording?.fingerprint, v.seconds);
               if (v.line !== line) problems.push(`${at}.line is "${v.line}", expected "${line}"`);
               if (!Array.isArray(v.chapters) || !v.chapters.every((c) => typeof c?.at === "number" && c.at >= 0 && typeof c?.label === "string")) problems.push(`${at}.chapters must list { at, label }`);
               // Schema 9: a suggested title and description per video, examples the runner may change; the description
