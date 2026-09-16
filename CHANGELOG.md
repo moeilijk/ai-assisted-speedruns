@@ -12,6 +12,10 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.18.1 — 2026-09-16
+
+- Portal's goal is "Credits" again, as in the text the owner approved ("stopped before the credits").
+
 ## 0.18.0 — 2026-09-16
 
 SPEC 0.37: the example video texts in the wording the owner approved on 2026-09-16 for the cut of portal-02.

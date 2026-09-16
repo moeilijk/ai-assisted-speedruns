@@ -173,8 +173,8 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   for (const v of p.summary.recording.videos) assert.ok(v.title && v.description.trim().endsWith(v.line), "a suggested title and a description that ends on the code");
   for (const v of p.summary.recording.videos) assert.equal(v.line, `aas${p.summary.recording.fingerprint.slice(0, 32)}`, "one code for every video, one word to copy");
   assert.equal("black_intervals" in p.summary.recording, false, "what the video shows is the archive's to judge");
-  assert.deepEqual(p.summary.ends, [{ id: "credits", label: "End credits", final: true }], "the game's ends as the plugin declares them");
-  assert.deepEqual(p.summary.category.goal_end, { id: "credits", label: "End credits", final: true });
+  assert.deepEqual(p.summary.ends, [{ id: "credits", label: "Credits", final: true }], "the game's ends as the plugin declares them");
+  assert.deepEqual(p.summary.category.goal_end, { id: "credits", label: "Credits", final: true });
   assert.equal(p.summary.goals.length, 1);
   assert.equal(p.summary.goals[0].id, "credits");
   assert.equal(p.summary.goals[0].reached_at !== null, true);

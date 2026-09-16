@@ -84,7 +84,7 @@ export default {
   // Segment names for the timer / splits file: one per chamber.
   segments: SPLITS,
   /** The game's one end: the credits; the completion marker in the agent's messages marks it for now. */
-  ends: [{ id: "credits", label: "End credits", final: true }],
+  ends: [{ id: "credits", label: "Credits", final: true }],
   /** Everything someone needs to reproduce this run: the game build, the in-game tooling with its pin, and the settings. */
   async build() {
     return {
