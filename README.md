@@ -4,6 +4,12 @@ The tooling for **AI Assisted Speedruns**: an LLM agent plays a game through a s
 
 The agent only ever sees three tools per game: `<game>_documentation`, `<game>_screenshot`, `<game>_exec`. Inspired by cozyblaze's Portal run: that tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent).
 
+## Status: pre-release
+
+Versions 0.x are pre-releases, for testing the setup: installing the tooling, recording a run and publishing a
+bundle. They may break with the live version (1.0.0) of the tooling and the AAS Archive, and probably will. What
+each version changed is in [CHANGELOG.md](CHANGELOG.md).
+
 ## What is in this repository
 
 ```
