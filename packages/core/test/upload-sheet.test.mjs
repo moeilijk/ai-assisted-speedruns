@@ -72,6 +72,21 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(readFileSync(writeUploadSheet(runDir), "utf8").includes("This run is an example."), "bundle and note are remembered");
 });
 
+test("from schema 14 the sheet gives one code for every video", () => {
+  const root = mkdtempSync(join(tmpdir(), "aas-sheet-code-"));
+  const runDir = join(root, "run-01");
+  const bundle = join(root, "public", "run-01");
+  mkdirSync(join(runDir, "recording"), { recursive: true });
+  mkdirSync(bundle, { recursive: true });
+  writeFileSync(join(bundle, "timeline.json"), JSON.stringify({ segments: [{ index: 0, offset: 0, seconds: 30, file: "recording/a.mp4" }], sections: [], keep: [[0, 10]], totals: { cut_video: 10 }, cut_chapters: [] }));
+  writeFileSync(join(bundle, "summary.json"), JSON.stringify({ schema_version: 14, run_id: "run-01", models: [], category: {}, recording: { fingerprint: "0123456789abcdefffff", duration_seconds: 30, files: ["recording/a.mp4"] } }));
+  const sheet = readFileSync(writeUploadSheet(runDir, { bundleDir: bundle }), "utf8");
+  assert.match(sheet, /contains the code aas0123456789abcdef \(or its title/);
+  assert.match(sheet, /the same for every video of this revision/);
+  assert.equal(sheet.match(/ {2}code: {2}aas0123456789abcdef\n/g).length, 2, "the whole recording and the cut");
+  assert.ok(!sheet.includes(" · "), "no line with separators");
+});
+
 test("a cut rendered before this revision is marked out of date: its line would not match it", { skip: spawnSync("ffmpeg", ["-version"]).status !== 0 && "no ffmpeg" }, () => {
   const root = mkdtempSync(join(tmpdir(), "aas-sheet-stale-"));
   const runDir = join(root, "run-01");

@@ -21,7 +21,7 @@ import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
-import { recordingVideos } from "./videos.mjs";
+import { CODE_SCHEMA, bindingLine, recordingVideos } from "./videos.mjs";
 import { withVideoTexts } from "./youtube-text.mjs";
 import { BUNDLE_VERSION, SUMMARY_SCHEMA } from "./versions.mjs";
 
@@ -36,7 +36,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.35";
+export const SPEC_VERSION = "0.36";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -266,7 +266,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     ? { shown: shown[0], keys: shown[0] && readRunEvents(runDir).some((e) => e.event === "game.playback" && e.data?.phase === "start" && (e.data?.steps ?? []).length > 0) }
     : null;
   summary.recording.videos = withVideoTexts(
-    recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline }),
+    recordingVideos({ runId: summary.run_id, fingerprint, durationSeconds: duration, files: summary.recording.files, timeline, schema: summary.schema_version }),
     summary, { archiveUrl: ARCHIVE_URL, note: previous.upload_note ?? null },
   );
   fs.writeFileSync(summaryFile, `${JSON.stringify(summary, null, 2)}\n`);
@@ -307,14 +307,14 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // The upload file: only a bundle the scan cleared is packed.
   const zip = packBundle(outDir);
   log(`${path.basename(zip.file)}: ${zip.files} files, ${Math.round(zip.bytes / 1024)} kB (the recording is published separately, not packed)`);
-  // The videos the runner uploads (the cut, the full recording per segment, or both) and the line each one's description
-  // must contain, with that video's length, are in one file next to the videos, in the private run directory.
+  // The videos the runner uploads (the cut, the full recording per segment, or both) and the code each one's description
+  // must contain are in one file next to the videos, in the private run directory.
   const { writeUploadSheet } = await import("./upload-sheet.mjs");
   const uploadSheet = writeUploadSheet(runDir, { bundleDir: outDir, log });
   if (fingerprint) {
     log("");
-    log(`Every video you upload needs its line in its description: ${descriptionLine(summary)} (the seconds are that video's length).`);
-    log(`The videos, their lines and their chapters: ${uploadSheet}`);
+    log(`Every video you upload needs this code in its description: ${descriptionLine(summary)}`);
+    log(`The videos, their code and their chapters: ${uploadSheet}`);
     log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/.`);
     log("");
   }
@@ -372,9 +372,13 @@ export function packBundle(outDir, { zipFile = `${outDir}.zip` } = {}) {
   return { file: zipFile, bytes: buf.length, files: entries.length };
 }
 
-/** The line an uploaded video's description carries, so the video names the bundle it belongs to; `seconds` is that video's length. */
+/**
+ * What an uploaded video's description carries, so the video names the bundle it belongs to: from schema 14 the code,
+ * the same for every video; before that the line with `seconds`, that video's length.
+ */
 export function descriptionLine(summary, seconds = summary.recording?.duration_seconds) {
   const id = summary.run_id ?? summary.category?.game ?? "run";
+  if ((summary.schema_version ?? 0) >= CODE_SCHEMA) return bindingLine(summary.schema_version, id, summary.recording?.fingerprint);
   return `AAS ${id} · fingerprint ${String(summary.recording?.fingerprint ?? "").slice(0, 16)} · ${seconds ?? "?"} s`;
 }
 

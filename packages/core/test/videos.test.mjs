@@ -1,7 +1,7 @@
 // The videos a runner may upload, as the bundle lists them (summary.recording.videos, schema 8).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { recordingVideos, viewerLabel } from "../src/videos.mjs";
+import { hasCode, recordingVideos, videoCode, viewerLabel } from "../src/videos.mjs";
 import { momentLabel, videoDescription, videoMoments, videoTitle, youtubeChapters } from "../src/youtube-text.mjs";
 import { modelDisplayName } from "../src/models.mjs";
 
@@ -30,6 +30,21 @@ test("a run in one file lists the whole recording and the cut", () => {
   const one = { ...timeline, segments: [timeline.segments[0]], sections: [timeline.sections[0]] };
   const videos = recordingVideos({ runId: "portal-01", fingerprint: "a6dbe5f577346982", durationSeconds: 1356, files: ["recording/AAS_portal-01.mp4"], timeline: one });
   assert.deepEqual(videos.map((v) => [v.kind, v.seconds, v.line]), [["whole", 1356, "AAS portal-01 · fingerprint a6dbe5f577346982 · 1356 s"], ["cut", 199.354, "AAS portal-01 · fingerprint a6dbe5f577346982 · 199 s"]]);
+});
+
+test("from schema 14 every video of a revision carries one code, one word to copy; an older bundle keeps its lines", () => {
+  const args = { runId: "portal-02", fingerprint: "BC91C3B4666F43A9ffff", durationSeconds: 632, files: ["recording/AAS_portal-02_1.mp4", "recording/AAS_portal-02_2.mp4"], timeline };
+  assert.deepEqual(recordingVideos({ ...args, schema: 14 }).map((v) => [v.kind, v.seconds, v.line]), [
+    ["segment", 302.936, "aasbc91c3b4666f43a9"], ["segment", 328.585, "aasbc91c3b4666f43a9"], ["cut", 199.354, "aasbc91c3b4666f43a9"],
+  ], "the lengths stay in the bundle; the archive measures the video");
+  assert.equal(recordingVideos({ ...args, schema: 13 })[2].line, "AAS portal-02 · fingerprint BC91C3B4666F43A9 · 199 s");
+  assert.equal(videoCode("bc91c3b4666f43a9ffff"), "aasbc91c3b4666f43a9");
+});
+
+test("the code counts only as a word of its own", () => {
+  const code = "aasbc91c3b4666f43a9";
+  for (const text of [code, `Verification line for the AAS Archive:\n${code}`, `code: ${code}.`, `(${code})`]) assert.ok(hasCode(text, code), text);
+  for (const text of [`${code}0`, `x${code}`, "aasbc91c3b4666f43a", "", undefined]) assert.ok(!hasCode(text, code), String(text));
 });
 
 test("viewer labels drop the save name and the resumed session's details", () => {

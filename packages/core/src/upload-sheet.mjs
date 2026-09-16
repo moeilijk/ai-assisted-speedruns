@@ -1,12 +1,13 @@
 // `aas upload-sheet <run-dir>`: what it takes to upload the run's videos to a video site, in one plain-text file next to
 // them: <run-dir>/recording/UPLOAD.txt. The runner uploads the cut, the full recording (one video per segment of a
-// resumed run), or both; per video the file, its length, the line its description must contain, and its chapters; then
+// resumed run), or both; per video the file, its length, the code (before schema 14: the line) its description must
+// contain, and its chapters; then
 // an example title and description. `aas publish` and `aas render` write it.
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ARCHIVE_URL } from "./plugins.mjs";
-import { formatDuration, recordingVideos } from "./videos.mjs";
+import { CODE_SCHEMA, formatDuration, recordingVideos, videoCode } from "./videos.mjs";
 import { withVideoTexts } from "./youtube-text.mjs";
 
 export const UPLOAD_SHEET = path.join("recording", "UPLOAD.txt");
@@ -63,9 +64,10 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
   // The videos the runner may upload, with their suggested title and description, as the bundle lists them; for an
   // older bundle the tooling lists them the same way.
   const listed = s.recording?.videos?.every((v) => v.title && v.description) ? s.recording.videos
-    : withVideoTexts(s.recording?.videos ?? recordingVideos({ runId: id, fingerprint: s.recording?.fingerprint, durationSeconds: s.recording?.duration_seconds, files: s.recording?.files ?? [], timeline }), s, { archiveUrl: ARCHIVE_URL, note: uploadNote });
+    : withVideoTexts(s.recording?.videos ?? recordingVideos({ runId: id, fingerprint: s.recording?.fingerprint, durationSeconds: s.recording?.duration_seconds, files: s.recording?.files ?? [], timeline, schema: s.schema_version ?? 0 }), s, { archiveUrl: ARCHIVE_URL, note: uploadNote });
   const videos = listed.map((v) => ({ ...v, abs: v.file ? path.join(runDir, v.file) : null }));
   const whole = (x) => formatDuration(x, { whole: true });
+  const code = (s.schema_version ?? 0) >= CODE_SCHEMA;
   const rule = "-".repeat(78);
   const one = (v) => {
     const made = v.abs && fs.existsSync(v.abs);
@@ -80,7 +82,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
       what,
       `  ${shownPath(v.abs ?? "")}${!made ? `   (not made yet: aas render ${runDir})` : stale ? `   (out of date: this file is ${whole(actual)}, this revision's cut is ${whole(v.seconds)}; aas render ${runDir})` : ""}`,
       `  ${whole(v.seconds)}`,
-      `  line:  ${v.line}`,
+      code ? `  code:  ${v.line}` : `  line:  ${v.line}`,
       "",
       `  Title: ${v.title}`,
       "",
@@ -94,10 +96,17 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     `Video upload: ${id}`,
     "",
     "Upload the cut video, the full recording, or both: that is the runner's choice.",
-    "REQUIRED: the description of every uploaded video contains that video's line (or its title, where a site has no",
-    "description). That is the only requirement. A line of its own keeps it easy to find.",
-    "The fingerprint is the start of the sha256 of the run's published timeline; the seconds are that video's length.",
-    "Each video below has a suggested title and description, ending on its line: use, change or leave them out.",
+    ...(code ? [
+      `REQUIRED: the description of every uploaded video contains the code ${videoCode(s.recording?.fingerprint)} (or its title, where a`,
+      "site has no description). That is the only requirement. The code is the same for every video of this revision.",
+      "It is \"aas\" and the start of the sha256 of the run's published timeline; the archive measures each video's length.",
+      "Each video below has a suggested title and description, ending on the code: use, change or leave them out.",
+    ] : [
+      "REQUIRED: the description of every uploaded video contains that video's line (or its title, where a site has no",
+      "description). That is the only requirement. A line of its own keeps it easy to find.",
+      "The fingerprint is the start of the sha256 of the run's published timeline; the seconds are that video's length.",
+      "Each video below has a suggested title and description, ending on its line: use, change or leave them out.",
+    ]),
     "The run's page in the archive exists once the archive has accepted the run and put it online.",
     "",
     ...[...videos.filter((v) => v.kind === "cut"), ...videos.filter((v) => v.kind !== "cut")].flatMap(one),

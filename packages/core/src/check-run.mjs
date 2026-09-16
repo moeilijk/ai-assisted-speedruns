@@ -13,7 +13,7 @@ import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
 import { verifyReceipt } from "./witness-receipt.mjs";
-import { formatDuration } from "./videos.mjs";
+import { CODE_SCHEMA, bindingLine, formatDuration, hasCode, videoCode } from "./videos.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
@@ -221,14 +221,17 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
               if (!["whole", "segment", "cut"].includes(v?.kind)) { problems.push(`${at}.kind "${v?.kind}" is not whole, segment or cut`); return; }
               if (typeof v.file !== "string" || !v.file) problems.push(`${at}.file missing`);
               if (typeof v.seconds !== "number" || !(v.seconds > 0)) { problems.push(`${at}.seconds must be a positive number`); return; }
-              const line = `AAS ${summary.run_id} · fingerprint ${fp} · ${Math.round(v.seconds)} s`;
+              // Up to schema 13 a line with the run, the fingerprint and the video's length; from 14 one code for every video.
+              const code = summary.schema_version >= CODE_SCHEMA;
+              const line = bindingLine(summary.schema_version, summary.run_id, fp, v.seconds);
               if (v.line !== line) problems.push(`${at}.line is "${v.line}", expected "${line}"`);
               if (!Array.isArray(v.chapters) || !v.chapters.every((c) => typeof c?.at === "number" && c.at >= 0 && typeof c?.label === "string")) problems.push(`${at}.chapters must list { at, label }`);
               // Schema 9: a suggested title and description per video, examples the runner may change; the description
               // carries the line, which is the only requirement.
               if (summary.schema_version >= 9) {
                 if (typeof v.title !== "string" || !v.title) problems.push(`${at}.title missing (schema 9)`);
-                if (typeof v.description !== "string" || !v.description.includes(line)) problems.push(`${at}.description must contain its line "${line}" (schema 9)`);
+                if (code && !hasCode(v.description, line)) problems.push(`${at}.description must contain the code ${line} as a word of its own (schema 14)`);
+                else if (!code && (typeof v.description !== "string" || !v.description.includes(line))) problems.push(`${at}.description must contain its line "${line}" (schema 9)`);
               }
               const expected = v.kind === "whole" ? summary.recording?.duration_seconds
                 : v.kind === "segment" ? t?.segments?.[v.part - 1]?.seconds
@@ -319,7 +322,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   // judged on a missing link.
   // What binds a recording to this bundle: the description of the video must carry this fingerprint and the
   // duration must match. A platform re-encodes the file, so its hash cannot do this.
-  const runId = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_id ?? null; } catch { return null; } })();
+  const { runId, schemaVersion } = (() => { try { const x = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")); return { runId: x.run_id ?? null, schemaVersion: x.schema_version ?? 0 }; } catch { return { runId: null, schemaVersion: 0 }; } })();
   // The runner uploads the full recording (one video per segment of a resumed run), the cut, or both: each video's
   // length is one of these. timeline.json carries the segments and the cut list.
   const lengths = (() => {
@@ -335,7 +338,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   })();
   add("recording bound to this bundle", rec?.fingerprint ? "met" : "unmet",
     rec?.fingerprint
-      ? `each uploaded video's description (or title, where a platform has no description) must contain "AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"${lengths.length ? `, and its length must be about ${lengths.join(", or ")}` : ""}`
+      ? `each uploaded video's description (or title, where a platform has no description) must contain ${schemaVersion >= CODE_SCHEMA ? `the code ${videoCode(rec.fingerprint)}` : `"AAS ${runId ?? "?"} · fingerprint ${String(rec.fingerprint).slice(0, 16)}"`}${lengths.length ? `, and its length must be about ${lengths.join(", or ")}` : ""}`
       : "summary.recording has no fingerprint: nothing ties the published recording to this bundle");
   if (exists("run.jsonl")) add("run.jsonl not published", "unmet", "private log present in the run directory; do not publish it");
 

@@ -200,23 +200,22 @@ itself. `--keep-open` leaves them open. A stopped run continues with `aas resume
 aas timeline <run-dir>                      # RTA, IGT, sections, attempts, cut list, subtitles
 aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thinking pauses
 aas publish <run-dir> <public-dir>          # the bundle + the upload zip + recording/UPLOAD.txt
-cat <run-dir>/recording/UPLOAD.txt          # the videos you can upload, each with its line and chapters
+cat <run-dir>/recording/UPLOAD.txt          # the videos you can upload, each with its code and chapters
 ```
 
 The recording is not part of the bundle, and neither is its link: gigabyte files are not what anyone shares.
 Publish the video where video is published, and bind the two:
 
-1. `aas publish` prints the line `AAS <run-id> · fingerprint <16 hex> · <n> s`. The fingerprint is the
-   sha256 of this bundle's own published timeline (`session.sanitized.jsonl`); `n` is the length of the video the
-   line goes with.
-2. Upload the video and put that line in the field the platform lets a viewer read: the description, or the
+1. `aas publish` prints the code `aas<16 hex>`: the start of the sha256 of this bundle's own published timeline
+   (`session.sanitized.jsonl`), the fingerprint. It is the same for every video of the bundle.
+2. Upload the video and put that code in the field the platform lets a viewer read: the description, or the
    title where there is none. The video is in the private run directory (`<run-dir>/recording/`, the cut is the
    `.cut.mp4`), not in the public folder; `<run-dir>/recording/UPLOAD.txt` lists the cut and the full recording (one
-   video per segment): upload either or both, each with its own line, which carries that video's length.
+   video per segment): upload either or both, each with the code.
 3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). The bundle carries no links.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
-duration, and a few tool calls spot-checked at their `elapsed_seconds`.
+video's length against the lengths the bundle states, and a few tool calls spot-checked at their `elapsed_seconds`.
 
 ```bash
 aas check --strict <public-dir>.zip # the conformance check of the upload zip (the directory works too)

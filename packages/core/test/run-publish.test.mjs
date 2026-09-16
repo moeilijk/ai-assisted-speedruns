@@ -162,7 +162,7 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const strange = checkRun(outDir).results.find((r) => r.requirement === "witnessed");
   assert.equal(strange.status, "invalid");
   assert.match(strange.detail, /not signed by a witness key of the archive/);
-  assert.equal(p.summary.schema_version, 13);
+  assert.equal(p.summary.schema_version, 14);
   assert.deepEqual(p.summary.recording.overlay, { shown: false, keys: false }, "no --overlay-port in this run: the picture has no overlay, and the text does not describe one");
   assert.ok(p.summary.recording.videos.every((v) => !/Bottom left/.test(v.description)));
   assert.deepEqual(p.summary.game.mods.map((m) => [m.name, m.details]), [["SourcePauseTool", "portal-agent's IPC patch"]], "the mod's own name, the patch in details");
@@ -170,8 +170,8 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.ok(Array.isArray(p.summary.harness.plugins.runtime.cli_versions), "the runtime CLI's versions, apart from the plugin's version");
   assert.equal("cli_versions" in p.summary, false);
   assert.ok(Array.isArray(p.summary.recording.videos), "the videos a runner may upload are in the bundle");
-  for (const v of p.summary.recording.videos) assert.ok(v.title && v.description.trim().endsWith(v.line), "a suggested title and a description that ends on the line");
-  for (const v of p.summary.recording.videos) assert.match(v.line, new RegExp(`^AAS ${p.summary.run_id} · fingerprint ${p.summary.recording.fingerprint.slice(0, 16)} · \\d+ s$`));
+  for (const v of p.summary.recording.videos) assert.ok(v.title && v.description.trim().endsWith(v.line), "a suggested title and a description that ends on the code");
+  for (const v of p.summary.recording.videos) assert.equal(v.line, `aas${p.summary.recording.fingerprint.slice(0, 16)}`, "one code for every video, one word to copy");
   assert.equal("black_intervals" in p.summary.recording, false, "what the video shows is the archive's to judge");
   assert.deepEqual(p.summary.ends, [{ id: "credits", label: "End credits", final: true }], "the game's ends as the plugin declares them");
   assert.deepEqual(p.summary.category.goal_end, { id: "credits", label: "End credits", final: true });

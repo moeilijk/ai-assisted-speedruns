@@ -9,8 +9,16 @@
  */
 export const viewerLabel = (label) => String(label).replace(/\s*\([^)]*\)\s*$/, "").replace(/ from save \S+/, "");
 
-/** The line a video's description carries: the run, the bundle's fingerprint, and that video's length in whole seconds. */
+/** The line a video's description carries up to schema 13: the run, the bundle's fingerprint, and that video's length in whole seconds. */
 export const videoLine = (runId, fingerprint, seconds) => `AAS ${runId} · fingerprint ${String(fingerprint ?? "").slice(0, 16)} · ${Math.round(seconds)} s`;
+
+/** From schema 14: one code for every video of a revision, "aas" and the fingerprint's first 16 hex, one word to copy (owner 16-09). */
+export const CODE_SCHEMA = 14;
+export const videoCode = (fingerprint) => `aas${String(fingerprint ?? "").slice(0, 16).toLowerCase()}`;
+/** What a video of a bundle with this schema carries: the code from schema 14, the line before it. */
+export const bindingLine = (schema, runId, fingerprint, seconds) => (schema >= CODE_SCHEMA ? videoCode(fingerprint) : videoLine(runId, fingerprint, seconds));
+/** Whether a description holds the code as a word of its own. */
+export const hasCode = (text, code) => new RegExp(`(^|[^a-z0-9])${code}($|[^a-z0-9])`, "i").test(String(text ?? ""));
 
 const ms = (x) => Math.round(x * 1000) / 1000;
 
@@ -41,8 +49,10 @@ export const youtubeTime = (seconds) => {
  * @param durationSeconds summary.recording.duration_seconds, the whole recording
  * @param files summary.recording.files, the raw recording files relative to the run directory
  * @param timeline the published timeline.json (segments, sections, keep, cut_chapters, totals.cut_video)
+ * @param schema the bundle's summary schema, which decides between the line and the code
  */
-export function recordingVideos({ runId, fingerprint, durationSeconds, files = [], timeline = null }) {
+export function recordingVideos({ runId, fingerprint, durationSeconds, files = [], timeline = null, schema = 0 }) {
+  const videoLine = (id, fp, seconds) => bindingLine(schema, id, fp, seconds);
   const raw = files.filter((f) => !/\.cut\.mp4$/i.test(f));
   const segments = timeline?.segments?.length ? timeline.segments : raw.map((file, index) => ({ index, file, offset: 0, seconds: null }));
   const sections = timeline?.sections ?? [];

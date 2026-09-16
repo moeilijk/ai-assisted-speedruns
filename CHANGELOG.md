@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.17.0 — 2026-09-16
+
+SPEC 0.36, schema 14: one code to copy (owner 16-09: lines with spaces, special characters and capitals make
+copying error-prone).
+
+- Every video of a revision carries the same code, `aas` and the first 16 hex digits of the fingerprint, in
+  lowercase and without separators: `aas36d633208676bfdb`. It replaces the line with run id, fingerprint and
+  length; the archive measures a video's length itself and holds it against the lengths in the bundle, which stay.
+- `aas check` requires the code in each video's description as a word of its own. A bundle of schema 8 to 13 keeps
+  its line, and a video that carries it stays bound to that bundle.
+- The upload sheet and `aas publish` give the code.
+
 ## 0.16.0 — 2026-09-16
 
 SPEC 0.35: durations in ISO 8601 (owner 16-09: "the international standard everyone understands").

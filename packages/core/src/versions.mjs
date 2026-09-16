@@ -2,7 +2,7 @@
 // in a server or in a browser.
 
 /** The summary.json schemas the checker reads. */
-export const SUMMARY_SCHEMAS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13];
+export const SUMMARY_SCHEMAS = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
 /** The bundle packagings the checker reads (`bundle.bundle_version`). */
 export const BUNDLE_VERSIONS = [1];
 /** Tooling releases after which a run may not simply go on with the new release (CHANGELOG.md, BREAKING). */
