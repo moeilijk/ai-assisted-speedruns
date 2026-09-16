@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.12.0 — 2026-09-16
+
+SPEC 0.31: a run keeps the tool interface it started with.
+
+- `aas resume` refuses, before anything starts, when the installed tooling or game plugin would serve the agent other
+  tools or documentation than the run's `tools.json` and `documentation.md`; the run directory is left as it was.
+  Resume such a run with the release it started with.
+- The broker does not serve a run whose `tools.json` or `documentation.md` differs from what it would serve;
+  `--check-interface` only compares.
+
 ## 0.11.0 — 2026-09-16
 
 Summary schema 12, SPEC 0.30: mod details. The tooling reports its version as 0.11.0.

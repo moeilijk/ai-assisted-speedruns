@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, readdirSync, existsSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -20,10 +20,10 @@ function call(id, name, args = {}) {
   return rpc(id, "tools/call", { name, arguments: args });
 }
 
-async function runBroker(lines, runDir) {
+async function runBroker(lines, runDir, args = []) {
   const child = spawn(
     process.execPath,
-    ["--permission", `--allow-fs-read=${core}`, `--allow-fs-write=${runDir}`, broker],
+    ["--permission", `--allow-fs-read=${core}`, `--allow-fs-read=${runDir}`, `--allow-fs-write=${runDir}`, broker, ...args],
     {
       env: {
         SECRET_TOKEN: "must-not-leak",
@@ -95,4 +95,21 @@ test("broker exposes three tools, sandboxes exec, and logs to the run directory"
   assert.ok(log.every((r) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/.test(r.timestamp)));
   assert.deepEqual(readdirSync(join(runDir, "screenshots")).sort(), ["call-00002-1.png", "call-00003-1.png"]);
   assert.ok(log.some((r) => r.kind === "tool_result" && r.output[0].path === "screenshots/call-00002-1.png"));
+});
+
+test("a later session serves the run's own tools and documentation, or none", async () => {
+  const runDir = mkdtempSync(join(tmpdir(), "aas-broker-interface-"));
+  const list = [rpc(1, "initialize", { protocolVersion: "2025-06-18" }), rpc(2, "tools/list")];
+  assert.equal((await runBroker([], runDir, ["--check-interface"])).code, 0, "nothing written yet");
+  assert.equal((await runBroker(list, runDir)).code, 0);
+  const tools = readFileSync(join(runDir, "tools.json"), "utf8");
+  assert.equal((await runBroker([], runDir, ["--check-interface"])).code, 0, "the same interface");
+  writeFileSync(join(runDir, "tools.json"), tools.replace("Screenshots are returned", "Images are returned"));
+  const check = await runBroker([], runDir, ["--check-interface"]);
+  assert.equal(check.code, 1);
+  assert.match(check.stderr, /other tools\.json than the run started with/);
+  const served = await runBroker(list, runDir);
+  assert.notEqual(served.code, 0, "the broker does not serve another interface");
+  assert.equal(served.responses.size, 0);
+  assert.equal(readFileSync(join(runDir, "tools.json"), "utf8"), tools.replace("Screenshots are returned", "Images are returned"), "the run's file is left as it is");
 });

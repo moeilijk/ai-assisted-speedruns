@@ -74,6 +74,17 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
     assert.equal(result.outcome.status, "stopped");
     // Resume from the last save: second recording segment, run.human, new playbacks.
     writeFileSync(join(runDir, "stub-codes-resume.json"), JSON.stringify(["const t = portal.tas(); t.hold(67, { forward: true }); return (await t.run()).ticks"]));
+    // Tooling that would serve the agent other documentation than its earlier session had does not resume the run,
+    // and leaves the run directory as it was.
+    const documentation = readFileSync(join(runDir, "documentation.md"), "utf8");
+    const brief = readFileSync(join(runDir, "brief.json"), "utf8");
+    const log = readFileSync(join(runDir, "run.jsonl"), "utf8");
+    writeFileSync(join(runDir, "documentation.md"), `${documentation}An older description.\n`);
+    await assert.rejects(resume({ "run-dir": runDir, recorder: "source-demo", timer: "livesplit", "no-autosave": true, "keep-open": true }, { log: () => {} }),
+      /cannot be resumed with the installed tooling: this broker would serve other documentation\.md than the run started with/);
+    assert.equal(readFileSync(join(runDir, "brief.json"), "utf8"), brief);
+    assert.equal(readFileSync(join(runDir, "run.jsonl"), "utf8"), log);
+    writeFileSync(join(runDir, "documentation.md"), documentation);
     const resumed = await resume({ "run-dir": runDir, recorder: "source-demo", timer: "livesplit", "no-autosave": true, "keep-open": true }, { log: () => {} });
     assert.equal(resumed.segment, 2);
     assert.equal(resumed.outcome.status, "completed");

@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.30
+# AI Assisted Speedruns (AAS) — Specification, draft 0.31
 
-Status: draft 0.30, 2026-09-16. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.31, 2026-09-16. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -291,7 +291,7 @@ A run is verifiable when all of the following hold:
 1. The full recording of this run, where the archive holds its link, is continuous from `run.started` to `run.ended`, one file per segment. Pauses are `run.wait` events in the timeline and visible in the recording. A cut video keeps exactly the intervals of `timeline.json` `keep`, in order.
 2. Every `tool_call` can be located in the full recording at its `elapsed_seconds`, and in a cut through `keep`; `chapters.txt` names the sections at the same offsets, so a reader can jump to any of them.
 3. `human: none` implies no `run.human` record in the published run. Any such record forces `restart-only` or `assisted`. A `run.human` record after `completed_at` that is followed by a `game.goal` belongs to a goal extension that is not published yet (§6) and does not count.
-4. `tools.json`, `AGENTS.md`, `documentation.md` and `runtime-config/` are published; the agent had no tool outside `tools.json`.
+4. `tools.json`, `AGENTS.md`, `documentation.md` and `runtime-config/` are published; the agent had no tool outside `tools.json`. Every session of a resumed run served exactly these tools and this documentation: the harness does not resume a run when the installed tooling or game plugin would serve others.
 5. The hashes in `manifest.json` match.
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
@@ -335,3 +335,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.28 | 2026-09-15 | Schema 10: each entry of `models` carries `context_window`, `max_output_tokens` and `provider` as the runtime reported them; `harness.plugins.runtime.cli_versions` lists the runtime CLI's versions from the session log |
 | 0.29 | 2026-09-15 | Schema 11: each entry of `models` carries `parts`, the model id split into `name`, `variant`, `version` and `snapshot` by its maker's naming; null for an id the tooling does not know |
 | 0.30 | 2026-09-16 | Schema 12: each mod in `game.mods` carries `details`, what was done to it beyond its own `name` (a patch), or null |
+| 0.31 | 2026-09-16 | §8.4: every session of a resumed run serves the tools and documentation the run started with |

@@ -4,6 +4,7 @@
 // session (Claude Code --resume), then ends like `aas run`. The resume is a
 // `run.human` record, so the category becomes `restart-only`.
 import fs from "node:fs";
+import { spawnSync } from "node:child_process";
 import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
 import path from "node:path";
@@ -45,6 +46,16 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   if (opts["max-turns"]) brief.budget = { ...(brief.budget ?? {}), toolCalls: Number(opts["max-turns"]) };
   if (opts["max-minutes"]) brief.budget = { ...(brief.budget ?? {}), minutes: Number(opts["max-minutes"]) };
   if (opts.headless) brief.headless = true;
+  const spec = await brokerSpec({ gameModule, runDir, timeZone: process.env.AAS_TIME_ZONE });
+  // The agent continues its own session, so it must get the tools and documentation it had: tooling or a game plugin
+  // updated between two sessions may not change them. Checked before anything starts.
+  const check = spawnSync(process.execPath, [...spec.nodeArgs, "--check-interface"], { cwd: runDir, env: spec.env, input: "", encoding: "utf8" });
+  if (check.status !== 0) {
+    const reason = String(check.stderr ?? "").split("\n").find((l) => l.includes("would serve"))?.replace(/^\[aas-broker\] /, "")
+      ?? `the broker check failed (${(check.error?.message ?? check.stderr ?? `exit ${check.status}`).trim().split("\n").at(-1)})`;
+    throw new Error(`This run cannot be resumed with the installed tooling: ${reason}. ` +
+      "The agent would see other tools than in its earlier sessions. Resume with the tooling version the run started with (git checkout of that release).");
+  }
   const goalEnd = resolveGoal(plugin, brief.category?.goal).end;
   brief.resume = { sessionId, save, prompt: opts.prompt ?? (goalExtended
     ? `The harness has resumed this run with a larger goal: ${goalEnd?.label ?? goalExtended.to}. The game was restored to your last save state, in the same paused condition. Continue from there.`
@@ -52,7 +63,6 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   fs.writeFileSync(path.join(runDir, "brief.json"), `${JSON.stringify(brief, null, 2)}\n`);
 
   // The runtime config carries absolute paths; regenerate it if the run directory moved.
-  const spec = await brokerSpec({ gameModule, runDir, timeZone: process.env.AAS_TIME_ZONE });
   if (runtime.reconfigure) await runtime.reconfigure(runDir, spec, brief);
 
   const events = createEventLog(runDir);

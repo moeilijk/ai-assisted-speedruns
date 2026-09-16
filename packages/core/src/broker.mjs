@@ -25,12 +25,15 @@
 //   AAS_ALLOWED_ENDPOINTS  host:port[,host:port] the broker may connect to (read by hardening.mjs)
 //   AAS_RUN_DIR            run directory for run.jsonl, screenshots/, tools.json, documentation.md (optional)
 //   AAS_TIME_ZONE          IANA zone for log timestamps (optional, default: system)
+//
+// `--check-interface`: only compare the tools and documentation this broker would serve with the run directory's
+// tools.json and documentation.md, and end with 0 when they are the same (or not written yet), 1 when they differ.
 
 // Must come first: locks down networking and scrubs the environment before
 // any other module loads or any snippet can run.
 import { ALLOWED_ENDPOINTS } from "./hardening.mjs";
 
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -449,8 +452,29 @@ const TOOLS = [
   },
 ];
 
-writeOnce("tools.json", `${JSON.stringify(TOOLS, null, 2)}\n`);
-writeOnce("documentation.md", DOCUMENTATION.endsWith("\n") ? DOCUMENTATION : `${DOCUMENTATION}\n`);
+// A run keeps the tool interface it started with: a later session, perhaps under newer tooling or a newer game plugin,
+// serves exactly the tools and documentation in the run's tools.json and documentation.md, or it does not serve at all.
+const INTERFACE = [
+  ["tools.json", `${JSON.stringify(TOOLS, null, 2)}\n`],
+  ["documentation.md", DOCUMENTATION.endsWith("\n") ? DOCUMENTATION : `${DOCUMENTATION}\n`],
+];
+const CHANGED = RUN_DIR
+  ? INTERFACE.filter(([name, text]) => {
+      try { return readFileSync(join(RUN_DIR, name), "utf8") !== text; } catch (error) { return error?.code !== "ENOENT"; }
+    }).map(([name]) => name)
+  : [];
+const INTERFACE_MESSAGE = `this broker would serve other ${CHANGED.join(" and ")} than the run started with`;
+// The check writes nothing and serves nothing: stdin is closed at once, and the broker ends as it always does, with
+// the result as its exit code (process.exit is locked by the hardening).
+const CHECK_ONLY = process.argv.includes("--check-interface");
+if (CHECK_ONLY) {
+  if (CHANGED.length) process.stderr.write(`[aas-broker] ${INTERFACE_MESSAGE}\n`);
+  process.exitCode = CHANGED.length ? 1 : 0;
+  process.stdin.destroy();
+} else {
+  if (CHANGED.length) fail(`${INTERFACE_MESSAGE}; the run's own ${CHANGED.join(" and ")} are left as they are.`);
+  for (const [name, text] of INTERFACE) writeOnce(name, text);
+}
 
 async function callTool(name, args) {
   switch (name) {
