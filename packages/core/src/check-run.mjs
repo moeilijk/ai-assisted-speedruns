@@ -13,6 +13,7 @@ import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
 import { verifyReceipt } from "./witness-receipt.mjs";
+import { formatDuration } from "./videos.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
@@ -232,7 +233,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
               const expected = v.kind === "whole" ? summary.recording?.duration_seconds
                 : v.kind === "segment" ? t?.segments?.[v.part - 1]?.seconds
                 : t?.totals?.cut_video;
-              if (!near(v.seconds, expected)) problems.push(`${at} (${v.kind}${v.part ? ` ${v.part}` : ""}) lasts ${v.seconds} s, but the bundle states ${expected ?? "no such length"}`);
+              if (!near(v.seconds, expected)) problems.push(`${at} (${v.kind}${v.part ? ` ${v.part}` : ""}) lasts ${formatDuration(v.seconds, { whole: true })} (${v.seconds} s), but the bundle states ${typeof expected === "number" ? `${formatDuration(expected, { whole: true })} (${expected} s)` : "no such length"}`);
             });
           }
         }
@@ -323,11 +324,12 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   // length is one of these. timeline.json carries the segments and the cut list.
   const lengths = (() => {
     const out = [];
-    if (rec?.duration_seconds) out.push(`${rec.duration_seconds} s (the full recording)`);
+    const both = (x) => `${formatDuration(x, { whole: true })} (${Math.round(x)} s)`;
+    if (rec?.duration_seconds) out.push(`${both(rec.duration_seconds)}, the full recording`);
     try {
       const t = JSON.parse(fs.readFileSync(file("timeline.json"), "utf8"));
-      if ((t.segments ?? []).length > 1) out.push(`${t.segments.map((sg) => `${Math.round(sg.seconds)} s`).join(" or ")} (its ${t.segments.length} files)`);
-      if ((t.keep ?? []).length) out.push(`${Math.round(t.keep.reduce((n, [a, b]) => n + (b - a), 0))} s (the cut)`);
+      if ((t.segments ?? []).length > 1) out.push(`${t.segments.map((sg) => both(sg.seconds)).join(" or ")}, its ${t.segments.length} files`);
+      if ((t.keep ?? []).length) out.push(`${both(t.keep.reduce((n, [a, b]) => n + (b - a), 0))}, the cut`);
     } catch { /* no timeline.json: only the full recording's length is known */ }
     return out;
   })();

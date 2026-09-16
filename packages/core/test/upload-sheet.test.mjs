@@ -8,11 +8,12 @@ import { join } from "node:path";
 import { formatDuration, writeUploadSheet } from "../src/upload-sheet.mjs";
 
 test("times read the way the archive shows them", () => {
-  assert.equal(formatDuration(39.405), "39.4s");
-  assert.equal(formatDuration(177.48), "2m 57.4s");
-  assert.equal(formatDuration(122.04), "2m 02.0s");
-  assert.equal(formatDuration(1362.641, { whole: true }), "22m 42s");
-  assert.equal(formatDuration(3675, { whole: true }), "1h 01m 15s");
+  assert.equal(formatDuration(39.405), "00:00:39.4");
+  assert.equal(formatDuration(177.48), "00:02:57.4");
+  assert.equal(formatDuration(122.04), "00:02:02.0");
+  assert.equal(formatDuration(1362.641, { whole: true }), "00:22:42");
+  assert.equal(formatDuration(3675, { whole: true }), "01:01:15");
+  assert.equal(formatDuration(90180, { whole: true }), "25:03:00", "hours past a day go on counting");
 });
 
 test("the sheet offers the cut and the full recording per segment, each with its own line, length and chapters", () => {
@@ -50,13 +51,13 @@ test("the sheet offers the cut and the full recording per segment, each with its
   const cut = sheet.split("CUT VIDEO")[1].split("FULL RECORDING")[0];
   assert.ok(cut.includes(join(runDir, "recording", "AAS_run_1.cut.mp4")));
   assert.ok(cut.includes(`line:  ${fp} · 769 s`), "the cut's own length");
-  assert.ok(cut.includes("Title: Claude Sonnet 5 plays Slay the Spire (cut) — reached the Act 1 boss in 2m 57.4s"));
-  assert.ok(cut.includes("so 25m 59.0s of recording becomes 12m 49.1s"));
+  assert.ok(cut.includes("Title: Claude Sonnet 5 plays Slay the Spire (cut) — reached the Act 1 boss in 00:02:57.4"));
+  assert.ok(cut.includes("so 00:25:59 of recording becomes 00:12:49"));
   assert.ok(cut.includes("At 11:15 it reached the Act 1 boss"));
   assert.ok(cut.includes("This run is an example."));
   assert.ok(cut.trim().split("\n").at(-2).startsWith(`${fp} · 769 s`), "the description ends on the cut's line");
   const cutText = cut.split("-".repeat(78))[1].trim().split("\n");
-  assert.equal(cutText[0], "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Its goal was the Act 1 boss; it got there in 2m 57.4s of game time (22m 42.6s of real time).", "the result first");
+  assert.equal(cutText[0], "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Its goal was the Act 1 boss; it got there in 00:02:57.4 of game time (00:22:42 of real time).", "the result first");
   assert.ok(cut.includes("Run sts-claude-code-01 is in the AAS Archive: ai-assisted-speedruns.org"), "the domain and the run id as text, no link YouTube would shorten");
   assert.ok(!cut.includes("https://"), "no links: a viewer has no bundle to check, and a link is shortened in view");
   assert.equal(cutText.at(-2), "Verification line for the AAS Archive:");
@@ -65,7 +66,7 @@ test("the sheet offers the cut and the full recording per segment, each with its
   const part2 = sheet.split("FULL RECORDING, PART 2 OF 2")[1];
   const part1 = sheet.split("FULL RECORDING, PART 1 OF 2")[1].split("FULL RECORDING, PART 2")[0];
   assert.ok(part1.includes(`line:  ${fp} · 1368 s`) && part1.includes("At 22:42 it reached the Act 1 boss."));
-  assert.ok(part1.includes("Title: Claude Sonnet 5 plays Slay the Spire (part 1 of 2) — reached the Act 1 boss in 2m 57.4s"));
+  assert.ok(part1.includes("Title: Claude Sonnet 5 plays Slay the Spire (part 1 of 2) — reached the Act 1 boss in 00:02:57.4"));
   assert.ok(part2.includes(`line:  ${fp} · 191 s`));
   assert.ok(part2.includes("At 0:04 the model had reached its goal and a person started it again."), "part 2's moments on its own clock, without the harness's details");
   assert.ok(readFileSync(writeUploadSheet(runDir), "utf8").includes("This run is an example."), "bundle and note are remembered");
@@ -82,7 +83,7 @@ test("a cut rendered before this revision is marked out of date: its line would 
   writeFileSync(join(bundle, "timeline.json"), JSON.stringify({ segments: [{ index: 0, offset: 0, seconds: 30, file: "recording/a.mp4" }], sections: [], keep: [[0, 10]], totals: { cut_video: 10 }, cut_chapters: [] }));
   writeFileSync(join(bundle, "summary.json"), JSON.stringify({ schema_version: 7, run_id: "run-01", models: [], category: {}, recording: { fingerprint: "0123456789abcdef", duration_seconds: 30, files: ["recording/a.mp4"] } }));
   const sheet = readFileSync(writeUploadSheet(runDir, { bundleDir: bundle }), "utf8");
-  assert.match(sheet, /a\.cut\.mp4 {3}\(out of date: this file is 2s, this revision's cut is 10s; aas render /);
+  assert.match(sheet, /a\.cut\.mp4 {3}\(out of date: this file is 00:00:02, this revision's cut is 00:00:10; aas render /);
 });
 
 test("paths on a WSL drive mount are shown as the Windows drive the file dialog knows", async () => {

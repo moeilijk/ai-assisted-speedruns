@@ -81,8 +81,8 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   const part2 = { kind: "segment", part: 2, parts: 2, seconds: 191, line: "AAS sts-x · fingerprint f · 191 s", chapters: [{ at: 5, label: "Human: resumed after completed" }, { at: 5, label: "Human: goal extended from act1 to act3" }] };
   const one = videoDescription(summary, part1, { archiveUrl: "https://ai-assisted-speedruns.org" });
   const two = videoDescription(summary, part2, { archiveUrl: "https://ai-assisted-speedruns.org" });
-  assert.equal(videoTitle(summary, part1), "Claude Sonnet 5 plays Slay the Spire (part 1 of 2) — reached the Act 1 boss in 2m 57.4s");
-  assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Its goal was the Act 1 boss; it got there in 2m 57\.4s of game time \(22m 42\.6s of real time\)\./);
+  assert.equal(videoTitle(summary, part1), "Claude Sonnet 5 plays Slay the Spire (part 1 of 2) — reached the Act 1 boss in 00:02:57.4");
+  assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Its goal was the Act 1 boss; it got there in 00:02:57\.4 of game time \(00:22:42 of real time\)\./);
   assert.match(one, /Top left is LiveSplit/);
   assert.match(one, /Bottom left are the name of the current section, two clocks, real time \(RTA\) and game time \(IGT\), and the last command/);
   assert.match(one, /At 22:42 it reached the Act 1 boss\./);

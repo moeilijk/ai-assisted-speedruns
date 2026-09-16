@@ -67,7 +67,7 @@ const facts = (s) => {
   const ttc = s.totals_to_completion;
   const reached = Boolean(s.completed_at && ttc);
   const igt = formatDuration(reached ? ttc.igt_seconds : s.recording?.igt_seconds);
-  const real = formatDuration(reached ? ttc.rta_seconds : s.recording?.wall_clock_seconds ?? s.recording?.duration_seconds);
+  const real = formatDuration(reached ? ttc.rta_seconds : s.recording?.wall_clock_seconds ?? s.recording?.duration_seconds, { whole: true });
   return { game, goal, models, several: names.length > 1, reached, igt, real };
 };
 
@@ -120,15 +120,15 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const plugins = s.harness?.plugins ?? {};
   const liveSplit = plugins.recorder?.id === "obs" && plugins.timer?.id === "livesplit";
   const overlay = s.recording?.overlay;
-  const full = formatDuration(s.recording?.duration_seconds);
+  const full = formatDuration(s.recording?.duration_seconds, { whole: true });
   const view = [
     "What you see: the game as the model played it.",
     ...(liveSplit ? ["Top left is LiveSplit, the speedrun timer with its splits."] : []),
     ...(overlay?.shown ? [`Bottom left are the name of the current section, two clocks, real time (RTA) and game time (IGT)${overlay.keys ? ", the keys the model pressed" : ""}, and the last command the model sent.`] : []),
     video.kind === "cut"
-      ? `In this cut the pauses while the model was thinking are left out, so ${full} of recording becomes ${formatDuration(video.seconds)}.`
+      ? `In this cut the pauses while the model was thinking are left out, so ${full} of recording becomes ${formatDuration(video.seconds, { whole: true })}.`
       : video.kind === "segment"
-        ? `This is part ${video.part} of ${video.parts} of the recording (${formatDuration(video.seconds)} of ${full}): the run was paused${video.part < video.parts ? ` and continues in part ${video.part + 1}` : " and continued here"}.`
+        ? `This is part ${video.part} of ${video.parts} of the recording (${formatDuration(video.seconds, { whole: true })} of ${full}): the run was paused${video.part < video.parts ? ` and continues in part ${video.part + 1}` : " and continued here"}.`
         : `This is the whole recording (${full}).`,
   ].join(" ");
   // Only what this video shows: its own moments, in order, merged when less than ten seconds apart.

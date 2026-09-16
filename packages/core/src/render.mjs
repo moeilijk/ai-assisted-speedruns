@@ -8,7 +8,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { computeTimeline, writeTimeline } from "./timeline.mjs";
-import { writeUploadSheet } from "./upload-sheet.mjs";
+import { formatDuration, writeUploadSheet } from "./upload-sheet.mjs";
 
 const VIDEO_RE = /\.(mp4|mkv|mov|flv|ts)$/i;
 
@@ -75,7 +75,7 @@ export function render(runDir, { video, out, burn = [], cut = true, crf, marginB
   const r = spawnSync("ffmpeg", args, { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   if (r.status !== 0) throw new Error(`ffmpeg failed: ${r.stderr.split("\n").filter((l) => l.trim()).slice(-5).join(" | ")}`);
   const kept = timeline.keep.reduce((n, [s, e]) => n + (e - s), 0);
-  log(`written ${out}: ${kept.toFixed(1)} s kept of ${timeline.totals.rta.toFixed(1)} s (${timeline.playbacks.length} playbacks); chapters in ${path.join(timelineDir, "chapters.cut.txt")}`);
+  log(`written ${out}: ${formatDuration(kept, { whole: true })} kept of ${formatDuration(timeline.totals.rta, { whole: true })} (${timeline.playbacks.length} playbacks); chapters in ${path.join(timelineDir, "chapters.cut.txt")}`);
   // A published run gets its upload sheet again, now naming the cut video and its chapters.
   const uploadSheet = writeUploadSheet(runDir, { log });
   return { out, kept, timeline, uploadSheet };

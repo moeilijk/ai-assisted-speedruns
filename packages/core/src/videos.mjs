@@ -14,18 +14,18 @@ export const videoLine = (runId, fingerprint, seconds) => `AAS ${runId} · finge
 
 const ms = (x) => Math.round(x * 1000) / 1000;
 
-/** Seconds as the archive shows a time: 39.4s, 2m 57.4s; `whole` drops the tenths: 22m 42s, 1h 01m 15s. */
+/**
+ * A duration in ISO 8601's extended format, hh:mm:ss, every part two digits, as the archive shows it (owner 16-09):
+ * game time with tenths (00:02:02.0), real time `whole` (00:10:32). Hours past 24 go on counting (25:03:00).
+ */
 export function formatDuration(seconds, { whole = false } = {}) {
   if (typeof seconds !== "number" || !Number.isFinite(seconds)) return "?";
   const tenths = Math.floor(seconds * 10 + 1e-6);
   const h = Math.floor(tenths / 36000);
   const m = Math.floor((tenths % 36000) / 600);
   const s = (tenths % 600) / 10;
-  const sec = whole ? String(Math.floor(s)) : s.toFixed(1);
-  const pad = (v) => (v.includes(".") ? v.padStart(4, "0") : v.padStart(2, "0"));
-  if (h) return `${h}h ${String(m).padStart(2, "0")}m ${pad(sec)}s`;
-  if (m) return `${m}m ${pad(sec)}s`;
-  return `${sec}s`;
+  const sec = whole ? String(Math.floor(s)).padStart(2, "0") : s.toFixed(1).padStart(4, "0");
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${sec}`;
 }
 
 /** A chapter time as YouTube reads it: 0:00, 11:15, 1:02:03. */
