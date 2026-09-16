@@ -40,9 +40,16 @@ There are four kinds of plugin: game, runtime (starts the model), recorder and t
 
 After `aas resume`, or after a tooling update that changes the bundle, you publish again as a new revision. See [docs/reference.md](docs/reference.md#a-new-revision).
 
-## Anti-cheat and bans
+## Disclaimer: anti-cheat, bans, your own risk
 
-This tooling injects code into games. For Portal that is SourcePauseTool's DLL and an IPC patch, and the game starts outside the normal launcher. Anti-cheat such as VAC, EAC or BattlEye can see this as cheating and ban the account, possibly for good. Only use games without anti-cheat or online play, preferably a separate offline copy (Portal here runs from Source Unpack, not from the Steam install). Check the game's terms yourself. You use this at your own risk; the authors are not responsible for bans, lost accounts or other damage.
+> [!WARNING]
+> This tooling injects code into games. For Portal that is SourcePauseTool's DLL and an IPC patch, and the game starts outside the normal launcher. Anti-cheat such as VAC, EAC or BattlEye can see this as cheating and **ban the account, possibly permanently**.
+>
+> - **Only use games without anti-cheat and without online play.** Never use it with online or competitive games.
+> - **Preferably use a separate offline copy of the game.** Portal here runs from Source Unpack, not from the Steam install.
+> - **Check the game's terms and anti-cheat yourself** before you connect anything.
+>
+> **Everything you do with this repository is at your own risk.** The authors are not responsible for bans, lost accounts or other damage.
 
 ## Install
 
