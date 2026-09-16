@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.16.0 — 2026-09-16
+
+SPEC 0.35: durations in ISO 8601 (owner 16-09: "the international standard everyone understands").
+
+- Every duration the tooling shows people is hh:mm:ss with two digits each: game time with tenths (00:02:02.0), real
+  time in whole seconds (00:10:32); hours past 24 go on counting. That covers the example video texts, the upload
+  sheet, the lengths in `aas check` (with the seconds of the line next to them), and the logs of `aas run` and
+  `aas render`. A place in a video stays as YouTube writes it (11:15), and the line keeps its seconds.
+
 ## 0.15.1 — 2026-09-16
 
 - A recording whose length could not be measured (no ffprobe, or not a video) lists no whole-recording video: its

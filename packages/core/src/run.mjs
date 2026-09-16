@@ -9,6 +9,7 @@ import { configure } from "./configure.mjs";
 import { createEventLog, followEvents } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { witnessSegment } from "./witness.mjs";
+import { formatDuration } from "./videos.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 
 /**
@@ -220,7 +221,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds });
   await witnessEnd(events, { runUid: brief.run_uid, segment: 1, tooling, recorded: info.segments.at(-1), log });
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify(outcome, null, 2)}\n`);
-  log(`run ${outcome.status}; ${files.length} recording file(s); ${info.wall_clock_seconds} s wall clock`);
+  log(`run ${outcome.status}; ${files.length} recording file(s); ${formatDuration(info.wall_clock_seconds, { whole: true })} wall clock`);
   // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is
   // still running. Nothing stays open on the machine after a run unless --keep-open asks for it.
   if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
