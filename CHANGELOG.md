@@ -12,6 +12,11 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.15.1 — 2026-09-16
+
+- A recording whose length could not be measured (no ffprobe, or not a video) lists no whole-recording video: its
+  line would state a length the bundle does not, and `aas check` rejected the bundle `aas publish` had just made.
+
 ## 0.15.0 — 2026-09-16
 
 Summary schema 13, SPEC 0.34: the example video texts are written for viewers, and a bundle says what the picture
@@ -27,8 +32,6 @@ shows.
   text. No links, no runtime name. Timestamps are listed only when YouTube makes chapters of them. The line stays
   last, after "Verification line for the AAS Archive:".
 - Portal's goal is "End credits".
-- A recording whose length could not be measured (no ffprobe, or not a video) lists no whole-recording video: its
-  line would state a length the bundle does not, and `aas check` rejected the bundle `aas publish` had just made.
 
 ## 0.14.0 — 2026-09-16
 
