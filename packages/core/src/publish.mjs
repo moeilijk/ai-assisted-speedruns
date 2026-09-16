@@ -21,7 +21,8 @@ import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
-import { recordingVideos, withVideoTexts } from "./videos.mjs";
+import { recordingVideos } from "./videos.mjs";
+import { withVideoTexts } from "./youtube-text.mjs";
 import { BUNDLE_VERSION, SUMMARY_SCHEMA } from "./versions.mjs";
 
 const copyTree = (src, dst) => {

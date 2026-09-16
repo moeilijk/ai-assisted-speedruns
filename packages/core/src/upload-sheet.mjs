@@ -6,7 +6,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ARCHIVE_URL } from "./plugins.mjs";
-import { formatDuration, recordingVideos, withVideoTexts } from "./videos.mjs";
+import { formatDuration, recordingVideos } from "./videos.mjs";
+import { withVideoTexts } from "./youtube-text.mjs";
 
 export const UPLOAD_SHEET = path.join("recording", "UPLOAD.txt");
 
@@ -97,7 +98,7 @@ export function writeUploadSheet(runDir, { bundleDir, note, log = () => {} } = {
     "description). That is the only requirement. A line of its own keeps it easy to find.",
     "The fingerprint is the start of the sha256 of the run's published timeline; the seconds are that video's length.",
     "Each video below has a suggested title and description, ending on its line: use, change or leave them out.",
-    "The link to the run's page works once the archive has accepted the run and put it online; until then it is not found.",
+    "The run's page in the archive exists once the archive has accepted the run and put it online.",
     "",
     ...[...videos.filter((v) => v.kind === "cut"), ...videos.filter((v) => v.kind !== "cut")].flatMap(one),
   ].join("\n");

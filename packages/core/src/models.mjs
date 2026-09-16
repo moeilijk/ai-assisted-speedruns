@@ -19,3 +19,13 @@ export function modelParts(id) {
   }
   return null;
 }
+
+const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+/** A model's name for people, from its parts (Claude Sonnet 5, GPT-5.6 Luna); the id itself when its parts are unknown. */
+export function modelDisplayName(id) {
+  const p = modelParts(id);
+  if (!p) return String(id);
+  if (p.name === "claude") return `Claude ${cap(p.variant)} ${p.version}`;
+  if (p.name === "gpt") return `GPT-${p.version}${p.variant ? ` ${cap(p.variant)}` : ""}`;
+  return String(id);
+}
