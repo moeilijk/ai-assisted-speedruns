@@ -97,7 +97,10 @@ export function createSession() {
       }
       return parts.join(" \\\n    ");
     };
+    const agentCheck = String(opts.agentCheck ?? "").trim();
+    const agentArgs = ["check-agent", "--runtime", agentCheck, "--game", g.file];
     const steps = [
+      ...(agentCheck ? [{ id: "agent", title: `Does ${RUNTIMES.find((r) => r.id === agentCheck)?.label.replace(" (AI run)", "") ?? agentCheck} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...agentArgs], shown: `${CLI_SHOWN} ${shownArgs(agentArgs)}` }] : []),
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
       { id: "obs", title: "Start OBS (the recording)", args: [path.join(REPO, "packages", "recorder-obs", "launch-obs.mjs")], shown: "npm run obs:launch" },
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
@@ -128,6 +131,7 @@ export function createSession() {
           const code = await node(st.args, st.shown);
           if (code !== 0) throw new Error(`${st.title} failed (exit ${code})`);
         };
+        if (byId.agent) await step(byId.agent);
         await step(byId.game);
         await step(byId.obs);
         if (byId.livesplit) await step(byId.livesplit);

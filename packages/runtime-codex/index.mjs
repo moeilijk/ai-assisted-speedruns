@@ -100,6 +100,16 @@ export default {
     rows.push({ ok: c.ok, what: `Codex plan budget for runs (AAS_CODEX_BUDGET_MAX ${c.max}%)`, detail: c.detail });
     return rows;
   },
+  /**
+   * Does the agent's own CLI reach the broker? `codex mcp list` reads the run's configuration and lists its MCP
+   * servers without asking the model anything, so it costs no tokens.
+   */
+  async connectCheck(runDir, { gameId } = {}) {
+    const r = spawnSync("codex", ["mcp", "list"], { cwd: path.resolve(runDir), encoding: "utf8", timeout: 120000, env: { ...process.env, CODEX_HOME: path.join(path.resolve(runDir), ".codex") } });
+    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    if (new RegExp(`\\b${gameId}\\b`).test(out)) return { ok: true, detail: `codex mcp list: ${gameId} configured` };
+    return { ok: false, detail: `codex mcp list did not name the ${gameId} server${out.trim() ? `: ${out.trim().split("\n").at(-1)}` : ""}` };
+  },
   /** Exports a rollout into the public timeline and summary (schema 2). */
   async exportSession(session, outDir, { completionMarker } = {}) {
     const r = spawnSync(process.execPath, [path.join(here, "export-rollout.mjs"), session, outDir], { env: { ...process.env, AAS_COMPLETION_MARKER: completionMarker ?? process.env.AAS_COMPLETION_MARKER ?? "" }, encoding: "utf8" });

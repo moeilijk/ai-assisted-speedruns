@@ -92,6 +92,19 @@ export default {
     try { const b = await checkBudget(); rows.push({ ok: b.ok, what: `Claude plan budget for runs (AAS_BUDGET_WEEKLY_MAX ${b.max}%)`, detail: b.detail }); } catch (e) { rows.push({ ok: false, what: "Claude plan budget", detail: e.message }); }
     return rows;
   },
+  /**
+   * Does the agent's own CLI reach the broker? `claude mcp list` starts the run's MCP server and health-checks it
+   * without asking the model anything, so it costs no tokens: it proves the configuration, the trust flag and the
+   * broker work together before a run is played for real.
+   */
+  async connectCheck(runDir, { gameId } = {}) {
+    if (!isTrusted(runDir)) return { ok: false, detail: `Claude Code does not trust ${path.resolve(runDir)} yet (aas configure sets it).` };
+    const r = spawnSync("claude", ["mcp", "list"], { cwd: path.resolve(runDir), encoding: "utf8", timeout: 120000 });
+    const out = `${r.stdout ?? ""}${r.stderr ?? ""}`;
+    const line = out.split("\n").find((l) => l.startsWith(`${gameId}:`)) ?? "";
+    if (/✔|Connected/.test(line)) return { ok: true, detail: `claude mcp list: ${gameId} connected` };
+    return { ok: false, detail: line ? `claude mcp list: ${line.trim().slice(-120)}` : `claude mcp list did not report the ${gameId} server${out.trim() ? `: ${out.trim().split("\n").at(-1)}` : ""}` };
+  },
   /** The private session log of a run, for `aas publish`. */
   findSession(runDir) { return findClaudeSession(runDir); },
   modelReports(runDir) { return claudeModelReports(runDir); },

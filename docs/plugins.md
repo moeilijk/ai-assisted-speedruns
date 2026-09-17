@@ -72,6 +72,7 @@ export default {
   async start(runDir, brief) { /* start the agent, wait; return { status, endedAt, notes, sessionId, privateLog } */ },
   interrupt(reason) { /* the harness asks the session to end (game over, budget) */ },
   async budget() { /* the plan's stand: { ok, percent, max, detail }; aas run refuses when ok is false */ },
+  async connectCheck(runDir, { gameId }) { /* does the agent's CLI reach the broker, without asking the model? aas check-agent */ },
   async doctor({ runDir }) { /* [{ ok, what, detail }]: the CLI on the PATH, trust of the run directory, the plan */ },
   findSession(runDir) { /* the private log when it lives outside the run directory */ },
   async exportSession(session, outDir, { completionMarker, completionTime }) { /* session.sanitized.jsonl + summary.json (schema 2) */ },
@@ -82,6 +83,8 @@ export default {
 `broker` (`BrokerSpec`) tells the runtime how to start the broker: `nodeArgs` (the `node --permission ...` command line), `env`, `gameId`, `runDir`. The configuration must give the agent exactly the three tools `mcp__<game>__<game>_documentation|screenshot|exec` (or the runtime's equivalent naming) and deny everything else: shell, web, file reads and writes outside the run directory, sub-agents. Write a second copy of the configuration with machine paths replaced (`publicPath`) into `runtime-config/`; that copy is published.
 
 `start` returns a `RunOutcome`: `completed` (the agent finished), `stopped` (a budget, a limit, or an interrupt; resumable), `failed`. In headless mode (`brief.headless`, with `brief.budget.toolCalls` and `brief.budget.minutes`) the runtime runs the agent non-interactively with `brief.goalPrompt`, or with `brief.resume.prompt` and `brief.resume.sessionId` at a resume. The runtime's private log is what `aas publish` exports: say where it is (`privateLog`), or write it as `session.jsonl` in the run directory, and provide an exporter (`export-claude-session.mjs`, `runtime-codex/export-rollout.mjs` are the two so far) that turns it into the timeline format of the spec.
+
+`connectCheck` is the cheap half of that verification: it has the agent's own CLI list and health-check the MCP server of a configured run directory (`claude mcp list`, `codex mcp list`), which asks the model nothing and so costs no tokens. `aas check-agent` and the GUI's mock run use it.
 
 Verify a runtime the way `smoke.mjs` does for Claude Code: a real headless session against the fake game, asking the agent to use the three tools and to try a shell command and a file read, and checking in the broker log that only the three tools were used and in the agent's reply that the rest was refused.
 

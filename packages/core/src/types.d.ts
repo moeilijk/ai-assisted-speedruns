@@ -224,6 +224,8 @@ export interface RuntimePlugin {
   /** The harness asks the session to end (game over, a budget). */
   interrupt?(reason: string): void;
   /** The plan's stand: `aas run`/`resume` refuse to start when `ok` is false; `aas budget` and `aas doctor` show it. */
+  /** Does the agent's own CLI reach the broker (`claude mcp list`, `codex mcp list`)? No model call, so no tokens; `aas check-agent`. */
+  connectCheck?(runDir: string, ctx: { gameId: string }): Promise<{ ok: boolean; detail: string }>;
   budget?(): Promise<BudgetVerdict>;
   /** Read-only checks for `aas doctor`. */
   doctor?(ctx: { runDir?: string | null }): Promise<DoctorRow[]>;

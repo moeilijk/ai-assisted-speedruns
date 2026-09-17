@@ -18,7 +18,7 @@ const dotEnv = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..
 if (fs.existsSync(dotEnv)) process.loadEnvFile(dotEnv);
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
-const BOOLEAN_FLAGS = new Set(["no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
+const BOOLEAN_FLAGS = new Set(["keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
 function parse(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
@@ -190,6 +190,13 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         process.exitCode = r.findings.length ? 1 : 0;
         break;
       }
+      case "check-agent": {
+        const { checkAgent } = await import("./check-agent.mjs");
+        if (!opts.runtime || !opts.game) throw new Error("Usage: aas check-agent --runtime <claude-code|codex> --game <plugin.mjs> [--run-dir <dir>] [--keep]");
+        const r = await checkAgent({ runtime: opts.runtime, game: opts.game, runDir: opts["run-dir"] ?? null, keep: opts.keep === true });
+        process.exitCode = r.ok ? 0 : 1;
+        break;
+      }
       case "gui": {
         const { startGui } = await import("./gui/server.mjs");
         await startGui({ port: Number(opts.port ?? 8770), open: !opts["no-open"] });
@@ -200,6 +207,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         console.error(
           [
             "Usage:",
+            "  aas check-agent --runtime <claude-code|codex> --game <plugin.mjs> [--run-dir <dir>] [--keep]   does the agent's CLI reach the broker? (no model call, no tokens)",
             "  aas gui [--port 8770] [--no-open]           a web page to set up tools and games and to start runs; shows the commands it runs",
             "  aas configure --runtime <codex|claude-code> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file]",
             "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [configure options]",
