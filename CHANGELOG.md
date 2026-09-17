@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.5 — 2026-09-17
+
+- GUI Setup: every row is checked on its own and shows "Checking…" until its result is in; saving a setting checks
+  that setting at once; the results are kept (`.local/gui-checks.json`) and a restart shows them again; a setting
+  without a check (keep displays awake) has no status. The harness side (repository, Node, ffmpeg, Claude Code, Codex)
+  shows its paths at once, and OBS and Steam show the default path the launchers use when none is set.
+- Slay the Spire has read-only checks (its mods, the bridge copy, Communication Mod's config); Portal's no longer
+  checks Steam, which the launcher starts itself.
+
 ## 0.19.4 — 2026-09-17
 
 - Portal: every test chamber after the first is an end of its own (`chamber01` … `chambere02`, reached on entering

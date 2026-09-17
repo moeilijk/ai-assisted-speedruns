@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { configModel, setupModel, guiGames } from "./checks.mjs";
+import { affectedBy, configItems, guiGames } from "./checks.mjs";
 import { readEnv, writeEnv, ENV_FILE } from "./env-file.mjs";
 import { createSession, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
@@ -32,10 +32,59 @@ function listDir(p) {
 
 export async function startGui({ port = 8770, open = true, log = console.log } = {}) {
   const session = createSession();
-  let lastCheck = null;
-  const envStamp = () => { try { return String(fs.statSync(ENV_FILE).mtimeMs); } catch { return "none"; } };
+  // Check results per row, kept in <repo>/.local/gui-checks.json so a restart keeps them; a row whose value changed
+  // since its check shows as not checked.
+  const cacheFile = path.join(here, "..", "..", "..", "..", ".local", "gui-checks.json");
+  let cache = {};
+  try { cache = JSON.parse(fs.readFileSync(cacheFile, "utf8")); } catch { /* no results yet */ }
+  const saveCache = () => { try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 2)); } catch { /* not kept */ } };
+  const pending = new Set();
+  const withResult = (item) => {
+    if (item.status === "none") return item;
+    if (pending.has(item.id)) return { ...item, status: "pending", detail: "" };
+    const c = cache[item.id];
+    if (!c || c.value !== item.value) return { ...item, status: "unchecked", detail: "" };
+    return { ...item, ...c.result, value: item.value, options: c.result.options ?? item.options, at: c.at };
+  };
+  // Every check is a child process (checks.mjs <id>), a few at a time; each result is pushed to the page when it is in.
+  const checkScript = path.join(here, "checks.mjs");
+  const queue = [];
+  let running = 0;
+  const pump = () => {
+    while (running < 4 && queue.length) {
+      const id = queue.shift();
+      running += 1;
+      const child = spawn(process.execPath, [checkScript, id], { env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+      let out = "";
+      child.stdout.on("data", (d) => (out += d));
+      child.on("close", async () => {
+        running -= 1;
+        pending.delete(id);
+        let result;
+        try { result = JSON.parse(out); } catch { result = { status: "fail", detail: "The check did not answer." }; }
+        const item = (await configItems()).find((i) => i.id === id);
+        if (item) {
+          cache[id] = { value: item.value, result, at: new Date().toTimeString().slice(0, 8) };
+          saveCache();
+          emitAll("check", withResult(item));
+        }
+        pump();
+      });
+    }
+  };
+  const startChecks = async (ids) => {
+    const all = (await configItems()).filter((i) => i.status !== "none").map((i) => i.id);
+    for (const id of ids ?? all) {
+      if (!all.includes(id) || pending.has(id)) continue;
+      pending.add(id);
+      queue.push(id);
+      emitAll("check", withResult((await configItems()).find((i) => i.id === id)));
+    }
+    pump();
+  };
   const clients = new Set();
-  session.subscribe((type, data) => { for (const res of clients) res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`); });
+  const emitAll = (type, data) => { for (const res of clients) res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`); };
+  session.subscribe(emitAll);
   const body = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => { try { resolve(c.length ? JSON.parse(Buffer.concat(c).toString("utf8")) : {}); } catch (e) { reject(e); } }); });
   const send = (res, code, data) => { const t = JSON.stringify(data); res.writeHead(code, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" }); res.end(t); };
 
@@ -51,15 +100,12 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION));
       } else if (req.method === "GET" && url.pathname === "/api/setup") {
-        // Fast: the settings as they are, or the last check while nothing changed since. ?check=1 runs the checks.
-        if (url.searchParams.get("check")) { lastCheck = { ...(await setupModel()), envStamp: envStamp() }; }
-        let model = lastCheck && lastCheck.envStamp === envStamp() ? lastCheck : await configModel();
-        if (lastCheck && model !== lastCheck) {
-          // A setting changed since the check: what did not change keeps its result, the rest shows "not checked".
-          const before = new Map(lastCheck.items.map((i) => [`${i.id}|${i.label}`, i]));
-          model = { ...model, checked: true, partly: true, at: lastCheck.at, items: model.items.map((i) => { const b = before.get(`${i.id}|${i.label}`); return b && (b.value ?? "") === (i.value ?? "") ? b : i; }) };
-        }
-        send(res, 200, { ...model, envFile: toWindows(ENV_FILE) });
+        const items = (await configItems()).map(withResult);
+        send(res, 200, { items, envFile: toWindows(ENV_FILE), checked: Object.keys(cache).length > 0, configured: Object.keys(readEnv()).some((k) => k.startsWith("AAS_")) });
+      } else if (req.method === "POST" && url.pathname === "/api/check") {
+        const b = await body(req);
+        await startChecks(b.ids ?? null);
+        send(res, 200, { ok: true });
       } else if (req.method === "POST" && url.pathname === "/api/settings") {
         const b = await body(req);
         const changes = {};
@@ -74,6 +120,8 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           changes.AAS_LIVESPLIT_POS = b.display ? `${x + 20},${y + 40}` : "";
         }
         writeEnv(changes);
+        // What was saved is checked at once.
+        await startChecks(await affectedBy(Object.keys(changes)));
         send(res, 200, { ok: true });
       } else if (req.method === "GET" && url.pathname === "/api/browse") {
         send(res, 200, listDir(url.searchParams.get("path") ?? ""));
@@ -103,8 +151,10 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
       } else if (req.method === "POST" && url.pathname === "/api/stop") {
         send(res, 200, { state: await session.stop((await body(req)).game) });
       } else if (req.method === "POST" && url.pathname === "/api/fix") {
-        await session.fix((await body(req)).id);
-        lastCheck = null;
+        const fixId = (await body(req)).id;
+        await session.fix(fixId);
+        const fixed = { "obs-password": ["obs"], "install-livesplit": ["livesplit"], "livesplit-server": ["livesplit"], "livesplit-windows": ["livesplit"], "install-svv": ["svv", "quiet"] }[fixId] ?? (fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : []);
+        await startChecks(fixed);
         send(res, 200, { ok: true });
       } else if (req.method === "POST" && url.pathname === "/api/open") {
         // Opens a folder or file from the page in Windows Explorer / the default program.

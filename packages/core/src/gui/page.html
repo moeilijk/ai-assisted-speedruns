@@ -42,7 +42,10 @@
   .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
   .warn .dot { background: var(--warn); } .warn { color: var(--warn); }
   .fail .dot, .missing .dot { background: var(--fail); } .fail, .missing { color: var(--fail); }
-  .unchecked { color: var(--muted); }
+  .unchecked, .pending { color: var(--muted); }
+  .pending .dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: .25; } }
+  @media (prefers-reduced-motion: reduce) { .pending .dot { animation: none; } }
   .phase { font-weight: 600; }
   pre.cmds { background: var(--code); border-radius: 8px; padding: 12px; margin: 0; overflow-x: auto; font: 13px/1.6 ui-monospace, Consolas, monospace; white-space: pre; }
   .cmds .c { color: var(--muted); }
@@ -231,21 +234,31 @@ function addLine(l) {
 
 // Setup tab
 let setup = null;
-async function loadSetup(check = false) {
-  if (check) { $("recheck").disabled = true; $("checkinfo").textContent = "Checking the tools and games… this takes a few seconds."; }
-  try {
-    setup = await api(`/api/setup${check ? "?check=1" : ""}`);
-  } finally { $("recheck").disabled = false; }
+async function loadSetup() {
+  setup = await api("/api/setup");
   $("envfile").textContent = setup.envFile;
-  $("recheck").textContent = !setup.configured ? "Initial check: find my tools and games" : (setup.checked ? "Check again" : "Check");
-  $("checkinfo").textContent = setup.checked ? `Checked at ${setup.at}${setup.partly ? "; changed settings are not checked yet" : ""}.` : (setup.configured ? "Shown as set; not checked yet." : "Nothing is set yet: the initial check finds what it can.");
+  $("recheck").textContent = setup.checked ? "Check again" : (setup.configured ? "Check" : "Initial check: find my tools and games");
+  $("checkinfo").textContent = setup.checked ? "" : (setup.configured ? "Not checked yet." : "Nothing is set yet: the initial check finds what it can.");
   const groups = [...new Set(setup.items.map((i) => i.group))];
   $("groups").innerHTML = groups.map((g) => `<div class="panel"><h2>${esc(g)}</h2>${setup.items.filter((i) => i.group === g).map(row).join("")}</div>`).join("");
 }
-const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set", unchecked: "Not checked" };
+/** One row came back from its check (or went pending): replace just that row, keep what is typed elsewhere. */
+function updateRow(item) {
+  if (!setup) return;
+  const i = setup.items.findIndex((x) => x.id === item.id);
+  if (i < 0) return;
+  setup.items[i] = item;
+  const el = document.querySelector(`.setting[data-id="${CSS.escape(item.id)}"]`);
+  if (!el) return;
+  const typed = document.activeElement && el.contains(document.activeElement) ? document.activeElement.value : null;
+  el.outerHTML = row(item);
+  if (typed !== null) { const f = $(`v-${item.id}`); if (f) { f.value = typed; f.focus(); } }
+  if (!setup.checked && item.status !== "pending" && item.status !== "unchecked") { setup.checked = true; $("recheck").textContent = "Check again"; $("checkinfo").textContent = ""; }
+}
+const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set", unchecked: "Not checked", pending: "Checking…" };
 function row(i) {
   let field = "";
-  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${i.kind === "dir" ? "folder" : esc(i.expect ?? "file")}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
+  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? "folder" : i.expect ?? "file"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
   else if (i.kind === "select") field = `<select id="v-${i.id}" data-autosave="${i.id}">${i.options.map((o) => `<option value="${esc(o.value)}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
   else if (i.kind === "display") field = `<select id="v-${i.id}" data-display="1"><option value="">Where Windows puts it</option>${i.options.map((o) => `<option value="${esc(o.value)}" data-size="${o.width}x${o.height}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
   else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${i.id}" data-autosave="${i.id}" ${i.value ? "checked" : ""}> on</label>`;
@@ -253,7 +266,7 @@ function row(i) {
   const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${i.id}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
   const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
-    <div><div class="name">${esc(i.label)}</div><span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span></div>
+    <div><div class="name">${esc(i.label)}</div>${i.status === "none" ? "" : `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>`}</div>
     <div class="field">${field}${fix}</div>
     <div class="detail muted">${esc(i.detail)}</div>${suggest}</div>`;
 }
@@ -269,7 +282,7 @@ $("groups").addEventListener("click", async (e) => {
   try {
     if (t.dataset.save) await saveValue(t.dataset.save, $(`v-${t.dataset.save}`).value.trim());
     else if (t.dataset.use) await saveValue(t.dataset.use, t.dataset.value);
-    else if (t.dataset.fix) { t.disabled = true; t.textContent = "Working…"; await api("/api/fix", { id: t.dataset.fix }); await loadSetup(true); }
+    else if (t.dataset.fix) { t.disabled = true; t.textContent = "Working…"; await api("/api/fix", { id: t.dataset.fix }); await loadSetup(); }
     else if (t.dataset.browse) {
       const picked = await browse($(`v-${t.dataset.browse}`).value, t.dataset.kind, t.dataset.expect);
       if (picked) await saveValue(t.dataset.browse, picked);
@@ -283,7 +296,7 @@ $("groups").addEventListener("change", async (e) => {
     else if (t.dataset.display !== undefined) { const o = t.selectedOptions[0]; await api("/api/settings", { display: t.value, displaySize: o?.dataset.size ?? "" }); await loadSetup(); }
   } catch (err) { alert(err.message); }
 });
-$("recheck").onclick = () => loadSetup(true);
+$("recheck").onclick = async () => { $("recheck").textContent = "Check again"; await api("/api/check", {}); };
 
 // Folder and file picker (the browser cannot hand full paths to the page, so the harness lists them)
 function browse(start, kind, expect) {
@@ -325,6 +338,7 @@ function browse(start, kind, expect) {
   const ev = new EventSource("/api/events");
   ev.addEventListener("state", (e) => showState(JSON.parse(e.data)));
   ev.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
+  ev.addEventListener("check", (e) => updateRow(JSON.parse(e.data)));
 })();
 (() => { let tab = new URLSearchParams(location.search).get("tab"); try { tab = tab || localStorage.getItem("aas-tab"); } catch {} if (tab === "setup") $("tab-setup").click(); })();
 </script>
