@@ -97,7 +97,7 @@ export async function setupModel() {
     if (value) {
       if (!exists(dir)) { status = "fail"; detail = "This folder does not exist."; }
       else {
-        try { fs.accessSync(dir, fs.constants.W_OK); status = "ok"; detail = "Runs are saved here."; } catch { status = "fail"; detail = "This folder is not writable."; }
+        try { fs.accessSync(dir, fs.constants.W_OK); status = "ok"; detail = ""; } catch { status = "fail"; detail = "This folder is not writable."; }
         if (status === "ok" && ON_WINDOWS && !/^\/mnt\/[a-z]\//.test(`${dir}/`)) { status = "warn"; detail = "Not on a Windows drive: OBS cannot record into it."; }
       }
     }
@@ -107,7 +107,7 @@ export async function setupModel() {
   // Node
   {
     const v = version(process.version);
-    add({ group: "General", id: "node", label: "Node.js", kind: "info", value: process.version, status: atLeast(v, [22]) ? "ok" : "fail", detail: atLeast(v, [22]) ? "Version 22 or newer." : "Needs Node 22 or newer." });
+    add({ group: "General", id: "node", label: "Node.js", kind: "info", value: process.version, status: atLeast(v, [22]) ? "ok" : "fail", detail: atLeast(v, [22]) ? "" : "Version 22 or newer is needed." });
   }
 
   // OBS
@@ -117,13 +117,13 @@ export async function setupModel() {
     let status = "ok"; const notes = [];
     if (!exists(obsExe)) { status = "fail"; notes.push("OBS Studio not found; install it from obsproject.com or choose obs64.exe."); }
     else if (!atLeast(v, [30])) { status = "fail"; notes.push(`OBS ${versions[obsExe] || "?"}; version 30 or newer is needed.`); }
-    else notes.push(`OBS ${versions[obsExe]}.`);
+    else notes.push(`OBS ${versions[obsExe]}`);
     let fix = null;
     if (exists(obsExe)) {
       if (!ws) { status = "fail"; notes.push("Its WebSocket server was never set up: OBS → Tools → WebSocket Server Settings."); }
       else if (!ws.server_enabled) { status = "fail"; notes.push("Its WebSocket server is off: OBS → Tools → WebSocket Server Settings → Enable."); }
       else {
-        notes.push(`WebSocket server on port ${ws.server_port}.`);
+        notes[notes.length - 1] += `, WebSocket port ${ws.server_port}.`;
         const want = `ws://127.0.0.1:${ws.server_port}`;
         if (ws.auth_required && ws.server_password !== env.AAS_OBS_PASSWORD) { status = status === "ok" ? "warn" : status; notes.push("The password in the settings is not the one OBS uses."); fix = { id: "obs-password", label: "Use OBS's password" }; }
         else if ((env.AAS_OBS_URL || "ws://127.0.0.1:4455") !== want) { status = status === "ok" ? "warn" : status; notes.push(`The address should be ${want}.`); fix = { id: "obs-password", label: "Use OBS's settings" }; }
@@ -141,16 +141,17 @@ export async function setupModel() {
       const cfg = path.join(path.dirname(exe), "settings.cfg");
       const text = exists(cfg) ? fs.readFileSync(cfg, "utf8") : "";
       const server = /<ServerStartup>1<\/ServerStartup>/.test(text);
-      detail = server ? "Ready: the harness can control the timer (LiveSplit's server starts with it)." : "Installed, but the harness cannot control the timer yet: LiveSplit's server does not start with it.";
+      const pinned = detect.aasToolsDir() && exe.startsWith(path.join(detect.aasToolsDir(), "LiveSplit")) ? JSON.parse(fs.readFileSync(path.join(REPO, "packages", "timer-livesplit", "UPSTREAM.json"), "utf8")).livesplit.version : null;
+      detail = server ? (pinned ? `LiveSplit ${pinned}` : "") : "Its server does not start with LiveSplit, so the harness cannot use it.";
       if (!server) { status = "warn"; fix = { id: "livesplit-server", label: "Start the server with LiveSplit" }; }
       else if (ON_WINDOWS) {
         const { windowsSetupStatus } = await import("../../../timer-livesplit/windows-setup.mjs");
         const w = windowsSetupStatus(exe);
         if (!w.outboundBlocked || !w.fileTypes) {
           status = "warn";
-          detail += ` But at every start LiveSplit will ask ${[!w.outboundBlocked && "whether to install updates", !w.fileTypes && "for administrator rights (to link .lss files to itself)"].filter(Boolean).join(" and ")}.`;
+          detail = `LiveSplit asks ${[!w.outboundBlocked && "about updates", !w.fileTypes && "for administrator rights"].filter(Boolean).join(" and ")} at every start.`;
           fix = { id: "livesplit-windows", label: "Stop LiveSplit's questions (Windows asks permission once)" };
-        } else detail += " It starts without asking anything: it has no internet access (so no update questions) and .lss files already open in it.";
+        }
       }
     }
     add({ group: "Tools", id: "livesplit", env: "AAS_LIVESPLIT_EXE", label: "LiveSplit (timer)", kind: "file", expect: "LiveSplit.exe", value: toWindows(exe), suggest: !env.AAS_LIVESPLIT_EXE && exists(exe) ? toWindows(exe) : null, status, detail, fix });
@@ -159,7 +160,7 @@ export async function setupModel() {
   // Steam
   {
     const exe = env.AAS_STEAM_EXE ? toLocal(env.AAS_STEAM_EXE) : steamInfo.exe;
-    add({ group: "Tools", id: "steam", env: "AAS_STEAM_EXE", label: "Steam", kind: "file", expect: "steam.exe", value: toWindows(exe ?? ""), status: exists(exe) ? "ok" : "warn", detail: exists(exe) ? `Found; ${steamInfo.libraries.length} library folder(s).` : "Not found; needed for Steam games." });
+    add({ group: "Tools", id: "steam", env: "AAS_STEAM_EXE", label: "Steam", kind: "file", expect: "steam.exe", value: toWindows(exe ?? ""), status: exists(exe) ? "ok" : "warn", detail: exists(exe) ? "" : "Not found; needed for Steam games." });
   }
 
   // ffmpeg
@@ -167,16 +168,16 @@ export async function setupModel() {
     const out = cli("ffmpeg", ["-version"]);
     const probe = cli("ffprobe", ["-version"]);
     const v = version(out?.match(/ffmpeg version (\S+)/)?.[1]);
-    add({ group: "Tools", id: "ffmpeg", label: "ffmpeg (video cut, length)", kind: "info", value: out ? `ffmpeg ${out.match(/ffmpeg version (\S+)/)?.[1]}` : "", status: out && probe && atLeast(v, [6]) ? "ok" : "fail", detail: out ? (probe ? (atLeast(v, [6]) ? "Version 6 or newer, with ffprobe." : "Version 6 or newer is needed.") : "ffprobe is missing.") : "Not found. In WSL: sudo apt install ffmpeg" });
+    add({ group: "Tools", id: "ffmpeg", label: "ffmpeg (video cut, length)", kind: "info", value: out ? `ffmpeg ${out.match(/ffmpeg version (\S+)/)?.[1]}` : "", status: out && probe && atLeast(v, [6]) ? "ok" : "fail", detail: out ? (probe ? (atLeast(v, [6]) ? "" : "Version 6 or newer is needed.") : "ffprobe is missing.") : "Not found. In WSL: sudo apt install ffmpeg" });
   }
 
   // Agents
   {
     const claude = cli("claude", ["--version"]);
     const cv = version(claude);
-    add({ group: "Agents", id: "claude", label: "Claude Code", kind: "info", value: claude ?? "", status: claude ? (atLeast(cv, [2, 1, 207]) ? "ok" : "warn") : "missing", detail: claude ? (atLeast(cv, [2, 1, 207]) ? "Installed and new enough." : "Version 2.1.207 or newer is needed.") : "Not installed (only needed for runs with Claude)." });
+    add({ group: "Agents", id: "claude", label: "Claude Code", kind: "info", value: claude ?? "", status: claude ? (atLeast(cv, [2, 1, 207]) ? "ok" : "warn") : "missing", detail: claude ? (atLeast(cv, [2, 1, 207]) ? "" : "Version 2.1.207 or newer is needed.") : "Not installed (only needed for runs with Claude)." });
     const codex = cli("codex", ["--version"]);
-    add({ group: "Agents", id: "codex", label: "Codex", kind: "info", value: codex ?? "", status: codex ? "ok" : "missing", detail: codex ? "Installed." : "Not installed (only needed for runs with Codex)." });
+    add({ group: "Agents", id: "codex", label: "Codex", kind: "info", value: codex ?? "", status: codex ? "ok" : "missing", detail: codex ? "" : "Not installed (only needed for runs with Codex)." });
   }
 
   // Display and audio (optional)
@@ -185,18 +186,18 @@ export async function setupModel() {
     try { displays = listDisplays(); } catch { /* not available */ }
     const games = await guiGames();
     const current = games.map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
-    add({ group: "Screen and sound", id: "display", label: "Display for the game", kind: "display", value: current, options: displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height })), status: "ok", detail: current ? "The game, and LiveSplit next to it, open on this display." : "The game opens where Windows puts it. Choose another display to keep runs off your desktop." });
+    add({ group: "Screen and sound", id: "display", label: "Display for the game", kind: "display", value: current, options: displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height })), status: "ok", detail: "" });
     const svv = toLocal(svvExe ?? "");
     const v = versions[svv];
-    add({ group: "Screen and sound", id: "svv", env: "AAS_SOUNDVOLUMEVIEW", label: "SoundVolumeView (NirSoft)", kind: "file", expect: "SoundVolumeView.exe", value: toWindows(svv), suggest: !env.AAS_SOUNDVOLUMEVIEW && exists(svv) ? toWindows(svv) : null, status: exists(svv) ? "ok" : "missing", detail: exists(svv) ? `Version ${v || "?"}: switches the sound device while a game starts.` : "Optional: needed only to keep game sound off your speakers.", fix: exists(svv) ? null : { id: "install-svv", label: "Install SoundVolumeView" } });
+    add({ group: "Screen and sound", id: "svv", env: "AAS_SOUNDVOLUMEVIEW", label: "SoundVolumeView (NirSoft)", kind: "file", expect: "SoundVolumeView.exe", value: toWindows(svv), suggest: !env.AAS_SOUNDVOLUMEVIEW && exists(svv) ? toWindows(svv) : null, status: exists(svv) ? "ok" : "missing", detail: exists(svv) ? `SoundVolumeView ${v || "?"}` : "Only needed to keep game sound off your speakers.", fix: exists(svv) ? null : { id: "install-svv", label: "Install SoundVolumeView" } });
     let devices = [];
     if (exists(svv)) {
       const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "list-audio.mjs")], { encoding: "utf8", timeout: 20000, env: { ...process.env, AAS_SOUNDVOLUMEVIEW: svv, AAS_QUIET_AUDIO_DEVICE: "-" } });
       try { devices = JSON.parse(r.stdout); } catch { devices = []; }
     }
     const quiet = env.AAS_QUIET_AUDIO_DEVICE ?? "";
-    add({ group: "Screen and sound", id: "quiet", env: "AAS_QUIET_AUDIO_DEVICE", label: "Sound device for the game", kind: "select", value: quiet, options: [{ value: "", label: "Normal (your default device)" }, ...devices.map((d) => ({ value: d, label: d }))], status: quiet && !devices.includes(quiet) && exists(svv) ? "warn" : "ok", detail: quiet ? (devices.includes(quiet) || !exists(svv) ? "The game's sound goes to this device; the recording still has it." : "This device is not active now.") : "The game plays on your default device." });
-    add({ group: "Screen and sound", id: "awake", env: "AAS_KEEP_DISPLAYS_AWAKE", label: "Keep displays awake during a run", kind: "check", value: env.AAS_KEEP_DISPLAYS_AWAKE === "1" ? "1" : "", status: "ok", detail: "Needed when the sound device is a display's HDMI audio." });
+    add({ group: "Screen and sound", id: "quiet", env: "AAS_QUIET_AUDIO_DEVICE", label: "Sound device for the game", kind: "select", value: quiet, options: [{ value: "", label: "Normal (your default device)" }, ...devices.map((d) => ({ value: d, label: d }))], status: quiet && !devices.includes(quiet) && exists(svv) ? "warn" : "ok", detail: quiet && exists(svv) && !devices.includes(quiet) ? "This device is not active now." : "" });
+    add({ group: "Screen and sound", id: "awake", env: "AAS_KEEP_DISPLAYS_AWAKE", label: "Keep displays awake during a run", kind: "check", value: env.AAS_KEEP_DISPLAYS_AWAKE === "1" ? "1" : "", status: "ok", detail: "" });
   }
 
   // Games
@@ -212,7 +213,7 @@ export async function setupModel() {
           const rows = (await plugin.doctor?.({}).catch((e) => [{ ok: false, what: "checks", detail: e.message }])) ?? [];
           const bad = rows.filter((r) => !r.ok);
           status = bad.length ? "warn" : "ok";
-          detail = bad.length ? `Not ready: ${bad.map((r) => r.what).join(", ")}.` : "Installed and ready.";
+          detail = bad.length ? `Not ready: ${bad.map((r) => r.what).join(", ")}.` : "";
         }
       }
       add({ group: "Games", id: `game-${plugin.id}`, game: plugin.id, env: s.env, label: s.label, kind: s.kind, expect: s.expect, value: toWindows(current), suggest: found && found.path !== current ? `${toWindows(found.path)}` : null, suggestSource: found?.source ?? null, status, detail, fix: plugin.setup.install && current && exists(current) ? { id: `install:${plugin.id}`, label: status === "ok" ? "Install again" : "Install what the game needs" } : null, file });
