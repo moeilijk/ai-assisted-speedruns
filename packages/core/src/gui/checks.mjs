@@ -68,8 +68,8 @@ export async function configItems() {
       item("Screen and sound", "display", "Display for the game", "display", null, { value: display, options: display ? [{ value: display, label: display }] : [] }),
       item("Screen and sound", "svv", "SoundVolumeView (NirSoft)", "file", "AAS_SOUNDVOLUMEVIEW", { expect: "SoundVolumeView.exe" }),
       item("Screen and sound", "quiet", "Sound device for the game", "select", "AAS_QUIET_AUDIO_DEVICE", { options: [{ value: "", label: "Normal (your default device)" }, ...(env.AAS_QUIET_AUDIO_DEVICE ? [{ value: env.AAS_QUIET_AUDIO_DEVICE, label: env.AAS_QUIET_AUDIO_DEVICE }] : [])] }),
-      // A plain preference: nothing to check, so no status.
-      item("Screen and sound", "awake", "Keep displays awake during a run", "check", "AAS_KEEP_DISPLAYS_AWAKE", { status: "none", detail: "" }),
+      // A plain preference: there is nothing to check, so this row has no check and no status at all.
+      item("Screen and sound", "awake", "Keep displays awake during a run", "check", "AAS_KEEP_DISPLAYS_AWAKE", { check: false }),
     ] : []),
     ...games.flatMap(({ plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect }))),
   ];

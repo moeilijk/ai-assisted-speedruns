@@ -266,7 +266,7 @@ function row(i) {
   const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${i.id}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
   const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
-    <div><div class="name">${esc(i.label)}</div>${i.status === "none" ? "" : `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>`}</div>
+    <div><div class="name">${esc(i.label)}</div>${i.status ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>` : ""}</div>
     <div class="field">${field}${fix}</div>
     <div class="detail muted">${esc(i.detail)}</div>${suggest}</div>`;
 }

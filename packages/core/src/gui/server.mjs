@@ -40,7 +40,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   const saveCache = () => { try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 2)); } catch { /* not kept */ } };
   const pending = new Set();
   const withResult = (item) => {
-    if (item.status === "none") return item;
+    if (item.check === false) return item;
     if (pending.has(item.id)) return { ...item, status: "pending", detail: "" };
     const c = cache[item.id];
     if (!c || c.value !== item.value) return { ...item, status: "unchecked", detail: "" };
@@ -73,7 +73,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
     }
   };
   const startChecks = async (ids) => {
-    const all = (await configItems()).filter((i) => i.status !== "none").map((i) => i.id);
+    const all = (await configItems()).filter((i) => i.check !== false).map((i) => i.id);
     for (const id of ids ?? all) {
       if (!all.includes(id) || pending.has(id)) continue;
       pending.add(id);
