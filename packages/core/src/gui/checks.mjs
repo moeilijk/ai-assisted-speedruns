@@ -210,7 +210,8 @@ export async function setupModel() {
         if (!exists(current)) { status = "fail"; detail = "This folder does not exist."; }
         else if (s.expect && !exists(path.join(current, s.expect))) { status = "fail"; detail = `${s.expect} is not in this folder.`; }
         else {
-          const rows = (await plugin.doctor?.({}).catch((e) => [{ ok: false, what: "checks", detail: e.message }])) ?? [];
+          const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "game-doctor.mjs"), file], { encoding: "utf8", timeout: 60000, env: process.env });
+          let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "checks", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
           const bad = rows.filter((r) => !r.ok);
           status = bad.length ? "warn" : "ok";
           detail = bad.length ? `Not ready: ${bad.map((r) => r.what).join(", ")}.` : "";

@@ -114,14 +114,14 @@ export default {
       settings: { resolution: process.env.AAS_PORTAL_RESOLUTION ?? "1920x1080", cvars: "game-config/ (portal_agent.cfg, agent_run.cfg)" },
     };
   },
-  /** Read-only checks for `aas doctor`: the Source Unpack, Steam, the SPT files, the audio routing, the autoexec. */
+  /** Read-only checks for `aas doctor`: the Source Unpack, the SPT files, the audio routing, the autoexec. Steam is not
+   *  checked: the launcher starts it when it is not running. */
   async doctor() {
     const rows = [];
     const add = (ok, what, detail = "") => rows.push({ ok, what, detail });
     const root = process.env.AAS_PORTAL_GAME_ROOT;
     add(Boolean(root && existsSync(join(root, "portal", "cfg"))), "AAS_PORTAL_GAME_ROOT (Source Unpack)", root ?? "not set");
     if (!root) return rows;
-    try { const { steamRunning } = await import("../../packages/core/src/windows/steam.mjs"); add(steamRunning(), "Steam running and logged in (hl2.exe needs it, also for every -hijack)"); } catch (e) { add(false, "Steam check", e.message); }
     for (const f of ["portal/spt.dll", "portal/addons/spt.vdf", "portal/cfg/agent_run.cfg", "portal/cfg/portal_agent.cfg", "hl2/addons/speedrun_demorecord-2007.dll"]) add(existsSync(join(root, f)), `game file ${f}`);
     try {
       const { audioStatus, CONFIGURED, DEVICE, NOT_CONFIGURED } = await import("../../packages/core/src/windows/audio-route.mjs");

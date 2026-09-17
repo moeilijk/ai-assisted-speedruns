@@ -481,6 +481,32 @@ export default {
       },
     };
   },
+  /** Read-only checks for `aas doctor` and the GUI: what `npm run sts:install` puts in place, and the Workshop mods the
+   *  launcher needs. */
+  async doctor() {
+    const rows = [];
+    const add = (ok, what, detail = "") => rows.push({ ok: Boolean(ok), what, detail });
+    add(GAME_ROOT && existsSync(join(GAME_ROOT, "SlayTheSpire.exe")), "Slay the Spire folder", GAME_ROOT ?? "AAS_STS_GAME_ROOT is not set");
+    if (!GAME_ROOT) return rows;
+    const upstream = JSON.parse(readFileSync(join(here, "UPSTREAM.json"), "utf8")).communication_mod;
+    const jar = join(GAME_ROOT, "mods", "CommunicationMod.jar");
+    add(existsSync(jar) && createHash("sha256").update(readFileSync(jar)).digest("hex") === upstream.sha256, `Communication Mod ${upstream.version}`, jar);
+    add(existsSync(join(GAME_ROOT, "mods", "BaseMod.jar")), "BaseMod", join(GAME_ROOT, "mods", "BaseMod.jar"));
+    const workshop = process.env.AAS_STS_WORKSHOP ?? resolve(GAME_ROOT, "..", "..", "workshop", "content", "646570");
+    add(existsSync(join(workshop, "1605060445", "ModTheSpire.jar")), "ModTheSpire (Steam Workshop)", join(workshop, "1605060445"));
+    const tools = process.env.AAS_STS_TOOLS_DIR ?? join(GAME_ROOT, "aas");
+    add(existsSync(join(tools, "bridge.mjs")) && readFileSync(join(tools, "bridge.mjs"), "utf8") === readFileSync(join(here, "bridge.mjs"), "utf8"), "bridge (current copy)", join(tools, "bridge.mjs"));
+    // Communication Mod starts the bridge named in its own config (written by install-mod.mjs).
+    try {
+      const { spawnSync } = await import("node:child_process");
+      const local = spawnSync("cmd.exe", ["/c", "echo %LOCALAPPDATA%"], { encoding: "utf8", cwd: "/mnt/c" }).stdout.trim();
+      const file = join(spawnSync("wslpath", ["-u", local], { encoding: "utf8" }).stdout.trim(), "ModTheSpire", "CommunicationMod", "config.properties");
+      const bridgeWin = spawnSync("wslpath", ["-w", join(tools, "bridge.mjs")], { encoding: "utf8" }).stdout.trim();
+      const command = (readFileSync(file, "utf8").match(/^command=(.*)$/m)?.[1] ?? "").replace(/\\(.)/g, "$1");
+      add(command.includes(bridgeWin), "Communication Mod starts this bridge", command || file);
+    } catch (e) { add(false, "Communication Mod config", e.message); }
+    return rows;
+  },
   /** Closes the game and undoes the launcher's set-up; the harness calls this when a run ends. */
   async close({ log = () => {} } = {}) {
     const { closeGame } = await import("./close-game.mjs");
