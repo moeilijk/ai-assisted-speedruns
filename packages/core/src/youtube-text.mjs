@@ -81,6 +81,25 @@ const facts = (s) => {
   return { game, goal, models, several: names.length > 1, reached, igt, real };
 };
 
+/**
+ * The moments of a video that belong to this run: for a run that reached its goal, nothing after the goal (owner
+ * 2026-09-17, the cut of the act 1 run: after the Act 1 boss the video shows the game's main menu of a later session,
+ * and "the run is resumed, the goal is extended" belongs to an extension that is not published). A segment that
+ * starts after the goal (its first moment is a resume after completion) has none.
+ */
+function runChapters(chapters, f) {
+  const sorted = [...(chapters ?? [])].sort((a, b) => a.at - b.at);
+  if (!f.reached) return sorted;
+  const out = [];
+  for (const c of sorted) {
+    if (/^Human: resumed after completed/.test(String(c.label))) break;
+    out.push(c);
+    if (String(c.label) === f.goal) break;
+  }
+  return out;
+}
+const afterGoal = (video, f) => f.reached && /^Human: resumed after completed/.test(String([...(video.chapters ?? [])].sort((a, b) => a.at - b.at)[0]?.label ?? ""));
+
 /** The suggested title: who plays what, which video, and how it ended. */
 export function videoTitle(summary, video) {
   const f = facts(summary);
@@ -128,7 +147,7 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const which = video.kind === "cut"
     ? `This cut leaves out the pauses while the model was thinking: ${full} of recording in ${own}.`
     : video.kind === "segment"
-      ? `This is part ${video.part} of ${video.parts} of the recording: ${own} of ${full}. ${video.part < video.parts ? `The run was paused here and continues in part ${video.part + 1}.` : "The run continues here after a pause."}`
+      ? `This is part ${video.part} of ${video.parts} of the recording: ${own} of ${full}. ${afterGoal(video, f) ? "It was recorded after the run had reached its goal." : video.part < video.parts ? `The run was paused here and continues in part ${video.part + 1}.` : "The run continues here after a pause."}`
       : `This is the whole recording: ${own}.`;
   // What the picture shows: LiveSplit when the OBS recorder recorded it next to the LiveSplit timer, and the harness's
   // overlay (recorder-obs and overlay-server.mjs place them).
@@ -141,12 +160,13 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
   ].join(" ");
   // Only what this video shows, as "m:ss what happens", moments less than ten seconds apart on one line. When the
   // moments make YouTube chapters, the start is listed too, at 0:00.
+  const own_chapters = afterGoal(video, f) ? [] : runChapters(video.chapters, f);
   const moments = [];
-  for (const c of [...(video.chapters ?? [])].sort((a, b) => a.at - b.at)) {
+  for (const c of own_chapters) {
     const last = moments.at(-1);
     if (last && c.at - last.at < 10) { if (!last.raw.includes(c.label)) last.raw.push(c.label); } else moments.push({ at: c.at, raw: [c.label] });
   }
-  const chapters = youtubeChapters(videoMoments(video.chapters ?? [], s), video.seconds);
+  const chapters = youtubeChapters(videoMoments(own_chapters, s), video.seconds);
   const lines = moments
     .map((m) => ({ at: m.at, text: momentText(m.raw, s, f) ?? (chapters && youtubeTime(m.at) === "0:00" ? "Start" : null) }))
     .filter((m) => m.text)

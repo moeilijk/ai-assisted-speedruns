@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.6 — 2026-09-17
+
+- Video descriptions describe only what belongs to the run: for a run that reached its goal, the moments stop at the
+  goal, and a part of the recording made after the goal says so instead of listing the resume and the goal extension
+  (owner, 2026-09-17, the cut of the act 1 run: after the Act 1 boss it shows the main menu of a later session).
+
 ## 0.19.5 — 2026-09-17
 
 - GUI Setup: every row is checked on its own and shows "Checking…" until its result is in; saving a setting checks

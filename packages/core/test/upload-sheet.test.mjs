@@ -68,7 +68,8 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(part1.includes(`line:  ${fp} · 1368 s`) && part1.includes("\n22:42 The run reaches the Act 1 boss."));
   assert.ok(part1.includes("Title: Claude Sonnet 5 plays Slay the Spire (part 1 of 2): reached the Act 1 boss in 00:02:57.4"));
   assert.ok(part2.includes(`line:  ${fp} · 191 s`));
-  assert.ok(part2.includes("\n0:04 The run is resumed.\n") && !/person|cost|exited/.test(part2), "part 2's moments on its own clock, without how the person restarted it");
+  const part2Text = part2.split("-".repeat(78))[1];
+  assert.ok(part2Text.includes("It was recorded after the run had reached its goal.") && !/resumed|person|cost|exited/.test(part2Text), "part 2 comes after the goal: no moments of the unpublished extension");
   assert.ok(readFileSync(writeUploadSheet(runDir), "utf8").includes("This run is an example."), "bundle and note are remembered");
 });
 

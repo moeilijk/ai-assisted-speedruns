@@ -99,11 +99,16 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   assert.equal(videoTitle(summary, part1), "Claude Sonnet 5 plays Slay the Spire (part 1 of 2): reached the Act 1 boss in 00:02:57.4");
   assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Goal: the Act 1 boss\. The run reached the Act 1 boss after 00⁠:02⁠:57\.4 of game time and 00⁠:22⁠:42 of real time\.\n/);
   assert.match(one, /\nThis is part 1 of 2 of the recording: 00⁠:22⁠:48 of 00⁠:25⁠:59\. The run was paused here and continues in part 2\.\n/);
-  assert.match(two, /\nThis is part 2 of 2 of the recording: 00⁠:03⁠:11 of 00⁠:25⁠:59\. The run continues here after a pause\.\n/);
   assert.match(one, /\nTop left: LiveSplit, the speedrun timer\. Bottom left: the current section, real time \(RTA\), game time \(IGT\) and the model's last command\.\n/);
   assert.match(one, /\n22:42 The run reaches the Act 1 boss\.\n/);
   assert.doesNotMatch(one, /Act 3/, "the extension is not in part 1");
-  assert.match(two, /\n0:05 The run is resumed\. The goal is extended to the Act 3 boss\.\n/);
+  // After the goal: part 2 of this act 1 run is a later session (the main menu); its resume and the goal extension belong
+  // to an extension that is not published, so they are not described.
+  assert.doesNotMatch(two, /resumed|extended|Act 3/);
+  assert.match(two, /This is part 2 of 2 of the recording: 00\u2060:03\u2060:11 of 00\u2060:25\u2060:59\. It was recorded after the run had reached its goal\.\n/);
+  const cutAfter = videoDescription(summary, { kind: "cut", seconds: 769, line: "aas0123456789abcdef0123456789abcdef", chapters: [{ at: 0, label: "Start" }, { at: 675.5, label: "Act 1 boss" }, { at: 678, label: "Human: resumed after completed" }, { at: 678, label: "Human: goal extended from act1 to act3" }] }, { archiveUrl: "https://ai-assisted-speedruns.org" });
+  assert.match(cutAfter, /\n11:15 The run reaches the Act 1 boss\.\n/);
+  assert.doesNotMatch(cutAfter, /resumed|extended/);
   assert.doesNotMatch(two, /person/, "how the run was restarted is the archive's to show");
   assert.doesNotMatch(two + one, /Claude Code|https?:|Moments/);
   assert.equal(one.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
