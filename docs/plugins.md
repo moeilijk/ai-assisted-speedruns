@@ -21,6 +21,12 @@ export default {
   segments: ["Level 1", "Level 2"],                  // the splits (chapter milestones), in order
   ends: [{ id: "level1", label: "Level 1", split: "Level 1" }, { id: "end", label: "The end", split: "Level 2", final: true }],   // required: the game's ends, each with a label, exactly one `final` (the default goal)
   stub: false,                   // true for a planned plugin that is not implemented: it loads, and `aas configure` refuses it
+  setup: {                       // optional: what `aas gui` needs to offer the game (see below)
+    folder: "MyGame",            // runs go to <output>/MyGame/<run>/
+    settings: [{ env: "AAS_MY_GAME_ROOT", label: "My Game folder", kind: "dir", expect: "mygame.exe", find: { steam: 123450 } }],
+    install: join(here, "install-mod.mjs"), launch: join(here, "launch-game.mjs"), stop: join(here, "stop-all.mjs"),
+    splits: { end: join(here, "splits", "mygame.lss") }, bot: join(here, "bot.mjs"), displayEnv: "AAS_MY_GAME_WINDOW_POS",
+  },
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim
   goalPrompt: "Play the run that has been started for you to the end.", // the first prompt
@@ -45,6 +51,8 @@ export default {
 **Hardening.** The broker process runs under `node --permission` with reads limited to core plus `readable` and writes to the run directory, and `hardening.mjs` limits sockets to `endpoints`. Its environment holds the harness's own variables and the names in `env`, nothing else (a password or a machine path the harness uses never reaches the broker or the published configuration). Design the game side so that this is enough: the controller connects to a local bridge or mod, nothing else. `fetch` is blocked; a bridge that speaks HTTP is reached with [`json-rpc-http.mjs`](../packages/core/src/json-rpc-http.mjs) (`node:http`, one call at a time, a deadline that covers connecting). When the upstream bridge also offers what the agent must not use (debug or cheat methods, starting and loading runs), declare a filtering bridge of your own as the endpoint instead, as Balatro does, so the broker cannot reach the upstream port at all.
 
 **The game side.** `prepareRun` runs after the recorder started and before the agent starts (t0 is the recording start); it starts the new game and resolves when the agent may act, returning the seed when the game has one. `saveState`/`loadState` make `aas resume` possible: the harness calls `saveState` every ten minutes, at chapter milestones and at the end of the session, and `loadState` with the chosen save at a resume. `endRun` runs after the agent stopped and before the recorder stops. `close` runs at the end of `aas run` and `aas resume` (and from the manual stop command) and closes the game the way a user would; nothing is killed, what does not close is reported. Launch is a script of your own (`launch-game.mjs`) wired as an npm script; the doctor checks the endpoints it leaves behind. On Windows, [`packages/core/src/windows/`](../packages/core/src/windows/) has what every launcher needs: `ensureSteam()`, `listDisplays()`/`displayAt()`, and `beforeGameStart()`/`afterGameClose()` for the per-machine options (quiet audio device, displays kept awake).
+
+**The GUI.** A game with `setup` appears in `aas gui`. `settings` are the machine settings the game needs (written to `.env`); `find` names where the GUI looks for the folder first (a Steam app id, an Epic display name, a GOG game id); `expect` is a file the folder must contain. `install`, `launch` and `stop` are the game's own scripts, run as they are; `splits` maps an end id to a LiveSplit file; `bot` makes a mock run possible with the `scripted` runtime; `displayEnv` (and `resolutionEnv`) is the variable the launcher reads for the display to play on, set from the GUI's display choice.
 
 **Ground truth.** Keep the game's own records (save files, run history, demo files) in the run directory under a folder that is never published, and provide a way to read them next to the harness's timeline (Slay the Spire: `save-track.mjs`, Portal: `demo-track.mjs`). That is what the splits are checked against.
 

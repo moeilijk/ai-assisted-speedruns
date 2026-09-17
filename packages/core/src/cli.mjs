@@ -18,7 +18,7 @@ const dotEnv = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..
 if (fs.existsSync(dotEnv)) process.loadEnvFile(dotEnv);
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
-const BOOLEAN_FLAGS = new Set(["strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
+const BOOLEAN_FLAGS = new Set(["no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
 function parse(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
@@ -190,10 +190,17 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         process.exitCode = r.findings.length ? 1 : 0;
         break;
       }
+      case "gui": {
+        const { startGui } = await import("./gui/server.mjs");
+        await startGui({ port: Number(opts.port ?? 8770), open: !opts["no-open"] });
+        await new Promise(() => {}); // runs until Ctrl-C (or the window's own end)
+        break;
+      }
       default:
         console.error(
           [
             "Usage:",
+            "  aas gui [--port 8770] [--no-open]           a web page to set up tools and games and to start runs; shows the commands it runs",
             "  aas configure --runtime <codex|claude-code> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file]",
             "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [configure options]",
             "                                           when the run ends the game, the timer, the recorder and a Steam the launcher started are closed; --keep-open leaves them",

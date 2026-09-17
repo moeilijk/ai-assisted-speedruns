@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AAS runs</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e2e1dc;
+    --accent: #2b5fd9; --accent-ink: #ffffff; --ok: #1f7a4d; --warn: #9a6400; --fail: #b3261e; --code: #f0efea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #161615; --panel: #1f1f1d; --ink: #ecebe6; --muted: #9c9b94; --line: #33332f; --accent: #7aa2ff; --accent-ink: #0b1020; --ok: #5ccf94; --warn: #e3b04b; --fail: #ff8a80; --code: #2a2a27; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 system-ui, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); position: sticky; top: 0; z-index: 2; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .ver { color: var(--muted); font-size: 13px; }
+  nav { display: flex; gap: 4px; margin-left: auto; }
+  nav button { background: none; border: 0; padding: 8px 14px; border-radius: 8px; color: var(--muted); font: inherit; cursor: pointer; }
+  nav button.on { background: var(--code); color: var(--ink); font-weight: 600; }
+  main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+  section { display: none; }
+  section.on { display: block; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  .panel h2 { font-size: 15px; margin: 0 0 12px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 16px; }
+  label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); }
+  input, select { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  button.b { font: inherit; border-radius: 8px; padding: 8px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; white-space: nowrap; }
+  button.b:disabled { opacity: .45; cursor: default; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button.danger { color: var(--fail); }
+  .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+  .muted { color: var(--muted); }
+  .path { font-family: ui-monospace, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+  .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+  .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
+  .warn .dot { background: var(--warn); } .warn { color: var(--warn); }
+  .fail .dot, .missing .dot { background: var(--fail); } .fail, .missing { color: var(--fail); }
+  .phase { font-weight: 600; }
+  pre.cmds { background: var(--code); border-radius: 8px; padding: 12px; margin: 0; overflow-x: auto; font: 13px/1.6 ui-monospace, Consolas, monospace; white-space: pre; }
+  .cmds .c { color: var(--muted); }
+  .cmds .run { font-weight: 600; }
+  #log { background: var(--code); border-radius: 8px; padding: 10px 12px; height: 340px; overflow: auto; font: 12.5px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  #log .cmd { color: var(--accent); font-weight: 600; }
+  #log .err { color: var(--fail); }
+  #log .note { color: var(--warn); }
+  #log .head { font-weight: 700; }
+  #log .t { color: var(--muted); }
+  .setting { display: grid; grid-template-columns: minmax(180px, 240px) 1fr; gap: 6px 16px; padding: 12px 0; border-top: 1px solid var(--line); }
+  .setting:first-of-type { border-top: 0; }
+  .setting .name { font-weight: 600; }
+  .setting .field { display: flex; gap: 8px; flex-wrap: wrap; }
+  .setting .field input, .setting .field select { flex: 1 1 280px; }
+  .setting .detail { grid-column: 2; font-size: 13px; }
+  .suggest { grid-column: 2; font-size: 13px; }
+  .suggest button { margin-left: 6px; }
+  @media (max-width: 640px) { .setting { grid-template-columns: 1fr; } .setting .detail, .suggest { grid-column: 1; } header { flex-wrap: wrap; } nav { margin-left: 0; } }
+  dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--ink); width: min(640px, 94vw); padding: 0; }
+  dialog::backdrop { background: rgb(0 0 0 / .35); }
+  .dlg-head { padding: 14px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 8px; align-items: center; }
+  .dlg-list { max-height: 50vh; overflow: auto; padding: 6px 0; }
+  .dlg-list div { padding: 7px 16px; cursor: pointer; display: flex; gap: 8px; }
+  .dlg-list div:hover { background: var(--code); }
+  .dlg-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
+  .result a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Assisted Speedruns</h1><span class="ver">tooling %VERSION%</span>
+  <nav><button id="tab-run" class="on">Run</button><button id="tab-setup">Setup</button></nav>
+</header>
+<main>
+<section id="run" class="on">
+  <div class="panel">
+    <h2>New run</h2>
+    <div class="grid">
+      <label class="f">Game<select id="game"></select></label>
+      <label class="f">Run type<select id="runtime"></select></label>
+      <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
+      <label class="f">Goal<select id="goal"></select></label>
+      <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
+      <label class="f">Seed (optional)<input id="seed" placeholder="the game picks one" autocomplete="off"></label>
+    </div>
+    <p class="muted" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
+    <div class="row-actions">
+      <button class="b primary" id="start">Start</button>
+      <button class="b danger" id="stop">Stop</button>
+      <span class="status" id="phase"><span class="dot"></span><span class="phase">idle</span></span>
+      <span class="muted" id="step"></span>
+    </div>
+    <div class="result muted" id="result" style="margin-top:10px"></div>
+  </div>
+  <div class="panel">
+    <h2>What this runs, as commands</h2>
+    <p class="muted" style="margin:0 0 10px">The same steps in a WSL shell, from the repository folder. They change with your choices above.</p>
+    <pre class="cmds" id="cmds"></pre>
+    <div class="row-actions"><button class="b" id="copy">Copy commands</button><span class="muted" id="copied"></span></div>
+  </div>
+  <div class="panel">
+    <h2>Log</h2>
+    <div id="log" aria-live="polite"></div>
+  </div>
+</section>
+
+<section id="setup">
+  <div class="panel">
+    <div class="row-actions" style="margin-top:0">
+      <button class="b" id="recheck">Check again</button>
+      <span class="muted">Settings are saved in <span class="path" id="envfile"></span> — the same file the command line uses.</span>
+    </div>
+  </div>
+  <div id="groups"></div>
+</section>
+</main>
+
+<dialog id="browse">
+  <div class="dlg-head"><button class="b" id="up">↑</button><span class="path" id="bpath"></span></div>
+  <div class="dlg-list" id="blist"></div>
+  <div class="dlg-foot"><button class="b" id="bcancel">Cancel</button><button class="b primary" id="bpick">Choose this folder</button></div>
+</dialog>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const api = async (url, body) => {
+  const r = await fetch(url, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+};
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// Tabs
+for (const t of ["run", "setup"]) $(`tab-${t}`).onclick = () => {
+  for (const u of ["run", "setup"]) { $(`tab-${u}`).classList.toggle("on", u === t); $(u).classList.toggle("on", u === t); }
+  if (t === "setup") loadSetup();
+  try { localStorage.setItem("aas-tab", t); } catch {}
+};
+
+// Run tab
+let games = [], runtimes = [], phase = "idle", nameTouched = false;
+async function loadGames() {
+  const j = await api("/api/games");
+  games = j.games; runtimes = j.runtimes;
+  const keep = $("game").value;
+  $("game").innerHTML = games.map((g) => `<option value="${g.id}">${esc(g.name)}${g.ready ? "" : " (not set up)"}</option>`).join("");
+  if (keep) $("game").value = keep;
+  fillGame();
+}
+function fillGame() {
+  const g = games.find((x) => x.id === $("game").value);
+  if (!g) return;
+  const keepRt = $("runtime").value;
+  $("runtime").innerHTML = runtimes.filter((r) => r.id !== "scripted" || g.mock).map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join("");
+  if ([...$("runtime").options].some((o) => o.value === keepRt)) $("runtime").value = keepRt;
+  $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}" ${e.final ? "selected" : ""}>${esc(e.label)}</option>`).join("");
+  fillRuntime();
+}
+function fillRuntime() {
+  const g = games.find((x) => x.id === $("game").value);
+  const rt = $("runtime").value;
+  $("runname").placeholder = g?.next?.[rt] ?? "";
+  if (!nameTouched) $("runname").value = "";
+  if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
+  if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
+  refreshPlan();
+}
+const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim() });
+let planTimer = null;
+function refreshPlan() {
+  clearTimeout(planTimer);
+  planTimer = setTimeout(async () => {
+    const c = choices();
+    const q = new URLSearchParams(Object.entries(c).filter(([, v]) => v));
+    try {
+      const p = await api(`/api/plan?${q}`);
+      $("where").textContent = p.runDir;
+      $("cmds").innerHTML = p.steps.map((s) => `<span class="c"># ${esc(s.title)}</span>\n<span class="${s.id === "run" ? "run" : ""}">${esc(s.shown)}</span>`).join("\n\n")
+        + (p.stop ? `\n\n<span class="c"># Only if something stayed open</span>\n${esc(p.stop)}` : "");
+      $("cmds").dataset.text = p.steps.map((s) => `# ${s.title}\n${s.shown}`).join("\n\n");
+    } catch (e) { $("cmds").textContent = e.message; }
+  }, 120);
+}
+for (const id of ["game", "runtime", "goal", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
+$("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
+$("start").onclick = async () => {
+  const c = choices();
+  if (c.runtime !== "scripted" && !confirm("This starts an AI run: it uses your plan's budget. Start?")) return;
+  try { await api("/api/start", c); nameTouched = false; } catch (e) { alert(e.message); }
+};
+$("stop").onclick = async () => {
+  if (phase === "idle" && !confirm("Nothing is running. Close the game, LiveSplit and OBS?")) return;
+  try { await api("/api/stop", { game: $("game").value }); } catch (e) { alert(e.message); }
+};
+const PHASES = { idle: ["ok", "Ready"], starting: ["warn", "Starting"], running: ["warn", "Running"], stopping: ["warn", "Stopping"], finishing: ["warn", "Making the bundle"], working: ["warn", "Working"] };
+const STEPS = { game: "starting the game", obs: "starting OBS", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
+function showState(s) {
+  phase = s.phase;
+  const [cls, label] = PHASES[s.phase] ?? ["warn", s.phase];
+  $("phase").className = `status ${cls}`;
+  $("phase").querySelector(".phase").textContent = label;
+  $("step").textContent = s.step ? (STEPS[s.step] ?? s.step) : "";
+  $("start").disabled = s.phase !== "idle";
+  $("stop").textContent = s.phase === "idle" ? "Close everything" : "Stop";
+  if (s.result && s.phase === "idle") {
+    const r = s.result;
+    const link = (p, t) => (p ? `<a data-open="${esc(p)}">${esc(t)}</a>` : "");
+    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "run folder"), link(r.recording, "recording"), link(r.bundle, "bundle (zip)")].filter(Boolean).join(" · ")}`;
+  }
+  if (s.phase === "idle") loadGames();
+}
+$("result").onclick = (e) => { const p = e.target.dataset?.open; if (p) api("/api/open", { path: p }).catch((x) => alert(x.message)); };
+function addLine(l) {
+  const box = $("log");
+  const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
+  const div = document.createElement("div");
+  div.className = l.kind;
+  div.innerHTML = `<span class="t">${esc(l.at)}</span> ${esc(l.text)}`;
+  box.appendChild(div);
+  while (box.children.length > 2000) box.firstChild.remove();
+  if (atEnd) box.scrollTop = box.scrollHeight;
+}
+
+// Setup tab
+let setup = null;
+async function loadSetup() {
+  $("groups").innerHTML = `<div class="panel muted">Checking…</div>`;
+  setup = await api("/api/setup");
+  $("envfile").textContent = setup.envFile;
+  const groups = [...new Set(setup.items.map((i) => i.group))];
+  $("groups").innerHTML = groups.map((g) => `<div class="panel"><h2>${esc(g)}</h2>${setup.items.filter((i) => i.group === g).map(row).join("")}</div>`).join("");
+}
+const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set" };
+function row(i) {
+  let field = "";
+  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${i.kind === "dir" ? "folder" : esc(i.expect ?? "file")}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
+  else if (i.kind === "select") field = `<select id="v-${i.id}" data-autosave="${i.id}">${i.options.map((o) => `<option value="${esc(o.value)}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+  else if (i.kind === "display") field = `<select id="v-${i.id}" data-display="1"><option value="">Where Windows puts it</option>${i.options.map((o) => `<option value="${esc(o.value)}" data-size="${o.width}x${o.height}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+  else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${i.id}" data-autosave="${i.id}" ${i.value ? "checked" : ""}> on</label>`;
+  else field = `<span class="path">${esc(i.value || "—")}</span>`;
+  const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${i.id}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
+  const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
+  return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
+    <div><div class="name">${esc(i.label)}</div><span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span></div>
+    <div class="field">${field}${fix}</div>
+    <div class="detail muted">${esc(i.detail)}</div>${suggest}</div>`;
+}
+const envOf = (id) => setup.items.find((i) => i.id === id)?.env;
+async function saveValue(id, value) {
+  const item = setup.items.find((i) => i.id === id);
+  await api("/api/settings", { values: { [item.env]: value }, paths: item.kind === "dir" || item.kind === "file" ? [item.env] : [] });
+  await loadSetup();
+}
+$("groups").addEventListener("click", async (e) => {
+  const t = e.target.closest("button");
+  if (!t) return;
+  try {
+    if (t.dataset.save) await saveValue(t.dataset.save, $(`v-${t.dataset.save}`).value.trim());
+    else if (t.dataset.use) await saveValue(t.dataset.use, t.dataset.value);
+    else if (t.dataset.fix) { t.disabled = true; t.textContent = "Working…"; await api("/api/fix", { id: t.dataset.fix }); await loadSetup(); }
+    else if (t.dataset.browse) {
+      const picked = await browse($(`v-${t.dataset.browse}`).value, t.dataset.kind, t.dataset.expect);
+      if (picked) await saveValue(t.dataset.browse, picked);
+    }
+  } catch (err) { alert(err.message); await loadSetup(); }
+});
+$("groups").addEventListener("change", async (e) => {
+  const t = e.target;
+  try {
+    if (t.dataset.autosave) await saveValue(t.dataset.autosave, t.type === "checkbox" ? (t.checked ? "1" : "") : t.value);
+    else if (t.dataset.display !== undefined) { const o = t.selectedOptions[0]; await api("/api/settings", { display: t.value, displaySize: o?.dataset.size ?? "" }); await loadSetup(); }
+  } catch (err) { alert(err.message); }
+});
+$("recheck").onclick = loadSetup;
+
+// Folder and file picker (the browser cannot hand full paths to the page, so the harness lists them)
+function browse(start, kind, expect) {
+  return new Promise((resolve) => {
+    const dlg = $("browse");
+    let current = "";
+    const dirOf = (p) => (kind === "file" && /\.[a-z0-9]+$/i.test(p) ? p.replace(/[\\/][^\\/]*$/, "") : p);
+    const show = async (p) => {
+      const j = await api(`/api/browse?path=${encodeURIComponent(p)}`);
+      current = j.path;
+      $("bpath").textContent = j.path || "Drives";
+      $("up").disabled = j.parent === null && !j.path;
+      $("up").onclick = () => show(j.parent ?? "");
+      $("bpick").style.display = kind === "dir" && j.path ? "" : "none";
+      const list = j.entries.filter((x) => x.dir || kind === "file");
+      $("blist").innerHTML = (j.error ? `<div class="muted">${esc(j.error)}</div>` : "") + list.map((x) => `<div data-p="${esc(x.path)}" data-dir="${x.dir ? 1 : ""}">${x.dir ? "📁" : (expect && x.name.toLowerCase() === expect.toLowerCase() ? "✅" : "📄")} ${esc(x.name)}</div>`).join("");
+    };
+    $("blist").onclick = (e) => {
+      const d = e.target.closest("div[data-p]");
+      if (!d) return;
+      if (d.dataset.dir) show(d.dataset.p);
+      else { dlg.close(); resolve(d.dataset.p); }
+    };
+    $("bpick").onclick = () => { dlg.close(); resolve(current); };
+    $("bcancel").onclick = () => { dlg.close(); resolve(null); };
+    show(dirOf(start || "")).catch(() => show(""));
+    dlg.showModal();
+  });
+}
+
+// Live state and log
+(async () => {
+  const j = await api("/api/state");
+  for (const l of j.lines) addLine(l);
+  await loadGames();
+  showState(j.state);
+  // ?static: no live connection (page screenshots in tests); the page shows the state it loaded.
+  if (new URLSearchParams(location.search).has("static")) return;
+  const ev = new EventSource("/api/events");
+  ev.addEventListener("state", (e) => showState(JSON.parse(e.data)));
+  ev.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
+})();
+(() => { let tab = new URLSearchParams(location.search).get("tab"); try { tab = tab || localStorage.getItem("aas-tab"); } catch {} if (tab === "setup") $("tab-setup").click(); })();
+</script>
+</body>
+</html>

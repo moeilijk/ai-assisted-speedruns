@@ -147,12 +147,19 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     await autosave?.onEvent(ev);
   });
   let result;
+  // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
+  // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
+  const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
+  process.once("SIGINT", stopRequested);
+  process.once("SIGTERM", stopRequested);
   try {
     result = await runtime.start(runDir, brief);
   } catch (error) {
     result = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
     events.append("run.error", { message: result.notes });
   }
+  process.off("SIGINT", stopRequested);
+  process.off("SIGTERM", stopRequested);
   autosave?.stop();
   if (result.status !== "failed") result = { ...result, deaths: (outcome.deaths ?? 0) + deaths, ...(over ? { status: "completed", over, notes: [result.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
   if (plugin.saveState && result.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });

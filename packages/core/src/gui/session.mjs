@@ -1,0 +1,216 @@
+// What the GUI's Start and Stop do. Every step is one of the harness's own commands, run as a child process and
+// shown in the log with the command line, so whatever the GUI does can be done (and continued) from a shell.
+// One session at a time: start the game, OBS and LiveSplit, run `aas run`, then `aas timeline` and `aas publish`.
+import { spawn } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { readEnv, writeEnv } from "./env-file.mjs";
+import { guiGames } from "./checks.mjs";
+import { aasToolsDir, obsWebsocketConfig } from "./detect.mjs";
+import { toLocal, toWindows } from "./windows-paths.mjs";
+
+const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
+const CLI = path.join(REPO, "packages", "core", "src", "cli.mjs");
+const rel = (p) => path.relative(REPO, p) || p;
+
+export const RUNTIMES = [
+  { id: "scripted", label: "Mock run (script, no AI)", prefix: "mock" },
+  { id: "claude-code", label: "Claude Code (AI run)", prefix: "claude" },
+  { id: "codex", label: "Codex (AI run)", prefix: "codex" },
+];
+
+export function createSession() {
+  const lines = [];
+  const listeners = new Set();
+  let state = { phase: "idle", step: null, game: null, run: null, runDir: null, runtime: null, startedAt: null, result: null };
+  let child = null;
+  let cancelled = false;
+  const emit = (type, data) => { for (const l of listeners) l(type, data); };
+  const log = (text, kind = "out") => {
+    for (const t of String(text).split(/\r?\n/)) {
+      if (!t.trim()) continue;
+      const line = { at: new Date().toTimeString().slice(0, 8), kind, text: t };
+      lines.push(line);
+      if (lines.length > 3000) lines.shift();
+      emit("line", line);
+    }
+  };
+  const set = (patch) => { state = { ...state, ...patch }; emit("state", state); };
+
+  /** Runs `node <args>` from the repository; resolves with the exit code. `shown` is the command as a person would type it. */
+  const node = (args, shown) => new Promise((resolve) => {
+    log(`$ ${shown ?? `node ${args.map((a) => (/\s/.test(a) ? `"${a}"` : a)).join(" ")}`}`, "cmd");
+    child = spawn(process.execPath, args, { cwd: REPO, env: process.env, stdio: ["ignore", "pipe", "pipe"] });
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (d) => log(d));
+    child.stderr.on("data", (d) => log(d));
+    child.on("error", (e) => { log(e.message, "err"); resolve(1); });
+    child.on("close", (code) => { child = null; resolve(code ?? 1); });
+  });
+
+  const nextRunName = (gameFolder, prefix) => {
+    const out = toLocal(readEnv().AAS_OUTPUT_DIR ?? "");
+    const dir = out ? path.join(out, gameFolder) : null;
+    for (let n = 1; n < 1000; n += 1) {
+      const name = `${prefix}-${String(n).padStart(2, "0")}`;
+      if (!dir || !fs.existsSync(path.join(dir, name))) return name;
+    }
+    return `${prefix}-${Date.now()}`;
+  };
+
+  const q = (a) => (/[\s"'()&;|<>$]/.test(a) ? `"${a}"` : a);
+  const CLI_SHOWN = "node packages/core/src/cli.mjs";
+
+  /**
+   * The commands a session runs for these choices, in order, exactly as a person would type them in the repository
+   * folder: the GUI runs these steps and shows them as a worked example of the CLI.
+   */
+  async function plan(opts) {
+    const env = readEnv();
+    const output = toLocal(env.AAS_OUTPUT_DIR ?? "");
+    const games = await guiGames();
+    const g = games.find((x) => x.plugin.id === opts.game);
+    if (!g) throw new Error(`Unknown game: ${opts.game}`);
+    const setup = g.plugin.setup;
+    const runtime = RUNTIMES.find((r) => r.id === opts.runtime);
+    if (!runtime) throw new Error(`Unknown run type: ${opts.runtime}`);
+    const run = String(opts.run || nextRunName(setup.folder, runtime.prefix)).trim();
+    const runDir = output ? path.join(output, setup.folder, run) : `<output>/${setup.folder}/${run}`;
+    const pub = output ? path.join(output, setup.folder, "public", run) : `<output>/${setup.folder}/public/${run}`;
+    const goal = opts.goal || g.plugin.ends.find((e) => e.final)?.id;
+    const livesplit = Boolean(env.AAS_LIVESPLIT_EXE) && fs.existsSync(toLocal(env.AAS_LIVESPLIT_EXE));
+    const splits = setup.splits?.[goal];
+    const npmScript = (file) => Object.entries(JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8")).scripts).find(([, cmd]) => cmd.endsWith(rel(file)))?.[0];
+    const shownScript = (file) => (npmScript(file) ? `npm run ${npmScript(file)}` : `node ${rel(file)}`);
+    const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", "obs", ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
+    if (runtime.id === "scripted") runArgs.push("--bot", setup.bot);
+    if (opts.maxMinutes) runArgs.push("--max-minutes", String(Number(opts.maxMinutes)));
+    if (opts.seed) runArgs.push("--seed", String(opts.seed));
+    // Long command lines are shown one option per line (bash continuation), so they stay readable and still paste.
+    const shownArgs = (args) => {
+      const words = args.map((a) => (a === g.file || a === setup.bot ? rel(a) : q(a)));
+      const parts = [words[0]];
+      for (let i = 1; i < words.length; i += 1) {
+        if (words[i].startsWith("--") && words[i + 1] !== undefined && !words[i + 1].startsWith("--")) { parts.push(`${words[i]} ${words[i + 1]}`); i += 1; } else parts.push(words[i]);
+      }
+      return parts.join(" \\\n    ");
+    };
+    const steps = [
+      { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
+      { id: "obs", title: "Start OBS (the recording)", args: [path.join(REPO, "packages", "recorder-obs", "launch-obs.mjs")], shown: "npm run obs:launch" },
+      ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
+      { id: "run", title: runtime.id === "scripted" ? "The run, played by the script; it closes the game, LiveSplit and OBS at the end" : "The run, played by the AI; it closes the game, LiveSplit and OBS at the end", args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
+      { id: "timeline", title: "Times, sections and the cut list", args: [CLI, "timeline", runDir], shown: `${CLI_SHOWN} timeline ${q(runDir)}` },
+      { id: "publish", title: "The bundle for the archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+    ];
+    return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
+  }
+
+  async function start(opts) {
+    if (state.phase !== "idle") throw new Error("A session is already running.");
+    const p = await plan(opts);
+    const { game: g, setup, runtime, run, runDir, pub, output } = p;
+    if (!output || !fs.existsSync(output)) throw new Error("Choose an output location first (Setup).");
+    if (runtime.id === "scripted" && !setup.bot) throw new Error(`${g.plugin.name} has no scripted player for a mock run.`);
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(run)) throw new Error("A run name may only have letters, digits, - and _.");
+    if (fs.existsSync(runDir)) throw new Error(`${toWindows(runDir)} already exists; choose another run name.`);
+    cancelled = false;
+    set({ phase: "starting", step: "game", game: g.plugin.id, run, runDir: toWindows(runDir), runtime: runtime.id, startedAt: new Date().toISOString(), result: null });
+    log(`Session: ${g.plugin.name}, ${runtime.label}, run ${run} → ${toWindows(runDir)}`, "head");
+    const byId = Object.fromEntries(p.steps.map((st) => [st.id, st]));
+    (async () => {
+      try {
+        const step = async (st) => {
+          if (cancelled) throw new Error("stopped");
+          set({ step: st.id });
+          const code = await node(st.args, st.shown);
+          if (code !== 0) throw new Error(`${st.title} failed (exit ${code})`);
+        };
+        await step(byId.game);
+        await step(byId.obs);
+        if (byId.livesplit) await step(byId.livesplit);
+        else log("LiveSplit is not set up: the run has no timer on screen (the splits are still published).", "note");
+        if (cancelled) throw new Error("stopped");
+        set({ phase: "running", step: "run" });
+        const runCode = await node(byId.run.args, byId.run.shown);
+        set({ phase: "finishing", step: "publish" });
+        let outcome = null;
+        try { outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8")); } catch { /* the run did not get that far */ }
+        const result = { status: outcome?.status ?? (runCode === 0 ? "unknown" : "failed"), notes: outcome?.notes ?? null, runDir: toWindows(runDir), recording: null, bundle: null };
+        try { const rec = fs.readdirSync(path.join(runDir, "recording")).find((f) => /\.(mp4|mkv)$/i.test(f)); if (rec) result.recording = toWindows(path.join(runDir, "recording", rec)); } catch { /* no recording */ }
+        // A run that ended before it started (a failed check) has closed nothing: close it here.
+        if (!outcome && p.stop) { log("The run did not start; closing what was started.", "note"); await node(p.stop.args, p.stop.shown); }
+        if (fs.existsSync(path.join(runDir, "run.jsonl")) && outcome) {
+          await node(byId.timeline.args, byId.timeline.shown);
+          const code = await node(byId.publish.args, byId.publish.shown);
+          if (fs.existsSync(`${pub}.zip`)) result.bundle = toWindows(`${pub}.zip`);
+          if (code !== 0) log("The bundle does not meet every rule yet; see the check above.", "note");
+        }
+        set({ phase: "idle", step: null, result });
+        log(`Session ended: ${result.status}${result.bundle ? `; bundle ${result.bundle}` : ""}`, "head");
+      } catch (error) {
+        log(String(error.message ?? error), "err");
+        if (p.stop) { log("Closing what was started.", "note"); await node(p.stop.args, p.stop.shown); }
+        set({ phase: "idle", step: null, result: { status: cancelled ? "stopped" : "failed", notes: String(error.message ?? error), runDir: toWindows(runDir) } });
+      }
+    })();
+    return state;
+  }
+
+  /** Stop: a running agent session ends like a budget stop (the run saves, keeps its recording and closes everything);
+   *  before that, the start is cancelled after the current step; with nothing running, everything is closed. */
+  async function stop(gameId) {
+    if (state.phase === "running" && child) { log("Stopping the run (the game is saved and the recording kept).", "note"); set({ phase: "stopping" }); child.kill("SIGINT"); return state; }
+    if (state.phase === "starting") { cancelled = true; log("Stopping after this step.", "note"); return state; }
+    if (state.phase !== "idle") return state;
+    const games = await guiGames();
+    const g = games.find((x) => x.plugin.id === (gameId ?? state.game)) ?? games[0];
+    set({ phase: "stopping", step: "close" });
+    const p = await plan({ game: g.plugin.id, runtime: "scripted" }).catch(() => null);
+    await node([g.plugin.setup.stop], p?.stop?.shown ?? `node ${rel(g.plugin.setup.stop)}`);
+    set({ phase: "idle", step: null });
+    return state;
+  }
+
+  /** One-click fixes named by the set-up checks. */
+  async function fix(id) {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    set({ phase: "working", step: id });
+    try {
+      if (id === "obs-password") {
+        const ws = obsWebsocketConfig();
+        if (!ws) throw new Error("OBS's WebSocket settings were not found.");
+        writeEnv({ AAS_OBS_URL: `ws://127.0.0.1:${ws.server_port}`, AAS_OBS_PASSWORD: ws.auth_required ? ws.server_password : "" });
+        log("OBS's WebSocket address and password copied into the settings.", "note");
+      } else if (id === "install-livesplit") {
+        const dir = path.join(aasToolsDir(), "LiveSplit");
+        const code = await node([path.join(REPO, "packages", "timer-livesplit", "install-livesplit.mjs"), dir], `node packages/timer-livesplit/install-livesplit.mjs "${toWindows(dir)}"`);
+        if (code !== 0) throw new Error("LiveSplit could not be installed.");
+        writeEnv({ AAS_LIVESPLIT_EXE: path.join(dir, "LiveSplit.exe") });
+      } else if (id === "livesplit-server") {
+        const { enableServerStartup } = await import("../../../timer-livesplit/install-livesplit.mjs");
+        log(enableServerStartup(path.join(path.dirname(toLocal(readEnv().AAS_LIVESPLIT_EXE)), "settings.cfg")), "note");
+        log("LiveSplit reads this when it starts; close it first if it is open.", "note");
+      } else if (id.startsWith("install:")) {
+        const g = (await guiGames()).find((x) => x.plugin.id === id.slice(8));
+        if (!g?.plugin.setup.install) throw new Error("Nothing to install for this game.");
+        const code = await node([g.plugin.setup.install], `node ${rel(g.plugin.setup.install)}`);
+        if (code !== 0) throw new Error(`Installing for ${g.plugin.name} failed.`);
+      } else throw new Error(`Unknown fix: ${id}`);
+    } catch (error) {
+      log(error.message, "err");
+      throw error;
+    } finally {
+      set({ phase: "idle", step: null });
+    }
+  }
+
+  return {
+    get state() { return state; },
+    get lines() { return lines; },
+    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    plan, start, stop, fix, nextRunName, log,
+  };
+}

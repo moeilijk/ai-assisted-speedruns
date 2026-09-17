@@ -64,6 +64,17 @@ export default {
   /** The variables the controller reads inside the broker; nothing else of the environment reaches it. */
   env: ["AAS_BALATRO_HOST", "AAS_BALATRO_PORT", "AAS_BALATRO_DECK", "AAS_BALATRO_STAKE", "AAS_BALATRO_PROCESS", "AAS_BALATRO_ACTION_TIMEOUT_MS"],
   ends: ENDS,
+  /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
+  setup: {
+    folder: "Balatro",
+    settings: [{ env: "AAS_BALATRO_GAME_ROOT", label: "Balatro folder", kind: "dir", expect: "Balatro.exe", find: { steam: 2379780, epic: "Balatro" } }],
+    install: join(here, "install-mod.mjs"),
+    launch: join(here, "launch-game.mjs"),
+    stop: join(here, "stop-all.mjs"),
+    splits: { win: join(here, "splits", "balatro-win.lss") },
+    bot: join(here, "bot.mjs"),
+    displayEnv: "AAS_BALATRO_WINDOW_POS",
+  },
   readable: [here],
   segments: SEGMENTS,
   // Turn-based: the cut video keeps a few seconds after each action so its result is seen.

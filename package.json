@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.18.3",
+  "version": "0.18.4",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -35,8 +35,9 @@
     "packages/timer-livesplit"
   ],
   "scripts": {
-    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/balatro/*.mjs; do node --check \"$f\" || exit 1; done",
+    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/core/src/gui/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/balatro/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "AAS_WITNESS_URL=off node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
+    "gui": "node packages/core/src/cli.mjs gui",
     "portal:fetch": "node --env-file-if-exists=.env games/portal/fetch-portal-agent.mjs",
     "portal:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/portal/plugin.mjs --run-dir runs/portal-check --exercise",
     "portal:install": "node --env-file-if-exists=.env games/portal/install-game-files.mjs",

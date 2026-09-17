@@ -1,0 +1,9 @@
+{
+  "livesplit": {
+    "repo": "https://github.com/LiveSplit/LiveSplit",
+    "version": "1.8.37",
+    "url": "https://github.com/LiveSplit/LiveSplit/releases/download/1.8.37/LiveSplit_1.8.37.zip",
+    "sha256": "14bc8ef8ded9ef4033fb2f0cb6a152386d393127da18a4de14f096c5347aa991",
+    "license": "MIT (Licenses.txt in the zip lists the licenses of its libraries)"
+  }
+}

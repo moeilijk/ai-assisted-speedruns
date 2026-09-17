@@ -12,6 +12,21 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.18.4 — 2026-09-17
+
+- `aas gui` (`npm run gui`, or `AAS.cmd` from Windows): a local web page to set up and start runs without a shell.
+  Setup finds the tools and games in their standard places (registry, Program Files, `%LOCALAPPDATA%\aas`, the
+  Steam libraries, Epic, GOG; drives are never searched), checks versions and use, and fixes what it can with one
+  click. Run shows the commands for the chosen game, run type, name, goal, limit and seed, and Start runs exactly those;
+  runs go to `<AAS_OUTPUT_DIR>/<game>/<run>/`.
+- Game plugins can declare `setup` (folder, settings with store look-up, install/launch/stop scripts, splits, bot,
+  display variable); Balatro, Slay the Spire and Portal do.
+- `aas run` and `aas resume` stop the agent session on Ctrl-C or SIGTERM like a budget stop: the game is saved, the
+  recording kept and everything closed.
+- LiveSplit 1.8.37 is pinned (`packages/timer-livesplit/UPSTREAM.json`); `install-livesplit.mjs` installs it with its
+  server starting with it.
+- The Portal installer takes `AAS_PORTAL_GAME_ROOT` when `--game-root` is not given.
+
 ## 0.18.3 — 2026-09-17
 
 - Code that is not about one game left the game folders: Steam, displays, quiet audio and keep-awake are in

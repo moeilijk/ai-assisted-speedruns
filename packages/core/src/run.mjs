@@ -195,12 +195,19 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const follower = followEvents(runDir, forward);
 
   let outcome;
+  // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
+  // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
+  const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
+  process.once("SIGINT", stopRequested);
+  process.once("SIGTERM", stopRequested);
   try {
     outcome = await runtime.start(runDir, brief);
   } catch (error) {
     outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
     events.append("run.error", { message: outcome.notes });
   }
+  process.off("SIGINT", stopRequested);
+  process.off("SIGTERM", stopRequested);
   autosave?.stop();
   if (outcome.status !== "failed") outcome = { ...outcome, deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
   // A final save state, so a stopped run can be resumed from exactly here.

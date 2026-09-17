@@ -111,7 +111,8 @@ ai-assisted-speedruns/
   package.json                  npm workspaces
   packages/
     core/                       broker, hardening, run log, run/resume/timeline/render/publish/check, `aas` CLI;
-                                src/windows/: Steam, displays, quiet audio, keep-awake, shared by the game launchers
+                                src/windows/: Steam, displays, quiet audio, keep-awake, shared by the game launchers;
+                                src/gui/: `aas gui`, a local web page over the same commands
     spec/                       the AAS standard
     recorder-obs/               OBS through obs-websocket v5
     recorder-source-demo/       in-game Source demos through SPT IPC

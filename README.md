@@ -12,7 +12,8 @@ Pre-release. The 0.x versions are for testing the setup: installing, recording a
 
 ```
 packages/
-  core/                 the aas command: broker, process hardening, run log, run/resume, timeline, render, publish, check
+  core/                 the aas command: broker, process hardening, run log, run/resume, timeline, render, publish, check;
+                        gui/ (aas gui), windows/ (Steam, displays, sound device, keep-awake for the launchers)
   spec/                 SPEC.md, the bundle format
   runtime-claude-code/  runs Claude Code against the broker, with its tools locked down
   runtime-codex/        the same for Codex
@@ -54,7 +55,14 @@ After `aas resume`, or after a tooling update that changes the bundle, you publi
 
 ## Install
 
-Full instructions, with a check per step: [docs/install.md](docs/install.md). In short:
+Full instructions, with a check per step: [docs/install.md](docs/install.md).
+
+**Without a command line:** after the clone (see below), double-click `AAS.cmd` in the repository folder, or run
+`npm run gui`. The page that opens finds the tools and games in their standard places (and the Steam, Epic and GOG
+libraries), checks their versions, installs what the games and LiveSplit need, and starts and stops runs. Runs are
+saved to `<output location>\<game>\<run>`. It shows every command it runs, so you can do the same from a shell.
+
+In short, from a shell:
 
 ```bash
 git clone https://github.com/moeilijk/ai-assisted-speedruns.git && cd ai-assisted-speedruns

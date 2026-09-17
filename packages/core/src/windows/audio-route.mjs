@@ -69,6 +69,10 @@ export function defaults(rows = listAll()) {
     names: { console: pick("Default")?.Name, multimedia: pick("Default Multimedia")?.Name, communications: pick("Default Communications")?.Name },
   };
 }
+/** The names of the active playback devices (for choosing the quiet device). */
+export function playbackDevices(rows = listAll()) {
+  return [...new Set(renderDevices(rows).map((r) => r.Name).filter(Boolean))].sort();
+}
 export function quietDevice(rows = listAll()) {
   return renderDevices(rows).find((r) => r.Name === DEVICE) ?? null;
 }

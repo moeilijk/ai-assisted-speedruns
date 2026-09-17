@@ -85,6 +85,18 @@ export default {
   segments: SPLITS,
   /** The game's one end: the credits; the completion marker in the agent's messages marks it for now. */
   ends: [{ id: "credits", label: "Credits", final: true }],
+  /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. Source Unpack is not a store
+   *  install, so its folder is not looked up. */
+  setup: {
+    folder: "Portal",
+    settings: [{ env: "AAS_PORTAL_GAME_ROOT", label: "Source Unpack folder (Portal)", kind: "dir", expect: "hl2.exe" }],
+    install: join(here, "install-game-files.mjs"),
+    launch: join(here, "launch-game.mjs"),
+    stop: join(here, "stop-all.mjs"),
+    splits: { credits: join(here, "splits", "portal-credits.lss") },
+    displayEnv: "AAS_PORTAL_WINDOW_POS",
+    resolutionEnv: "AAS_PORTAL_RESOLUTION",
+  },
   /** Everything someone needs to reproduce this run: the game build, the in-game tooling with its pin, and the settings. */
   async build() {
     return {

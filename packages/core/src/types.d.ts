@@ -94,6 +94,28 @@ export interface Controller {
   close?(): void;
 }
 
+/** A game's set-up for `aas gui`. Scripts are Node modules run with the repository's .env loaded. */
+export interface GameSetup {
+  /** Folder name under the output location: runs go to `<output>/<folder>/<run>/`. */
+  folder: string;
+  /** Machine settings the game needs, written to .env. `expect` names a file the folder must contain; `find` says where
+   *  the GUI looks for it first (a Steam app id, an Epic display name, a GOG game id). */
+  settings: { env: string; label: string; kind: "dir" | "file"; expect?: string; find?: { steam?: number; epic?: string; gog?: string } }[];
+  /** Installs what the plugin adds to the game (mods, config); may be run again. */
+  install?: string;
+  /** Starts the game and whatever bridge it needs; leaves a game that is already up alone. */
+  launch: string;
+  /** Closes what the harness started for this game. */
+  stop?: string;
+  /** LiveSplit splits file per end id. */
+  splits?: Record<string, string>;
+  /** A bot module for the `scripted` runtime (a mock run). */
+  bot?: string;
+  /** The variable the launcher reads for the display to play on ("X,Y"), and for the window size ("WxH"). */
+  displayEnv?: string;
+  resolutionEnv?: string;
+}
+
 export interface GamePlugin {
   /** `^[a-z][a-z0-9_]*$`; becomes the tool-name prefix. */
   id: string;
@@ -129,6 +151,8 @@ export interface GamePlugin {
   ends: { id: string; label: string; split?: string; final?: boolean }[];
   /** A planned plugin that is not implemented: it loads and declares its ends, and `aas configure` refuses it. */
   stub?: boolean;
+  /** What `aas gui` needs to set the game up and start it. A game without it does not appear in the GUI. */
+  setup?: GameSetup;
   /** Default first prompt for the agent (the goal); `aas configure --prompt` overrides it. */
   goalPrompt?: string;
   /** Optional extra checks for `aas check-connection --exercise`. */

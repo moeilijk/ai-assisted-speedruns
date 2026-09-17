@@ -156,6 +156,17 @@ export default {
   /** The variables the controller reads inside the broker; nothing else of the environment reaches it. */
   env: ["AAS_STS_HOST", "AAS_STS_PORT", "AAS_STS_GAME_ROOT", "AAS_STS_CLASS", "AAS_STS_ASCENSION", "AAS_STS_SEED", "AAS_STS_PROCESS", "AAS_STS_CONTINUE_XY", "AAS_STS_DEATH_CONTINUE_XY", "AAS_STS_COMMAND_TIMEOUT_MS"],
   ends: ENDS,
+  /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
+  setup: {
+    folder: "SlayTheSpire",
+    settings: [{ env: "AAS_STS_GAME_ROOT", label: "Slay the Spire folder", kind: "dir", expect: "SlayTheSpire.exe", find: { steam: 646570 } }],
+    install: join(here, "install-mod.mjs"),
+    launch: join(here, "launch-game.mjs"),
+    stop: join(here, "stop-all.mjs"),
+    splits: { act1: join(here, "splits", "sts-act1.lss"), act3: join(here, "splits", "sts-act3.lss") },
+    bot: join(here, "bot.mjs"),
+    displayEnv: "AAS_STS_WINDOW_POS",
+  },
   readable: [here],
   segments: SEGMENTS,
   // Turn-based: a command itself takes milliseconds; the cut video keeps a few seconds after each one so the result is seen.

@@ -27,6 +27,8 @@ The plugin, the bridge and the scripted player are this repository's own code (M
 
 ## Workflow
 
+In the GUI (`npm run gui`, or `AAS.cmd`): Setup → Balatro folder → *Install what the game needs*; Run → Balatro, *Mock run* or an AI run → Start. The same from a shell:
+
 ```bash
 npm run balatro:install                        # once: Lovely, Steamodded, balatrobot
 npm run balatro:doctor                         # read-only: game, mods, OBS, LiveSplit, runtime

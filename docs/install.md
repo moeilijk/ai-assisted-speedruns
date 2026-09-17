@@ -69,6 +69,13 @@ every plugin's own tests work on this machine. If it fails here, nothing below w
 Every command below is written as `aas <command>`; that is the package's bin,
 `node packages/core/src/cli.mjs <command> …`. Make it an alias or put it on your PATH, or type the long form.
 
+## 2a. The GUI
+
+`npm run gui` (or double-click `AAS.cmd` in the repository folder in Windows Explorer) opens a page in your browser
+that does §3 to §8 for you: it fills in and checks the settings below, installs what the games and LiveSplit need,
+and starts runs. It shows the commands it runs, so everything below stays available from the shell. The rest of this
+guide is the same set-up by hand.
+
 ## 3. Machine settings (`.env`)
 
 ```bash

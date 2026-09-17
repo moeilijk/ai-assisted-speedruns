@@ -5,7 +5,7 @@
 // Existing files are backed up as <name>.aas-backup once; the exec line is
 // added only if missing.
 //
-// Usage: node games/portal/install-game-files.mjs --game-root <Source Unpack folder> [--spt-dll <path>]
+// Usage: node games/portal/install-game-files.mjs [--game-root <Source Unpack folder>] [--spt-dll <path>]   (default: AAS_PORTAL_GAME_ROOT)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,8 +15,8 @@ const repoRoot = path.resolve(here, "..", "..");
 const portalAgent = path.resolve(process.env.AAS_PORTAL_AGENT_DIR || path.join(repoRoot, ".local", "portal-agent"));
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i === -1 ? null : args[i + 1]; };
-const gameRoot = opt("--game-root");
-if (!gameRoot) throw new Error("Usage: install-game-files --game-root <Source Unpack folder> [--spt-dll <path>]");
+const gameRoot = opt("--game-root") ?? process.env.AAS_PORTAL_GAME_ROOT;
+if (!gameRoot) throw new Error("Usage: install-game-files --game-root <Source Unpack folder> [--spt-dll <path>] (or AAS_PORTAL_GAME_ROOT)");
 const sptDll = opt("--spt-dll") ?? path.join(repoRoot, ".local", "SourcePauseTool", "build", "Release", "spt.dll");
 const portalDir = path.join(gameRoot, "portal");
 if (!fs.existsSync(path.join(portalDir, "cfg"))) throw new Error(`${portalDir}/cfg not found; is ${gameRoot} a Source Unpack folder?`);
