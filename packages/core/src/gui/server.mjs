@@ -5,7 +5,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { setupModel, guiGames } from "./checks.mjs";
+import { configModel, setupModel, guiGames } from "./checks.mjs";
 import { readEnv, writeEnv, ENV_FILE } from "./env-file.mjs";
 import { createSession, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
@@ -32,6 +32,8 @@ function listDir(p) {
 
 export async function startGui({ port = 8770, open = true, log = console.log } = {}) {
   const session = createSession();
+  let lastCheck = null;
+  const envStamp = () => { try { return String(fs.statSync(ENV_FILE).mtimeMs); } catch { return "none"; } };
   const clients = new Set();
   session.subscribe((type, data) => { for (const res of clients) res.write(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`); });
   const body = (req) => new Promise((resolve, reject) => { const c = []; req.on("data", (d) => c.push(d)); req.on("end", () => { try { resolve(c.length ? JSON.parse(Buffer.concat(c).toString("utf8")) : {}); } catch (e) { reject(e); } }); });
@@ -49,7 +51,15 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION));
       } else if (req.method === "GET" && url.pathname === "/api/setup") {
-        send(res, 200, { ...(await setupModel()), envFile: toWindows(ENV_FILE) });
+        // Fast: the settings as they are, or the last check while nothing changed since. ?check=1 runs the checks.
+        if (url.searchParams.get("check")) { lastCheck = { ...(await setupModel()), envStamp: envStamp() }; }
+        let model = lastCheck && lastCheck.envStamp === envStamp() ? lastCheck : await configModel();
+        if (lastCheck && model !== lastCheck) {
+          // A setting changed since the check: what did not change keeps its result, the rest shows "not checked".
+          const before = new Map(lastCheck.items.map((i) => [`${i.id}|${i.label}`, i]));
+          model = { ...model, checked: true, partly: true, at: lastCheck.at, items: model.items.map((i) => { const b = before.get(`${i.id}|${i.label}`); return b && (b.value ?? "") === (i.value ?? "") ? b : i; }) };
+        }
+        send(res, 200, { ...model, envFile: toWindows(ENV_FILE) });
       } else if (req.method === "POST" && url.pathname === "/api/settings") {
         const b = await body(req);
         const changes = {};
@@ -94,6 +104,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, { state: await session.stop((await body(req)).game) });
       } else if (req.method === "POST" && url.pathname === "/api/fix") {
         await session.fix((await body(req)).id);
+        lastCheck = null;
         send(res, 200, { ok: true });
       } else if (req.method === "POST" && url.pathname === "/api/open") {
         // Opens a folder or file from the page in Windows Explorer / the default program.

@@ -12,6 +12,13 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.3 — 2026-09-17
+
+- GUI Setup shows the settings as `.env` has them at once; the check runs only on its button ("Initial check" when
+  nothing is set, then "Check again"), and a changed setting keeps the other results.
+- SoundVolumeView (NirSoft, 2.53, pinned by sha256) is installed by the GUI into `%LOCALAPPDATA%\aas`
+  (`packages/core/src/windows/install-soundvolumeview.mjs`), as LiveSplit is.
+
 ## 0.19.2 — 2026-09-17
 
 - Balatro: Ante 1 to Ante 7 are ends of their own (`--goal ante1` … `ante7`), shorter goals for tests and first runs;

@@ -189,6 +189,11 @@ export function createSession() {
         const code = await node([path.join(REPO, "packages", "timer-livesplit", "install-livesplit.mjs"), dir], `node packages/timer-livesplit/install-livesplit.mjs "${toWindows(dir)}"`);
         if (code !== 0) throw new Error("LiveSplit could not be installed.");
         writeEnv({ AAS_LIVESPLIT_EXE: path.join(dir, "LiveSplit.exe") });
+      } else if (id === "install-svv") {
+        const dir = path.join(aasToolsDir(), "SoundVolumeView");
+        const code = await node([path.join(REPO, "packages", "core", "src", "windows", "install-soundvolumeview.mjs"), dir], `node packages/core/src/windows/install-soundvolumeview.mjs "${toWindows(dir)}"`);
+        if (code !== 0) throw new Error("SoundVolumeView could not be installed.");
+        writeEnv({ AAS_SOUNDVOLUMEVIEW: path.join(dir, "SoundVolumeView.exe") });
       } else if (id === "livesplit-server") {
         const { enableServerStartup } = await import("../../../timer-livesplit/install-livesplit.mjs");
         log(enableServerStartup(path.join(path.dirname(toLocal(readEnv().AAS_LIVESPLIT_EXE)), "settings.cfg")), "note");

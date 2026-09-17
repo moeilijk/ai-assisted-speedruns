@@ -41,6 +41,33 @@ function fileVersions(exes) {
   return map;
 }
 
+/** The settings as .env has them, without checking anything (fast): what the Setup page shows before a check. */
+export async function configModel() {
+  const env = readEnv();
+  const item = (group, id, label, kind, envName, extra = {}) => ({ group, id, label, kind, env: envName, value: envName && (kind === "dir" || kind === "file") ? toWindows(toLocal(env[envName] ?? "")) : (env[envName] ?? ""), status: "unchecked", detail: "", ...extra });
+  const games = await guiGames();
+  const display = games.map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
+  const items = [
+    item("General", "output", "Output location", "dir", "AAS_OUTPUT_DIR"),
+    item("General", "node", "Node.js", "info", null, { value: process.version }),
+    item("Tools", "obs", "OBS Studio (recording)", "file", "AAS_OBS_EXE", { expect: "obs64.exe" }),
+    item("Tools", "livesplit", "LiveSplit (timer)", "file", "AAS_LIVESPLIT_EXE", { expect: "LiveSplit.exe" }),
+    item("Tools", "steam", "Steam", "file", "AAS_STEAM_EXE", { expect: "steam.exe" }),
+    item("Tools", "ffmpeg", "ffmpeg (video cut, length)", "info", null),
+    item("Agents", "claude", "Claude Code", "info", null),
+    item("Agents", "codex", "Codex", "info", null),
+    ...(ON_WINDOWS ? [
+      item("Screen and sound", "display", "Display for the game", "display", null, { value: display, options: display ? [{ value: display, label: display }] : [] }),
+      item("Screen and sound", "svv", "SoundVolumeView (NirSoft)", "file", "AAS_SOUNDVOLUMEVIEW", { expect: "SoundVolumeView.exe" }),
+      item("Screen and sound", "quiet", "Sound device for the game", "select", "AAS_QUIET_AUDIO_DEVICE", { options: [{ value: "", label: "Normal (your default device)" }, ...(env.AAS_QUIET_AUDIO_DEVICE ? [{ value: env.AAS_QUIET_AUDIO_DEVICE, label: env.AAS_QUIET_AUDIO_DEVICE }] : [])] }),
+      item("Screen and sound", "awake", "Keep displays awake during a run", "check", "AAS_KEEP_DISPLAYS_AWAKE"),
+    ] : []),
+    ...games.flatMap(({ file, plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, file }))),
+  ];
+  const configured = ["AAS_OUTPUT_DIR", "AAS_OBS_EXE", "AAS_LIVESPLIT_EXE"].some((k) => env[k]) || games.some(({ plugin }) => env[plugin.setup.settings[0]?.env]);
+  return { items, checked: false, configured };
+}
+
 export async function setupModel() {
   const env = readEnv();
   const steamInfo = ON_WINDOWS ? detect.steam() : { exe: null, libraries: [], app: () => null };
@@ -152,7 +179,7 @@ export async function setupModel() {
     add({ group: "Screen and sound", id: "display", label: "Display for the game", kind: "display", value: current, options: displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height })), status: "ok", detail: current ? "The game, and LiveSplit next to it, open on this display." : "The game opens where Windows puts it. Choose another display to keep runs off your desktop." });
     const svv = toLocal(svvExe ?? "");
     const v = versions[svv];
-    add({ group: "Screen and sound", id: "svv", env: "AAS_SOUNDVOLUMEVIEW", label: "SoundVolumeView (NirSoft)", kind: "file", expect: "SoundVolumeView.exe", value: toWindows(svv), suggest: !env.AAS_SOUNDVOLUMEVIEW && exists(svv) ? toWindows(svv) : null, status: exists(svv) ? "ok" : "missing", detail: exists(svv) ? `Version ${v || "?"}: switches the sound device while a game starts.` : "Optional: needed only to keep game sound off your speakers." });
+    add({ group: "Screen and sound", id: "svv", env: "AAS_SOUNDVOLUMEVIEW", label: "SoundVolumeView (NirSoft)", kind: "file", expect: "SoundVolumeView.exe", value: toWindows(svv), suggest: !env.AAS_SOUNDVOLUMEVIEW && exists(svv) ? toWindows(svv) : null, status: exists(svv) ? "ok" : "missing", detail: exists(svv) ? `Version ${v || "?"}: switches the sound device while a game starts.` : "Optional: needed only to keep game sound off your speakers.", fix: exists(svv) ? null : { id: "install-svv", label: "Install SoundVolumeView" } });
     let devices = [];
     if (exists(svv)) {
       const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "list-audio.mjs")], { encoding: "utf8", timeout: 20000, env: { ...process.env, AAS_SOUNDVOLUMEVIEW: svv, AAS_QUIET_AUDIO_DEVICE: "-" } });
@@ -182,5 +209,5 @@ export async function setupModel() {
       add({ group: "Games", id: `game-${plugin.id}`, game: plugin.id, env: s.env, label: s.label, kind: s.kind, expect: s.expect, value: toWindows(current), suggest: found && found.path !== current ? `${toWindows(found.path)}` : null, suggestSource: found?.source ?? null, status, detail, fix: plugin.setup.install && current && exists(current) ? { id: `install:${plugin.id}`, label: status === "ok" ? "Install again" : "Install what the game needs" } : null, file });
     }
   }
-  return { items, env: { AAS_BUDGET_WEEKLY_MAX: env.AAS_BUDGET_WEEKLY_MAX ?? "" } };
+  return { items, checked: true, configured: true, at: new Date().toTimeString().slice(0, 8) };
 }

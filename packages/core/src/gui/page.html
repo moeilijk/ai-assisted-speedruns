@@ -41,6 +41,7 @@
   .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
   .warn .dot { background: var(--warn); } .warn { color: var(--warn); }
   .fail .dot, .missing .dot { background: var(--fail); } .fail, .missing { color: var(--fail); }
+  .unchecked { color: var(--muted); }
   .phase { font-weight: 600; }
   pre.cmds { background: var(--code); border-radius: 8px; padding: 12px; margin: 0; overflow-x: auto; font: 13px/1.6 ui-monospace, Consolas, monospace; white-space: pre; }
   .cmds .c { color: var(--muted); }
@@ -111,7 +112,8 @@
 <section id="setup">
   <div class="panel">
     <div class="row-actions" style="margin-top:0">
-      <button class="b" id="recheck">Check again</button>
+      <button class="b primary" id="recheck">Check</button>
+      <span class="muted" id="checkinfo"></span>
       <span class="muted">Settings are saved in <span class="path" id="envfile"></span> — the same file the command line uses.</span>
     </div>
   </div>
@@ -228,14 +230,18 @@ function addLine(l) {
 
 // Setup tab
 let setup = null;
-async function loadSetup() {
-  $("groups").innerHTML = `<div class="panel muted">Checking…</div>`;
-  setup = await api("/api/setup");
+async function loadSetup(check = false) {
+  if (check) { $("recheck").disabled = true; $("checkinfo").textContent = "Checking the tools and games… this takes a few seconds."; }
+  try {
+    setup = await api(`/api/setup${check ? "?check=1" : ""}`);
+  } finally { $("recheck").disabled = false; }
   $("envfile").textContent = setup.envFile;
+  $("recheck").textContent = !setup.configured ? "Initial check: find my tools and games" : (setup.checked ? "Check again" : "Check");
+  $("checkinfo").textContent = setup.checked ? `Checked at ${setup.at}${setup.partly ? "; changed settings are not checked yet" : ""}.` : (setup.configured ? "Shown as set; not checked yet." : "Nothing is set yet: the initial check finds what it can.");
   const groups = [...new Set(setup.items.map((i) => i.group))];
   $("groups").innerHTML = groups.map((g) => `<div class="panel"><h2>${esc(g)}</h2>${setup.items.filter((i) => i.group === g).map(row).join("")}</div>`).join("");
 }
-const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set" };
+const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set", unchecked: "Not checked" };
 function row(i) {
   let field = "";
   if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${i.kind === "dir" ? "folder" : esc(i.expect ?? "file")}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
@@ -262,7 +268,7 @@ $("groups").addEventListener("click", async (e) => {
   try {
     if (t.dataset.save) await saveValue(t.dataset.save, $(`v-${t.dataset.save}`).value.trim());
     else if (t.dataset.use) await saveValue(t.dataset.use, t.dataset.value);
-    else if (t.dataset.fix) { t.disabled = true; t.textContent = "Working…"; await api("/api/fix", { id: t.dataset.fix }); await loadSetup(); }
+    else if (t.dataset.fix) { t.disabled = true; t.textContent = "Working…"; await api("/api/fix", { id: t.dataset.fix }); await loadSetup(true); }
     else if (t.dataset.browse) {
       const picked = await browse($(`v-${t.dataset.browse}`).value, t.dataset.kind, t.dataset.expect);
       if (picked) await saveValue(t.dataset.browse, picked);
@@ -276,7 +282,7 @@ $("groups").addEventListener("change", async (e) => {
     else if (t.dataset.display !== undefined) { const o = t.selectedOptions[0]; await api("/api/settings", { display: t.value, displaySize: o?.dataset.size ?? "" }); await loadSetup(); }
   } catch (err) { alert(err.message); }
 });
-$("recheck").onclick = loadSetup;
+$("recheck").onclick = () => loadSetup(true);
 
 // Folder and file picker (the browser cannot hand full paths to the page, so the harness lists them)
 function browse(start, kind, expect) {
