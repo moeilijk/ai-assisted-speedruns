@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.7 — 2026-09-17
+
+- Every game can do a mock run: Portal has a scripted player (`games/portal/bot.mjs`), so the whole chain (TAS
+  playback, IGT, chamber milestones, recording, timeline, bundle) can be tested without a model and without tokens.
+- `aas check-agent --runtime <id> --game <plugin.mjs>`: does the agent's own CLI reach the broker? It configures a
+  throwaway run directory and has the CLI health-check its MCP servers (`claude mcp list`, `codex mcp list`); the
+  model is never asked anything, so it costs no tokens. Runtime plugins get `connectCheck` for it.
+- The GUI's Run tab has "Check the AI connection first", on by default for a mock run; it runs as the first step.
+
 ## 0.19.6 — 2026-09-17
 
 - Video descriptions describe only what belongs to the run: for a run that reached its goal, the moments stop at the
