@@ -13,7 +13,8 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { ensureSteam } from "./steam.mjs";
+import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
+import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i === -1 ? d : args[i + 1]; };
@@ -34,24 +35,9 @@ if (await probe()) {
 // +snd_mute_losefocus 0: the Source engine mutes itself when its window loses
 // focus; on a secondary display without focus the recording would be silent.
 console.log(`steam: ${await ensureSteam({ log: console.log })}`);
-// Optional quiet audio: the Windows default is the quiet device while the game opens its audio device, then restored.
-const quiet = Boolean(process.env.AAS_QUIET_AUDIO_DEVICE);
-const audioRoute = new URL("./audio-route.mjs", import.meta.url).pathname;
-const snapshot = path.join(root, "aas-audio-defaults.json");
-const audio = (...a) => { const r = spawnSync(process.execPath, [audioRoute, ...a], { encoding: "utf8" }); const out = (r.stdout + r.stderr).trim(); console.log(out.split("\n").map((l) => `audio: ${l}`).join("\n")); if (r.status !== 0) throw new Error(`audio routing failed: ${out}`); };
-if (quiet) audio("--snapshot", snapshot); else audio("--check");
-// Optional: keep the displays awake (an HDMI audio endpoint vanishes while its display sleeps); stop-all ends this.
-if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") console.log(spawnSync(process.execPath, [new URL("./keep-display-awake.mjs", import.meta.url).pathname, "start"], { encoding: "utf8" }).stdout.trim());
-// A quiet device that is an HDMI audio endpoint disappears while that display sleeps and comes
-// back when it wakes, so wait for it instead of failing at once. Without it the game would open
-// its audio on the speakers the user wanted to keep quiet, so the game is not started at all then.
-for (let attempt = 1; quiet; attempt += 1) {
-  try { audio("--set-quiet"); break; } catch (error) {
-    if (attempt >= 6) throw new Error(`quiet audio device not available after 90 s; not starting the game (${error.message.split("\n").at(-1)})`);
-    console.log(`audio: quiet device not active yet (attempt ${attempt}/6); waiting 15 s`);
-    await new Promise((r) => setTimeout(r, 15000));
-  }
-}
+// Optional quiet audio (the Windows default is the quiet device while the game opens its audio device, then
+// restored) and displays kept awake; stop-all ends the latter.
+const quiet = await beforeGameStart({ processName: "hl2.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
 const gameArgs = ["-game", "portal", "-novid", "-console", "-noborder", "-window", "-high", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0"];
 console.log(`starting ${exe} ${gameArgs.join(" ")}`);
 const child = spawn(exe, gameArgs, { cwd: root, detached: true, stdio: "ignore" });
@@ -62,10 +48,10 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 3000));
   if (await probe()) {
     console.log(`Portal is up; SPT IPC listening on ${port} (autoexec ran exec portal_agent).`);
-    if (quiet) audio("--restore", snapshot);
-    audio("--check");
+    quiet.restore();
+    quiet.check();
     process.exit(0);
   }
 }
-if (quiet) audio("--restore", snapshot);
+quiet.restore();
 throw new Error("Portal started but SPT IPC did not come up within 120 s. Check the game console for plugin_print and y_spt_ipc 1.");

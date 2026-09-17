@@ -15,7 +15,7 @@ import { spawn } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { sptSession, waitUntilReady } from "./spt-session.mjs";
-import { ensureSteam } from "./steam.mjs";
+import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, "..", "..");
@@ -104,11 +104,11 @@ export default {
     const root = process.env.AAS_PORTAL_GAME_ROOT;
     add(Boolean(root && existsSync(join(root, "portal", "cfg"))), "AAS_PORTAL_GAME_ROOT (Source Unpack)", root ?? "not set");
     if (!root) return rows;
-    try { const { steamRunning } = await import("./steam.mjs"); add(steamRunning(), "Steam running and logged in (hl2.exe needs it, also for every -hijack)"); } catch (e) { add(false, "Steam check", e.message); }
+    try { const { steamRunning } = await import("../../packages/core/src/windows/steam.mjs"); add(steamRunning(), "Steam running and logged in (hl2.exe needs it, also for every -hijack)"); } catch (e) { add(false, "Steam check", e.message); }
     for (const f of ["portal/spt.dll", "portal/addons/spt.vdf", "portal/cfg/agent_run.cfg", "portal/cfg/portal_agent.cfg", "hl2/addons/speedrun_demorecord-2007.dll"]) add(existsSync(join(root, f)), `game file ${f}`);
     try {
-      const { audioStatus, CONFIGURED, DEVICE, NOT_CONFIGURED } = await import("./audio-route.mjs");
-      if (CONFIGURED) { const st = audioStatus(); add(st.ok, `quiet audio device "${DEVICE}" active (game audio away from the speakers)`, st.detail); }
+      const { audioStatus, CONFIGURED, DEVICE, NOT_CONFIGURED } = await import("../../packages/core/src/windows/audio-route.mjs");
+      if (CONFIGURED) { const st = audioStatus({ processName: "hl2.exe" }); add(st.ok, `quiet audio device "${DEVICE}" active (game audio away from the speakers)`, st.detail); }
       else add(true, "game audio: default playback device", NOT_CONFIGURED);
     } catch (e) { add(false, "game audio routing", e.message); }
     const autoexec = join(root, "portal", "cfg", "autoexec.cfg");

@@ -9,8 +9,9 @@ import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
-import { ensureSteam } from "../portal/steam.mjs";
-import { listDisplays } from "./primary-display.mjs";
+import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
+import { listDisplays } from "../../packages/core/src/windows/displays.mjs";
+import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
 
 const root = process.env.AAS_STS_GAME_ROOT;
 if (!root) throw new Error("AAS_STS_GAME_ROOT is not set");
@@ -68,15 +69,7 @@ if (pos) {
 const probe = () => new Promise((res) => { const s = net.connect(port, "127.0.0.1"); s.setTimeout(2000); s.on("connect", () => (s.destroy(), res(true))); s.on("error", () => res(false)); s.on("timeout", () => (s.destroy(), res(false))); });
 if (await probe()) { console.log(`Slay the Spire is already running (bridge on ${port}).`); process.exit(0); }
 console.log(`steam: ${await ensureSteam({ log: console.log })}`);
-const portalDir = new URL("../portal/", import.meta.url).pathname;
-const tool = (script, ...a) => { const r = spawnSync(process.execPath, [path.join(portalDir, script), ...a], { encoding: "utf8", env: { ...process.env, AAS_AUDIO_PROCESS: "java.exe" } }); const out = (r.stdout + r.stderr).trim(); if (out) console.log(out.split("\n").map((l) => `${script.replace(".mjs", "")}: ${l}`).join("\n")); if (r.status !== 0) throw new Error(`${script} failed`); };
-const quiet = Boolean(process.env.AAS_QUIET_AUDIO_DEVICE);
-if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") tool("keep-display-awake.mjs", "start");
-const snapshot = path.join(root, "aas-audio-defaults.json");
-if (quiet) tool("audio-route.mjs", "--snapshot", snapshot);
-for (let attempt = 1; quiet; attempt += 1) {
-  try { tool("audio-route.mjs", "--set-quiet"); break; } catch (e) { if (attempt >= 6) throw e; console.log(`audio: quiet device not active yet (attempt ${attempt}/6); waiting 15 s`); await new Promise((r) => setTimeout(r, 15000)); }
-}
+const quiet = await beforeGameStart({ processName: "java.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
 // Windows java gets Windows paths; its output goes to <game>/aas-launch.log for diagnosis.
 const win = (p) => execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim();
 // -Dorg.lwjgl.opengl.Window.undecorated: LWJGL's own option for a window without title bar or borders.
@@ -94,7 +87,7 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 3000));
   if (await probe()) { up = true; break; }
 }
-if (quiet) tool("audio-route.mjs", "--restore", snapshot);
+quiet.restore();
 if (!up) throw new Error("Slay the Spire started but the bridge did not come up within 180 s (see communication_mod_errors.log in the game folder).");
 console.log(`Slay the Spire is up; bridge listening on ${port}.`);
 // Optionally move the window (title "Slay the Spire"), e.g. to a secondary display.
@@ -109,4 +102,4 @@ if (-not $p) { 'window not found' } else {
   'moved ' + $p.MainWindowTitle + ' to ${x},${y}, client ' + ($c.R - $c.L) + 'x' + ($c.B - $c.T)
 }` : null;
 if (ps) console.log(`window: ${spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8" }).stdout.trim()}`);
-tool("audio-route.mjs", "--check");
+quiet.check();

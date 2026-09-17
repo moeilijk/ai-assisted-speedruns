@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { closeWindows } from "../../packages/core/src/close-windows.mjs";
+import { afterGameClose } from "../../packages/core/src/windows/quiet-start.mjs";
 import { readBridgeState } from "./bridge.mjs";
 
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -32,10 +33,7 @@ export function restoreProfile() {
 export async function closeGame({ log = () => {} } = {}) {
   const lines = [];
   const say = (t) => { for (const l of String(t ?? "").split("\n")) if (l.trim()) { lines.push(l); log(l); } };
-  if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") {
-    const portalDir = new URL("../portal/", import.meta.url).pathname;
-    say(spawnSync(process.execPath, [path.join(portalDir, "keep-display-awake.mjs"), "stop"], { encoding: "utf8" }).stdout.trim());
-  }
+  say(afterGameClose());
   say(closeWindows([{ name: "Balatro", title: "Balatro", seconds: 20 }], { report: ["Balatro"] }));
   say(await stopBridge());
   say(restoreProfile());

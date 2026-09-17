@@ -7,7 +7,7 @@ Inspired by cozyblaze's Portal run; the design and the code this builds on are h
 A generic framework with plugins for three kinds of communication, plus a standard:
 
 1. **Runtime** (the agent: Codex via MCP, Claude Code via MCP, later an in-process loop against the Messages API)
-2. **Game** (the bridge into the game: SourcePauseTool for Portal, Communication Mod for Slay the Spire, kRPC for Kerbal Space Program, ...)
+2. **Game** (the bridge into the game: SourcePauseTool for Portal, Communication Mod for Slay the Spire, balatrobot for Balatro, kRPC for Kerbal Space Program, ...)
 3. **Recorder** (OBS via obs-websocket, in-game demo, none)
 
 The **standard** ([packages/spec/SPEC.md](../packages/spec/SPEC.md)) says what an "AI Assisted Speedrun" is, how it is recorded and logged, and how someone else can check and compare it. Every plugin combination produces the same run directory, the same log format, the same timeline and the same publication export. Portal-agent's published `evidence/` is used as a format fixture.
@@ -19,7 +19,7 @@ The **standard** ([packages/spec/SPEC.md](../packages/spec/SPEC.md)) says what a
 | Repository name | `ai-assisted-speedruns`, CLI and package `aas` | uses the term itself; spec and reference implementation fit in one repo for now |
 | Language | Node.js, plain ESM JavaScript with `.d.ts` type contracts, no build step, no dependencies in core | broker, hardening, configure-run and export from portal-agent are reusable almost verbatim; Node is already required by both Codex and Claude Code, so it is on every machine that runs an agent; obs-websocket, MCP and the Anthropic SDK all have first-class Node libraries; runs unchanged on Windows, WSL, macOS |
 | First runtimes | Codex and Claude Code | both are only a config generator plus launcher around the same broker |
-| First games | Portal (adapter around portal-agent, validates the model against the original run) and Slay the Spire (turn-based, through Communication Mod). Zero Company was dropped before the first release; its research is not published; Kerbal Space Program (kRPC, Mun landing) is the next candidate |
+| First games | Portal (adapter around portal-agent, validates the model against the original run) and Slay the Spire (turn-based, through Communication Mod). Zero Company was dropped before the first release; its research is not published. Balatro (turn-based, through balatrobot) followed on 2026-09-17 as the first game with an HTTP bridge |
 | Language of the repository | English everywhere | a standard others can adopt |
 | `paused-think` for turn-based games | applies automatically; enemy turns and cinematics keep running but the agent does not act then; wall-clock time is reported separately | |
 
@@ -110,7 +110,8 @@ ai-assisted-speedruns/
   README.md
   package.json                  npm workspaces
   packages/
-    core/                       broker, hardening, run log, run/resume/timeline/render/publish/check, `aas` CLI
+    core/                       broker, hardening, run log, run/resume/timeline/render/publish/check, `aas` CLI;
+                                src/windows/: Steam, displays, quiet audio, keep-awake, shared by the game launchers
     spec/                       the AAS standard
     recorder-obs/               OBS through obs-websocket v5
     recorder-source-demo/       in-game Source demos through SPT IPC
@@ -122,6 +123,7 @@ ai-assisted-speedruns/
   games/
     portal/                     adapter around portal-agent's controller
     slay-the-spire/             through Communication Mod: bridge, install, launch, splits, scripted bot
+    balatro/                    through balatrobot: filtering bridge, install, launch, splits, scripted bot
   docs/
     install.md                  prerequisites and the installation, step by step
     design.md                   this document

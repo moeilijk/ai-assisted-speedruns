@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.18.2",
+  "version": "0.18.3",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -35,7 +35,7 @@
     "packages/timer-livesplit"
   ],
   "scripts": {
-    "check": "for f in packages/core/src/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/index.mjs games/portal/*.mjs games/balatro/*.mjs; do node --check \"$f\" || exit 1; done",
+    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/balatro/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "AAS_WITNESS_URL=off node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
     "portal:fetch": "node --env-file-if-exists=.env games/portal/fetch-portal-agent.mjs",
     "portal:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/portal/plugin.mjs --run-dir runs/portal-check --exercise",
@@ -46,7 +46,8 @@
     "portal:launch": "node --env-file-if-exists=.env games/portal/launch-game.mjs",
     "portal:stop": "node --env-file-if-exists=.env games/portal/stop-all.mjs",
     "obs:launch": "node --env-file-if-exists=.env packages/recorder-obs/launch-obs.mjs",
-    "portal:audio": "node --env-file-if-exists=.env games/portal/audio-route.mjs",
+    "livesplit:launch": "node --env-file-if-exists=.env packages/timer-livesplit/launch-livesplit.mjs",
+    "portal:audio": "node --env-file-if-exists=.env packages/core/src/windows/audio-route.mjs --process hl2.exe",
     "sts:install": "node --env-file-if-exists=.env games/slay-the-spire/install-mod.mjs",
     "sts:launch": "node --env-file-if-exists=.env games/slay-the-spire/launch-game.mjs",
     "sts:stop": "node --env-file-if-exists=.env games/slay-the-spire/stop-all.mjs",
@@ -59,6 +60,7 @@
     "balatro:stop": "node --env-file-if-exists=.env games/balatro/stop-all.mjs",
     "balatro:doctor": "node --env-file-if-exists=.env packages/core/src/cli.mjs doctor --game games/balatro/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "balatro:check": "node --env-file-if-exists=.env packages/core/src/cli.mjs check-connection --game games/balatro/plugin.mjs",
+    "balatro:scripted": "node --env-file-if-exists=.env packages/core/src/cli.mjs run --runtime scripted --game games/balatro/plugin.mjs --bot games/balatro/bot.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
     "balatro:run": "node --env-file-if-exists=.env packages/core/src/cli.mjs run --runtime claude-code --game games/balatro/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir"
   },
   "bin": {

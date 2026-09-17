@@ -45,7 +45,7 @@ Machine settings live in `.env` in the repository root, copied from [`.env.examp
 | Variable | Used by | Meaning |
 |---|---|---|
 | `AAS_OBS_URL`, `AAS_OBS_PASSWORD`, `AAS_OBS_EXE` | recorder obs, `npm run obs:launch`, doctor | obs-websocket address and password; OBS executable for the launcher |
-| `AAS_LIVESPLIT_HOST`, `AAS_LIVESPLIT_PORT`, `AAS_LIVESPLIT_EXE`, `AAS_LIVESPLIT_POS` | timer livesplit, `select-splits.mjs`, `place-windows.mjs` | LiveSplit Server address; the executable (its `settings.cfg` is next to it); window position |
+| `AAS_LIVESPLIT_HOST`, `AAS_LIVESPLIT_PORT`, `AAS_LIVESPLIT_EXE`, `AAS_LIVESPLIT_POS` | timer livesplit, `select-splits.mjs`, `launch-livesplit.mjs` | LiveSplit Server address; the executable (its `settings.cfg` is next to it); window position |
 | `AAS_BUDGET_WEEKLY_MAX` | `aas budget`, run, resume, doctor | share of the weekly Claude plan that runs may use (default 50) |
 | `AAS_CODEX_BUDGET_MAX` | `aas budget`, run, resume, doctor, the Codex runtime | share of the ChatGPT plan's window that Codex runs may use (default 50); the stand comes from the `rate_limits` Codex writes into its rollouts after every turn, no endpoint is asked |
 | `AAS_TIME_ZONE` | broker, publish | time zone of the run log (default the machine's) |

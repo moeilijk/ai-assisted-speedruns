@@ -140,6 +140,8 @@ Each game has its own install: the mod or the in-game tooling, the bridge, and i
 
 - **Slay the Spire** — [games/slay-the-spire/README.md](../games/slay-the-spire/README.md): Steam + ModTheSpire
   + BaseMod, then `npm run sts:install` (Communication Mod, the bridge, the mod config) and `npm run sts:launch`.
+- **Balatro** — [games/balatro/README.md](../games/balatro/README.md): Steam, then `npm run balatro:install`
+  (Lovely, Steamodded, balatrobot) and `npm run balatro:launch`.
 - **Portal** — [games/portal/README.md](../games/portal/README.md): Source Unpack, SourcePauseTool built with
   portal-agent's scripts, then `npm run portal:install -- --game-root <dir>` and `npm run portal:launch`.
 - **Another game** — write a plugin: [plugins.md](plugins.md). Nothing in the core has to change, and a game
@@ -161,7 +163,9 @@ that stays black or cannot be rendered after one rebind, aborts the run. See [pa
 ## 7. LiveSplit (optional)
 
 Install LiveSplit, put `ServerStartup=1` in its `settings.cfg` (next to the executable) so its TCP server
-starts with it, and open the game's splits file (`games/<game>/splits/*.lss`). Without LiveSplit, leave
+starts with it, and set `AAS_LIVESPLIT_EXE` in `.env`. `npm run livesplit:launch -- games/<game>/splits/<file>.lss`
+starts it with the game's splits (it closes a LiveSplit that has other splits open first), waits for its server and
+moves its window to `AAS_LIVESPLIT_POS` when that is set. Without LiveSplit, leave
 `--timer livesplit` off: `aas publish` still writes `splits.lss` from the timeline.
 
 ## 8. Check the whole chain before your first run

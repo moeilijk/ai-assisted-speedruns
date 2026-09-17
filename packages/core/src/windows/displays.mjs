@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Windows: read the attached displays with their real position and size (EnumDisplayDevices +
-// EnumDisplaySettings). The launcher places the game window on the display the recording runs on, using
+// EnumDisplaySettings). A launcher places the game window on the display the recording runs on, using
 // these bounds rather than typed coordinates: a display can shift by a pixel, and then part of the window
 // falls off the screen and the taskbar ends up in the recording.
 //
-//   node games/slay-the-spire/primary-display.mjs list
+//   node packages/core/src/windows/displays.mjs
 import { execFileSync } from "node:child_process";
 
 const CSHARP = `
@@ -63,6 +63,12 @@ export function listDisplays() {
   });
 }
 
-if (process.argv[1]?.endsWith("primary-display.mjs")) {
+/** The display that contains the point "X,Y" (an AAS_*_WINDOW_POS value), or null. */
+export function displayAt(pos, all = listDisplays()) {
+  const [x, y] = String(pos).split(",").map(Number);
+  return all.find((d) => x >= d.x && x < d.x + d.width && y >= d.y && y < d.y + d.height) ?? null;
+}
+
+if (process.argv[1]?.endsWith("displays.mjs")) {
   for (const d of listDisplays()) console.log(`${d.name}${d.primary ? " (primary)" : ""} ${d.width}x${d.height} at ${d.x},${d.y}`);
 }

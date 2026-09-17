@@ -1,10 +1,10 @@
 // Closes Slay the Spire the way a user would, and undoes what the launcher set up for the run: the
 // keep-awake helper and the neutral profile name. Called by the game plugin's `close()` (the harness at the
 // end of a run) and by stop-all.mjs (the manual command).
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { closeWindows } from "../../packages/core/src/close-windows.mjs";
+import { afterGameClose } from "../../packages/core/src/windows/quiet-start.mjs";
 
 export function restoreProfileName(root = process.env.AAS_STS_GAME_ROOT) {
   if (!root) return null;
@@ -22,10 +22,7 @@ export function restoreProfileName(root = process.env.AAS_STS_GAME_ROOT) {
 export async function closeGame({ log = () => {} } = {}) {
   const lines = [];
   const say = (t) => { for (const l of String(t ?? "").split("\n")) if (l.trim()) { lines.push(l); log(l); } };
-  if (process.env.AAS_STS_GAME_ROOT) {
-    const portalDir = new URL("../portal/", import.meta.url).pathname;
-    say(spawnSync(process.execPath, [path.join(portalDir, "keep-display-awake.mjs"), "stop"], { encoding: "utf8" }).stdout.trim());
-  }
+  say(afterGameClose());
   say(closeWindows([
     // ModTheSpire's log window first: closing it ends the whole JVM (game included) in ~5 s,
     // whereas WM_CLOSE to the game window alone takes 30 s or more., measured:.

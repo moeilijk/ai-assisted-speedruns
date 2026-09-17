@@ -44,7 +44,7 @@ After `aas resume`, or after a tooling update that changes the bundle, you publi
 ## Disclaimer: anti-cheat, bans, your own risk
 
 > [!WARNING]
-> This tooling injects code into games. For Portal that is SourcePauseTool's DLL and an IPC patch, and the game starts outside the normal launcher. Anti-cheat such as VAC, EAC or BattlEye can see this as cheating and **ban the account, possibly permanently**.
+> This tooling injects code into games. For Portal that is SourcePauseTool's DLL and an IPC patch, for Balatro Lovely's DLL (`version.dll` in the game folder) with Steamodded and balatrobot, and the games start outside the normal launcher. Anti-cheat such as VAC, EAC or BattlEye can see this as cheating and **ban the account, possibly permanently**.
 >
 > - **Only use games without anti-cheat and without online play.** Never use it with online or competitive games.
 > - **Preferably use a separate offline copy of the game.** Portal here runs from Source Unpack, not from the Steam install.
@@ -98,4 +98,13 @@ MIT, see [LICENSE](LICENSE). Code from others keeps its own license:
 - [portal-agent](https://github.com/cozyblaze/portal-agent) by cozyblaze (MIT): see [packages/core/NOTICE](packages/core/NOTICE) and [packages/core/vendor/portal-agent/LICENSE](packages/core/vendor/portal-agent/LICENSE). A bundle that contains portal-agent material (Portal game configuration, instructions and documentation, or the Codex configuration template) includes that license.
 - [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) by gamerpuppy (MIT): see [games/slay-the-spire/NOTICE](games/slay-the-spire/NOTICE) and [games/slay-the-spire/lightspeed/LICENSE](games/slay-the-spire/lightspeed/LICENSE).
 
-Games, mods and tools that the setup downloads or builds (Communication Mod, BaseMod, ModTheSpire, SourcePauseTool, sts_lightspeed) are not in this repository. Each is pinned in the game's `UPSTREAM.json` and has its own license.
+Games, mods and tools that the setup downloads or builds are not in this repository. Each is pinned in the game's `UPSTREAM.json` and has its own license:
+
+| Game | Downloaded or built | License |
+|---|---|---|
+| Slay the Spire | Communication Mod, BaseMod, ModTheSpire | MIT |
+| Slay the Spire | sts_lightspeed (built for the scripted bot) | MIT |
+| Portal | SourcePauseTool | MIT |
+| Balatro | [Lovely](https://github.com/ethangreen-dev/lovely-injector) | MIT |
+| Balatro | [Steamodded](https://github.com/Steamodded/smods) | GPL-3.0 |
+| Balatro | [balatrobot](https://github.com/coder/balatrobot) | MIT |

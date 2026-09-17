@@ -1,20 +1,20 @@
 #!/usr/bin/env node
-// Keep the game's sound off the user's speakers: the Source engine opens its
-// audio device at startup and keeps it (DirectSound does not follow later
-// changes), so the Windows default playback device is switched to a quiet
-// output for the seconds the game starts, then restored exactly. OBS's
+// Keep the game's sound off the user's speakers: a game opens its audio device at startup and keeps it (the
+// Source engine's DirectSound does not follow later changes; Balatro's audio session stayed on the quiet device
+// after the default was restored, measured 2026-09-17), so the Windows default playback device is switched to a
+// quiet output for the seconds the game starts, then restored exactly. OBS's
 // application audio capture reads the process, not the speakers.
 // Uses NirSoft SoundVolumeView (portable). Optional, per machine: nothing here
 // runs unless AAS_QUIET_AUDIO_DEVICE names an active playback device (a monitor's
 // HDMI output, a virtual cable); by default the game plays on the default device
 // and only the recording captures it.
 //
-//   node games/portal/audio-route.mjs --check            report defaults and the game's audio sessions
-//   node games/portal/audio-route.mjs --snapshot <file>  save the current defaults
-//   node games/portal/audio-route.mjs --set-quiet        make the quiet device the default (all roles)
-//   node games/portal/audio-route.mjs --restore <file>   restore the saved defaults
+//   node packages/core/src/windows/audio-route.mjs --check --process <exe>  report defaults and the game's audio sessions
+//   node packages/core/src/windows/audio-route.mjs --snapshot <file>       save the current defaults
+//   node packages/core/src/windows/audio-route.mjs --set-quiet             make the quiet device the default (all roles)
+//   node packages/core/src/windows/audio-route.mjs --restore <file>        restore the saved defaults
 // Env: AAS_QUIET_AUDIO_DEVICE (device name; unset = feature off), AAS_SOUNDVOLUMEVIEW (path to
-// SoundVolumeView.exe, required when the device is set); --process <exe> (default hl2.exe)
+// SoundVolumeView.exe, required when the device is set); --process <exe> or AAS_AUDIO_PROCESS (the game's executable, for the session report)
 import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -24,7 +24,7 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i === -1 ? d : args[i + 1]; };
 export const DEVICE = opt("--device", process.env.AAS_QUIET_AUDIO_DEVICE || null);
 export const CONFIGURED = Boolean(DEVICE); // quiet routing is off unless a device is named
-export const PROCESS = opt("--process", process.env.AAS_AUDIO_PROCESS ?? "hl2.exe"); // the game's executable name
+export const PROCESS = opt("--process", process.env.AAS_AUDIO_PROCESS ?? null); // the game's executable name
 const svv = process.env.AAS_SOUNDVOLUMEVIEW ?? null;
 export const NOT_CONFIGURED = "no quiet audio device configured (AAS_QUIET_AUDIO_DEVICE unset): the game uses the default playback device";
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
@@ -74,19 +74,20 @@ export function quietDevice(rows = listAll()) {
 }
 // Only the session the game currently holds; SoundVolumeView also lists stale
 // (Inactive) entries from earlier launches on every device the game ever used.
-export function gameSessions(rows = listAll()) {
+export function gameSessions(rows = listAll(), processName = PROCESS) {
+  if (!processName) return [];
   return rows
-    .filter((r) => r.Type === "Application" && (r["Process Path"] ?? "").toLowerCase().endsWith(`\\${PROCESS.toLowerCase()}`) && r["Device State"] === "Active")
+    .filter((r) => r.Type === "Application" && (r["Process Path"] ?? "").toLowerCase().endsWith(`\\${processName.toLowerCase()}`) && r["Device State"] === "Active")
     .map((r) => ({ deviceId: (r["Item ID"] ?? "").split("|")[0], device: r["Device Name"] }));
 }
 export function setDefault(itemId, role /* 0 console, 1 multimedia, 2 communications, all */) {
   spawnSync(svv, ["/SetDefault", itemId, String(role)], { stdio: "ignore" });
 }
-export function audioStatus() {
+export function audioStatus({ processName = PROCESS } = {}) {
   const rows = listAll();
   const q = quietDevice(rows);
   const d = defaults(rows);
-  const sessions = gameSessions(rows);
+  const sessions = gameSessions(rows, processName);
   const gameOnQuiet = sessions.length > 0 && sessions.every((s) => s.deviceId === q?.["Item ID"]);
   return {
     ok: Boolean(q),
@@ -94,7 +95,7 @@ export function audioStatus() {
     defaults: d,
     sessions,
     gameOnQuiet,
-    detail: `quiet device "${DEVICE}": ${q ? "active" : "NOT FOUND"}; defaults: play=${d.names.console ?? "?"}, media=${d.names.multimedia ?? "?"}, comms=${d.names.communications ?? "?"}; ${PROCESS} active audio session on: ${sessions.length ? sessions.map((s) => `${s.device} (${s.deviceId === q?.["Item ID"] ? DEVICE : "NOT the quiet device"})`).join(", ") : "none (game silent or not running)"}`,
+    detail: `quiet device "${DEVICE}": ${q ? "active" : "NOT FOUND"}; defaults: play=${d.names.console ?? "?"}, media=${d.names.multimedia ?? "?"}, comms=${d.names.communications ?? "?"}; ${processName ?? "(no game named)"} active audio session on: ${sessions.length ? sessions.map((s) => `${s.device} (${s.deviceId === q?.["Item ID"] ? DEVICE : "NOT the quiet device"})`).join(", ") : "none (game silent or not running)"}`,
   };
 }
 

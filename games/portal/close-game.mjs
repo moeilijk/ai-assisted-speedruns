@@ -4,7 +4,8 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { closeWindows } from "../../packages/core/src/close-windows.mjs";
-import { ensureSteam } from "./steam.mjs";
+import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
+import { afterGameClose } from "../../packages/core/src/windows/quiet-start.mjs";
 
 export async function closeGame({ log = () => {} } = {}) {
   const lines = [];
@@ -16,7 +17,7 @@ export async function closeGame({ log = () => {} } = {}) {
     spawnSync(path.join(root, "hl2.exe"), ["-game", "portal", "-hijack", "+stop_run"], { cwd: root, stdio: "ignore" });
     spawnSync(path.join(root, "hl2.exe"), ["-game", "portal", "-hijack", "+quit"], { cwd: root, stdio: "ignore" });
   }
-  say(spawnSync(process.execPath, [new URL("./keep-display-awake.mjs", import.meta.url).pathname, "stop"], { encoding: "utf8" }).stdout.trim());
+  say(afterGameClose());
   say(closeWindows([{ wait: "hl2", seconds: 25 }], { report: ["hl2"] }));
   return lines.join("\n");
 }

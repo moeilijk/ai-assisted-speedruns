@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.18.3 — 2026-09-17
+
+- Code that is not about one game left the game folders: Steam, displays, quiet audio and keep-awake are in
+  `packages/core/src/windows/` (`ensureSteam`, `listDisplays`/`displayAt`, `beforeGameStart`/`afterGameClose`), used by
+  the Portal, Slay the Spire and Balatro launchers. `games/portal/place-windows.mjs` is gone.
+- `npm run livesplit:launch -- <splits.lss>`: LiveSplit with the game's splits (a LiveSplit with other splits is closed
+  first), its server checked, its window at `AAS_LIVESPLIT_POS`.
+- `npm run balatro:scripted -- <run-dir>`: the Balatro chain with the scripted player, OBS and LiveSplit.
+- Documentation: Balatro in the install guide, the design, the plugin guide, the disclaimer and the license table.
+
 ## 0.18.2 — 2026-09-17
 
 - Balatro is a game plugin (games/balatro), no longer a stub: balatrobot 1.5.2 on Steamodded 1.0.0-beta-1814a and

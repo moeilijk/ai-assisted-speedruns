@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-const script = fileURLToPath(new URL("../audio-route.mjs", import.meta.url));
+const script = fileURLToPath(new URL("../src/windows/audio-route.mjs", import.meta.url));
 const run = (args, env) => spawnSync(process.execPath, [script, ...args], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
 
 test("no quiet device configured: check and snapshot are no-ops, set-quiet fails", () => {

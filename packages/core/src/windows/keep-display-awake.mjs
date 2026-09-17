@@ -6,12 +6,12 @@
 // mouse move) as long as the flag file exists and still carries this start's
 // token, so there is at most one live helper: a new start replaces the old one,
 // stop from any game ends it. The flag lives in the Windows temp folder.
-//   node games/portal/keep-display-awake.mjs start | stop | status
+//   node packages/core/src/windows/keep-display-awake.mjs start | stop | status
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const winTemp = execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+const winTemp = execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", cwd: "/mnt/c", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const flagWin = `${winTemp}\\aas-keep-awake.flag`;
 const flag = execFileSync("wslpath", ["-u", flagWin], { encoding: "utf8" }).trim();
 const cmd = process.argv[2] ?? "status";

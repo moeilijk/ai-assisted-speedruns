@@ -13,10 +13,11 @@ import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 import { jsonRpcClient } from "../../packages/core/src/json-rpc-http.mjs";
-import { ensureSteam } from "../portal/steam.mjs";
+import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
+import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
 import { BOT_PORT, BRIDGE_PORT, gamePath, readBridgeState } from "./bridge.mjs";
 import { toolsDir } from "./plugin.mjs";
-import { listDisplays } from "../slay-the-spire/primary-display.mjs";
+import { listDisplays } from "../../packages/core/src/windows/displays.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = process.env.AAS_BALATRO_GAME_ROOT;
@@ -99,15 +100,7 @@ console.log(`steam: ${await ensureSteam({ log: console.log })}`);
 // variables listed in WSLENV.
 const botEnv = { ...upstream.balatrobot.settings, BALATROBOT_HOST: "127.0.0.1", BALATROBOT_PORT: String(botPort) };
 const env = { ...process.env, ...botEnv, WSLENV: [process.env.WSLENV, ...Object.keys(botEnv)].filter(Boolean).join(":") };
-const portalDir = path.join(here, "..", "portal");
-const tool = (script, ...a) => { const r = spawnSync(process.execPath, [path.join(portalDir, script), ...a], { encoding: "utf8", env: { ...process.env, AAS_AUDIO_PROCESS: "Balatro.exe" } }); const out = (r.stdout + r.stderr).trim(); if (out) console.log(out.split("\n").map((l) => `${script.replace(".mjs", "")}: ${l}`).join("\n")); if (r.status !== 0) throw new Error(`${script} failed`); };
-const quiet = Boolean(process.env.AAS_QUIET_AUDIO_DEVICE);
-if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") tool("keep-display-awake.mjs", "start");
-const snapshot = path.join(tools, "aas-audio-defaults.json");
-if (quiet) tool("audio-route.mjs", "--snapshot", snapshot);
-for (let attempt = 1; quiet; attempt += 1) {
-  try { tool("audio-route.mjs", "--set-quiet"); break; } catch (e) { if (attempt >= 6) throw e; console.log(`audio: quiet device not active yet (attempt ${attempt}/6); waiting 15 s`); await new Promise((r) => setTimeout(r, 15000)); }
-}
+const quiet = await beforeGameStart({ processName: "Balatro.exe", snapshotFile: path.join(tools, "aas-audio-defaults.json") });
 const exe = path.join(root, "Balatro.exe");
 const args = ["--mod-dir", gamePath(path.join(tools, "Mods")), "--disable-console"];
 console.log(`starting ${exe} ${args.join(" ")}`);
@@ -121,11 +114,11 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 2000));
   if (await health(botPort)) { up = true; break; }
 }
-if (quiet) tool("audio-route.mjs", "--restore", snapshot);
+quiet.restore();
 if (!up) throw new Error(`Balatro started but balatrobot did not answer on ${botPort} within 120 s (see ${path.join(tools, "Mods", "lovely", "log")})`);
 console.log(`Balatro is up; balatrobot on ${botPort}.`);
 console.log(`bridge: ${await ensureBridge()}`);
 const token = readBridgeState()?.token;
 if (!(await health(port, { "X-AAS-Token": token }))) throw new Error(`the bridge on ${port} does not reach balatrobot`);
 console.log(`bridge answers on ${port}.`);
-tool("audio-route.mjs", "--check");
+quiet.check();
