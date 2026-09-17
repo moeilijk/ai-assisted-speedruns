@@ -86,7 +86,7 @@ export default {
   gameConfig: [join(here, "UPSTREAM.json")],
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),
-  goalPrompt: `You are playing Balatro with the ${DECK} deck at ${STAKE} stake; the run has been started. Read balatro_documentation, then play until the run is won: beat the boss blind of ante 8. Do not look up information about the game online.`,
+  goalPrompt: (end) => `You are playing Balatro with the ${DECK} deck at ${STAKE} stake; the run has been started. Read balatro_documentation, then play ${end && !end.final ? `until you have beaten the boss blind of ${end.label.toLowerCase()}` : "until the run is won: beat the boss blind of ante 8"}. Do not look up information about the game online.`,
   category: {
     build: "Balatro (Steam) + Lovely + Steamodded + balatrobot",
     observation: "state",

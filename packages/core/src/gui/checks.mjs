@@ -143,6 +143,15 @@ export async function setupModel() {
       const server = /<ServerStartup>1<\/ServerStartup>/.test(text);
       detail = server ? "Found; its server starts with it." : "Found, but its server does not start with it.";
       if (!server) { status = "warn"; fix = { id: "livesplit-server", label: "Start the server with LiveSplit" }; }
+      else if (ON_WINDOWS) {
+        const { windowsSetupStatus } = await import("../../../timer-livesplit/windows-setup.mjs");
+        const w = windowsSetupStatus(exe);
+        if (!w.outboundBlocked || !w.fileTypes) {
+          status = "warn";
+          detail += ` At every start it will ask ${[!w.outboundBlocked && "about updates", !w.fileTypes && "for administrator rights (file types)"].filter(Boolean).join(" and ")}.`;
+          fix = { id: "livesplit-windows", label: "Stop LiveSplit's questions (Windows asks permission once)" };
+        } else detail += " It starts without questions (no network, file types set).";
+      }
     }
     add({ group: "Tools", id: "livesplit", env: "AAS_LIVESPLIT_EXE", label: "LiveSplit (timer)", kind: "file", expect: "LiveSplit.exe", value: toWindows(exe), suggest: !env.AAS_LIVESPLIT_EXE && exists(exe) ? toWindows(exe) : null, status, detail, fix });
   }

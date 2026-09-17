@@ -153,8 +153,8 @@ export interface GamePlugin {
   stub?: boolean;
   /** What `aas gui` needs to set the game up and start it. A game without it does not appear in the GUI. */
   setup?: GameSetup;
-  /** Default first prompt for the agent (the goal); `aas configure --prompt` overrides it. */
-  goalPrompt?: string;
+  /** Default first prompt for the agent (the goal), or a function of the run's end that gives it; `aas configure --prompt` overrides it. */
+  goalPrompt?: string | ((end: { id: string; label: string; final?: boolean }) => string);
   /** Optional extra checks for `aas check-connection --exercise`. */
   exercise?: { label: string; code: string; verify?: (value: unknown) => void }[];
   /** Files or directories published as `game-config/` (cvars, patches, upstream references). */

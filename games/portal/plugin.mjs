@@ -83,8 +83,12 @@ export default {
   id: "portal",
   // Segment names for the timer / splits file: one per chamber.
   segments: SPLITS,
-  /** The game's one end: the credits; the completion marker in the agent's messages marks it for now. */
-  ends: [{ id: "credits", label: "Credits", final: true }],
+  /** The game's ends: reaching each test chamber after the first (the chamber milestone marks it; owner 2026-09-17), and
+   *  the credits, the game's own end, which the completion marker in the agent's messages marks for now. */
+  ends: [
+    ...CHAMBERS.slice(1).map((id) => ({ id: `chamber${id}`, label: `Chamber ${id}` })),
+    { id: "credits", label: "Credits", final: true },
+  ],
   /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. Source Unpack is not a store
    *  install, so its folder is not looked up. */
   setup: {
@@ -93,7 +97,8 @@ export default {
     install: join(here, "install-game-files.mjs"),
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
-    splits: { credits: join(here, "splits", "portal-credits.lss") },
+    // The splits up to a chamber are the chambers before it (entering a chamber closes the previous one).
+    splits: { ...Object.fromEntries(CHAMBERS.slice(1).map((id) => [`chamber${id}`, join(here, "splits", `portal-chamber${id}.lss`)])), credits: join(here, "splits", "portal-credits.lss") },
     displayEnv: "AAS_PORTAL_WINDOW_POS",
     resolutionEnv: "AAS_PORTAL_RESOLUTION",
   },
@@ -140,9 +145,10 @@ export default {
   // Published as game-config/ by `aas publish`.
   // His license travels with his files: game-config/LICENSE.
   gameConfig: [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json"), join(PORTAL_AGENT_DIR, "controller", "LICENSE")],
-  // The goal the original run was given; `aas run` hands it to the agent as its first prompt.
-  goalPrompt:
-    "You are controlling Portal. Your goal is to progress through the game and reach the end credits. " +
+  // The goal the original run was given; `aas run` hands it to the agent as its first prompt. A shorter goal names its
+  // chamber in the same words.
+  goalPrompt: (end) =>
+    `You are controlling Portal. Your goal is to progress through the game and reach ${end && !end.final ? `test chamber ${end.id.replace(/^chamber/, "")}` : "the end credits"}. ` +
     "Do not cheat/look up information about the game online.",
   category: {
     build: `Source Unpack 2.6 (build 5135) + portal-agent SPT patch ${UPSTREAM.commit.slice(0, 7)}`,
@@ -257,7 +263,7 @@ export default {
     // observations): a new chamber is a `game.milestone` with `chapter: true`.
     const chambers = createChamberTracker(lastChamber(process.env.AAS_RUN_DIR));
     const entered = (id, extra = {}) => {
-      if (id) globalThis.aas?.event?.("game.milestone", { label: `Chamber ${id}`, chamber: id, map: chambers.map, chapter: true, ...extra });
+      if (id) globalThis.aas?.event?.("game.milestone", { label: `Chamber ${id}`, chamber: id, end: `chamber${id}`, map: chambers.map, chapter: true, ...extra });
     };
     const observe = controller.observe.bind(controller);
     controller.observe = async (fields = ["facing", "position"], options) => {

@@ -29,7 +29,7 @@ export default {
   },
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim
-  goalPrompt: "Play the run that has been started for you to the end.", // the first prompt
+  goalPrompt: (end) => `Play the run that has been started for you until ${end.label}.`, // the first prompt: a string, or a function of the run's end
   scopeName: "mg",               // second name of the controller inside <id>_exec, next to `game`
   execDescription: "...",        // optional: the <id>_exec tool description
   category: { build: "...", goal: "any%", observation: "state", input: "api", timing: "paused-think", human: "none" },

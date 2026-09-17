@@ -174,7 +174,7 @@ export default {
   gameConfig: [join(here, "UPSTREAM.json")],
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),
-  goalPrompt: `You are playing Slay the Spire as the ${CLASS} at ascension ${ASCENSION}; the run has been started. Read sts_documentation, then play until the run is won: the boss of Act 3, and the Heart if the run allows it. Do not look up information about the game online.`,
+  goalPrompt: (end) => `You are playing Slay the Spire as the ${CLASS} at ascension ${ASCENSION}; the run has been started. Read sts_documentation, then play ${end?.id === "heart" ? "until the Heart is defeated" : end && !end.final ? `until the ${end.label} is defeated` : "until the run is won: the boss of Act 3, and the Heart if the run allows it"}. Do not look up information about the game online.`,
   category: {
     build: `Slay the Spire (Steam) + ModTheSpire + BaseMod + Communication Mod ${MOD_VERSION}`,
     observation: "state",

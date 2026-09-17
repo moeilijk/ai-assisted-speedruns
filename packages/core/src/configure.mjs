@@ -43,9 +43,11 @@ export async function configure(opts) {
   if (!instructions) throw new Error("No instructions: the game plugin has none; pass --instructions <file>.");
   const category = { game: plugin.id, build: "", goal: "", observation: "vision", input: "input", timing: "paused-think", human: "none", ...(plugin.category ?? {}) };
   // The goal: one of the game's ends, checked against the plugin's list; no goal means the game's own end.
-  category.goal = resolveGoal(plugin, opts.goal).id;
+  const goal = resolveGoal(plugin, opts.goal);
+  category.goal = goal.id;
   if (opts.build) category.build = opts.build;
-  const goalPrompt = opts.prompt ?? plugin.goalPrompt ?? null;
+  // The first prompt names the run's own goal: a plugin may give it per end.
+  const goalPrompt = opts.prompt ?? (typeof plugin.goalPrompt === "function" ? plugin.goalPrompt(goal.end) : plugin.goalPrompt) ?? null;
   const brief = { id: opts.id ?? path.basename(runDir), run_uid: randomBytes(16).toString("hex"), instructions, goalPrompt, category, model: opts.model, reasoningEffort: opts.effort ?? null, runtime: runtime.id, runtimeVersion: runtime.version, runtimeModule: /\.m?js$/.test(opts.runtime) ? path.resolve(opts.runtime) : null, game: { id: plugin.id, version: plugin.version }, gameModule: spec.gameModule };
   if (opts.headless) brief.headless = true;
   // The seed, for games that have one: configuration of the run, handed to the plugin's prepareRun.

@@ -12,6 +12,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.4 — 2026-09-17
+
+- Portal: every test chamber after the first is an end of its own (`chamber01` … `chambere02`, reached on entering
+  it), each with its LiveSplit file; the credits stay the default. A Portal bundle's `ends` lists them.
+- The first prompt names the run's goal: a game plugin's `goalPrompt` may be a function of the chosen end (Balatro,
+  Slay the Spire and Portal use it); the agent instructions of Balatro and Slay the Spire refer to that goal.
+- LiveSplit starts without questions: `packages/timer-livesplit/windows-setup.mjs` (the GUI runs it after installing
+  LiveSplit, or from its check) asks Windows for permission once, blocks that LiveSplit's outbound network (its update
+  check at every start fails quietly; the version stays the pinned one) and registers its file types, which it asked
+  administrator rights for at every start.
+
 ## 0.19.3 — 2026-09-17
 
 - GUI Setup shows the settings as `.env` has them at once; the check runs only on its button ("Initial check" when

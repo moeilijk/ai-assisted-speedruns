@@ -189,6 +189,14 @@ export function createSession() {
         const code = await node([path.join(REPO, "packages", "timer-livesplit", "install-livesplit.mjs"), dir], `node packages/timer-livesplit/install-livesplit.mjs "${toWindows(dir)}"`);
         if (code !== 0) throw new Error("LiveSplit could not be installed.");
         writeEnv({ AAS_LIVESPLIT_EXE: path.join(dir, "LiveSplit.exe") });
+        log("Windows asks for permission once: LiveSplit gets no network (no update questions) and owns its file types.", "note");
+        const setupCode = await node([path.join(REPO, "packages", "timer-livesplit", "windows-setup.mjs"), path.join(dir, "LiveSplit.exe")], `node packages/timer-livesplit/windows-setup.mjs "${toWindows(path.join(dir, "LiveSplit.exe"))}"`);
+        if (setupCode !== 0) log("Not done (permission refused?): LiveSplit will ask about updates and file types at its starts.", "note");
+      } else if (id === "livesplit-windows") {
+        const exe = toLocal(readEnv().AAS_LIVESPLIT_EXE ?? "");
+        log("Windows asks for permission once.", "note");
+        const code = await node([path.join(REPO, "packages", "timer-livesplit", "windows-setup.mjs"), exe], `node packages/timer-livesplit/windows-setup.mjs "${toWindows(exe)}"`);
+        if (code !== 0) throw new Error("Not done: the permission was refused or the rule could not be made.");
       } else if (id === "install-svv") {
         const dir = path.join(aasToolsDir(), "SoundVolumeView");
         const code = await node([path.join(REPO, "packages", "core", "src", "windows", "install-soundvolumeview.mjs"), dir], `node packages/core/src/windows/install-soundvolumeview.mjs "${toWindows(dir)}"`);
