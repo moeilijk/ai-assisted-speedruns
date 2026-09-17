@@ -1,6 +1,6 @@
 # Changelog
 
-The tooling is in beta: versions stay below 1.0.0 until the AAS Archive goes live.
+The tooling is in beta: versions stay below 1.0.0 until the AAS Archive goes live on 2026-10-01, together with 1.0.0.
 
 - **Minor** (0.x.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
   reads it before the release comes out.

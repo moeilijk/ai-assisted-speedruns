@@ -6,7 +6,7 @@ The idea comes from cozyblaze's Portal run. The tool interface and the log forma
 
 ## Status
 
-Pre-release. The 0.x versions are for testing the setup: installing, recording a run, publishing a bundle. Expect them to break with version 1.0.0, which comes out when the archive goes live. Changes per version are in [CHANGELOG.md](CHANGELOG.md).
+Pre-release. The 0.x versions are for testing the setup: installing, recording a run, publishing a bundle. Expect them to break with version 1.0.0, which comes out when the archive goes live on 1 October 2026. Changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contents
 
