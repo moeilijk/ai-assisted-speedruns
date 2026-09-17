@@ -1,0 +1,41 @@
+{
+  "balatro": {
+    "steam_app_id": 2379780,
+    "tested_version": "1.0.1o-FULL"
+  },
+  "lovely": {
+    "repo": "https://github.com/ethangreen-dev/lovely-injector",
+    "version": "0.9.0",
+    "url": "https://github.com/ethangreen-dev/lovely-injector/releases/download/v0.9.0/lovely-x86_64-pc-windows-msvc.zip",
+    "sha256": "40b994a055ee75e5f2aba81e7ae06f2c17460e18cc346483089921899fadd1f7",
+    "file": "version.dll",
+    "license": "MIT"
+  },
+  "steamodded": {
+    "repo": "https://github.com/Steamodded/smods",
+    "version": "1.0.0-beta-1814a",
+    "commit": "f8e4ae060df0e42ce698ffaf901a39a6ef424c0f",
+    "url": "https://codeload.github.com/Steamodded/smods/zip/f8e4ae060df0e42ce698ffaf901a39a6ef424c0f",
+    "sha256": "1cae496bfd1c5dbfbc5db1eb51137d822c44fb7758ba6beaf020e43f1b5f96db",
+    "folder": "smods",
+    "license": "GPL-3.0"
+  },
+  "balatrobot": {
+    "repo": "https://github.com/coder/balatrobot",
+    "version": "1.5.2",
+    "commit": "9052d76f14723293f6c6b2cecaa791a5c4ae68f3",
+    "url": "https://codeload.github.com/coder/balatrobot/zip/refs/tags/v1.5.2",
+    "sha256": "7b1352be6b79d3190a3ab7cc0c9a88b3af7d5247a0dc8a8be09252b0ee241d5e",
+    "folder": "balatrobot",
+    "files": ["balatrobot.json", "balatrobot.lua", "LICENSE", "src/lua/"],
+    "settings": {
+      "BALATROBOT_AUDIO": "1",
+      "BALATROBOT_FAST": "0",
+      "BALATROBOT_HEADLESS": "0",
+      "BALATROBOT_RENDER_ON_API": "0",
+      "BALATROBOT_DEBUG": "0",
+      "BALATROBOT_GAMESPEED": "4"
+    },
+    "license": "MIT"
+  }
+}

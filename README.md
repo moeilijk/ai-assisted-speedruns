@@ -24,7 +24,8 @@ packages/
 games/
   slay-the-spire/       Slay the Spire through Communication Mod
   portal/               Portal through the controller from portal-agent
-  balatro/ half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
+  balatro/              Balatro through balatrobot
+  half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
                         planned, not implemented; each README has the route, license and risks
 docs/                   install, command reference, plugins, design
 ```
@@ -62,7 +63,7 @@ cp .env.example .env         # machine settings: OBS password, game folders, bud
 npm run claude:smoke         # Claude Code and its permissions, against a fake game
 ```
 
-Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal](games/portal/README.md)) and OBS, and do a first run:
+Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal](games/portal/README.md), [Balatro](games/balatro/README.md)) and OBS, and do a first run:
 
 ```bash
 aas doctor --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --runtime claude-code

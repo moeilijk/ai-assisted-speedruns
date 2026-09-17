@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.18.2 — 2026-09-17
+
+- Balatro is a game plugin (games/balatro), no longer a stub: balatrobot 1.5.2 on Steamodded 1.0.0-beta-1814a and
+  Lovely 0.9.0, pinned with their sha256. A bridge between the agent and balatrobot refuses `add` and `set` to everyone
+  and the harness's `start`, `menu`, `save` and `load` to the agent. Goal `win` (ante 8), splits per ante, restart
+  after a game over. The run plays on its own profile slot; the launcher can put the game on another display through
+  the game's own display setting and keep its audio off the speakers.
+- Core: `json-rpc-http.mjs`, a JSON-RPC client over `node:http` for game bridges that speak HTTP, with a deadline that
+  also covers connecting (under WSL's mirrored networking a connection to a closed port hangs until the TCP timeout).
+- `aas run` and `aas resume` end when a preflight fails (LiveSplit not reachable, OBS already recording); the overlay
+  server and the OBS connection kept the process alive after the error.
+
 ## 0.18.1 — 2026-09-16
 
 - Portal's goal is "Credits" again, as in the text the owner approved ("stopped before the credits").

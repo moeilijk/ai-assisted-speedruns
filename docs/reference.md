@@ -54,6 +54,7 @@ Machine settings live in `.env` in the repository root, copied from [`.env.examp
 | `AAS_QUIET_AUDIO_DEVICE`, `AAS_SOUNDVOLUMEVIEW`, `AAS_KEEP_DISPLAYS_AWAKE` | launchers | optional: route the game's audio to another device while it starts; keep the displays awake |
 | `AAS_PORTAL_*` | Portal plugin and scripts | see [../games/portal/README.md](../games/portal/README.md) |
 | `AAS_STS_*`, `AAS_BOT_*` | Slay the Spire plugin, scripts and the scripted bot | see [../games/slay-the-spire/README.md](../games/slay-the-spire/README.md) |
+| `AAS_BALATRO_*`, `AAS_BOT_BALATRO_ATTEMPTS` | Balatro plugin, scripts, bridge and the scripted bot | see [../games/balatro/README.md](../games/balatro/README.md) |
 
 Variables the harness sets for the broker process itself (`AAS_RUN_DIR`, `AAS_GAME_MODULE`, `AAS_ALLOWED_ENDPOINTS`, `AAS_TIME_ZONE`) are not settings. The broker's environment holds those and the variables the game plugin declares in its `env` list, nothing else of the machine's environment; the published copy of the configuration shows the plugin's variables as `__ENV__`.
 

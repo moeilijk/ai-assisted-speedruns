@@ -252,6 +252,11 @@ export function createObsRecorder(options = {}) {
       const out = closeWindows([{ name: "obs64", title: "OBS ", seconds: 180 }], { report: ["obs64"] });
       return `${out}\nobs64: ${Math.round((Date.now() - t0) / 1000)} s from WM_CLOSE to the report`;
     },
+    /** Drops the websocket connection without touching OBS: after a failed preflight the run does not start. */
+    disconnect() {
+      obs?.close();
+      obs = null;
+    },
     async preflight(brief, game) {
       const o = await connect();
       const v = await o.call("GetVersion");

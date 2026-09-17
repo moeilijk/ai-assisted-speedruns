@@ -87,8 +87,16 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   const segment = (fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")).segments?.length ?? 1 : 0) + 1;
   const overlay = opts["overlay-port"] !== undefined ? await startOverlayServer(runDir, { port: Number(opts["overlay-port"]) || 0 }) : null;
   const ctx = { runDir, game: plugin, overlayUrl: overlay?.url ?? null };
-  await recorder.preflight(brief, plugin);
-  await timer?.preflight?.(brief, plugin);
+  // A failed preflight (OBS already recording, LiveSplit not reachable) stops the run before it starts; the overlay
+  // server and the recorder's connection are closed too, or they keep the process alive after the error.
+  try {
+    await recorder.preflight(brief, plugin);
+    await timer?.preflight?.(brief, plugin);
+  } catch (error) {
+    recorder.disconnect?.();
+    await overlay?.close();
+    throw error;
+  }
   const { t0 } = await recorder.start(brief, ctx);
   events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString(), segment });
   try {

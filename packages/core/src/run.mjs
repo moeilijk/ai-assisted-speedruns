@@ -133,8 +133,16 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   if (overlay) log(`overlay at ${overlay.url} (add it as a browser source; the OBS recorder does this itself)`);
   const ctx = { runDir, game: plugin, overlayUrl: overlay?.url ?? null };
 
-  await recorder.preflight(brief, plugin);
-  await timer?.preflight?.(brief, plugin);
+  // A failed preflight (OBS already recording, LiveSplit not reachable) stops the run before it starts; the overlay
+  // server and the recorder's connection are closed too, or they keep the process alive after the error.
+  try {
+    await recorder.preflight(brief, plugin);
+    await timer?.preflight?.(brief, plugin);
+  } catch (error) {
+    recorder.disconnect?.();
+    await overlay?.close();
+    throw error;
+  }
   let t0 = null;
   const tooling = toolingIdentity();
   try {
