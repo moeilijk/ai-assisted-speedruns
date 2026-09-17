@@ -12,6 +12,11 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.2 — 2026-09-17
+
+- Balatro: Ante 1 to Ante 7 are ends of their own (`--goal ante1` … `ante7`), shorter goals for tests and first runs;
+  `win` stays the default. Each has its LiveSplit file.
+
 ## 0.19.1 — 2026-09-17
 
 - The OBS recorder sets OBS's own recording folder back only after the recording has stopped, and says so, or says

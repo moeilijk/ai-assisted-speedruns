@@ -17,8 +17,12 @@ const DECK = (process.env.AAS_BALATRO_DECK || "RED").toUpperCase();
 const STAKE = (process.env.AAS_BALATRO_STAKE || "WHITE").toUpperCase();
 export const ACTION_TIMEOUT_MS = Number(process.env.AAS_BALATRO_ACTION_TIMEOUT_MS || 120000);
 export const SEGMENTS = ["Ante 1", "Ante 2", "Ante 3", "Ante 4", "Ante 5", "Ante 6", "Ante 7", "Ante 8"];
-/** The game's ends: winning the run (the boss blind of ante 8) is the game's own end and the Random Seed and Set Seed goal. */
-export const ENDS = [{ id: "win", label: "Win", split: "Ante 8", final: true }];
+/** The game's ends: winning the run (the boss blind of ante 8) is the game's own end and the Random Seed and Set Seed
+ *  goal; each earlier ante is a shorter end (owner 2026-09-17), for tests and first runs, as act1 is for Slay the Spire. */
+export const ENDS = [
+  ...SEGMENTS.slice(0, 7).map((label, i) => ({ id: `ante${i + 1}`, label, split: label })),
+  { id: "win", label: "Win", split: "Ante 8", final: true },
+];
 
 /** The folder next to the game where install-mod.mjs puts the mods, and where the harness keeps its saves. */
 export const toolsDir = (root = GAME_ROOT) => (process.env.AAS_BALATRO_TOOLS_DIR ? resolve(process.env.AAS_BALATRO_TOOLS_DIR) : root ? join(root, "aas") : null);
@@ -71,7 +75,7 @@ export default {
     install: join(here, "install-mod.mjs"),
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
-    splits: { win: join(here, "splits", "balatro-win.lss") },
+    splits: { ...Object.fromEntries(SEGMENTS.slice(0, 7).map((_, i) => [`ante${i + 1}`, join(here, "splits", `balatro-ante${i + 1}.lss`)])), win: join(here, "splits", "balatro-win.lss") },
     bot: join(here, "bot.mjs"),
     displayEnv: "AAS_BALATRO_WINDOW_POS",
   },
@@ -121,7 +125,7 @@ export default {
       if (ante !== null && ante > highestAnte) {
         for (let a = highestAnte; a < ante; a += 1) {
           if (a >= 8) continue; // ante 8 ends with the win below
-          emit("game.milestone", { label: `Ante ${a}`, split: SEGMENTS[a - 1], ante: a, round: s.round_num ?? null, seed: s.seed ?? null, chapter: true });
+          emit("game.milestone", { label: `Ante ${a}`, split: SEGMENTS[a - 1], end: `ante${a}`, ante: a, round: s.round_num ?? null, seed: s.seed ?? null, chapter: true });
         }
         highestAnte = ante;
       }

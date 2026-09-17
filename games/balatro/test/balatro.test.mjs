@@ -74,6 +74,14 @@ test("prepareRun starts the run; actions, splits and the win are reported", asyn
   const chapters = t.events.filter((e) => e.event === "game.milestone" && e.data.chapter).map((e) => [e.data.label, e.data.split]);
   assert.deepEqual(chapters, [["Ante 1", "Ante 1"], ["Ante 2", "Ante 2"], ["Win", "Ante 8"]]);
   assert.equal(t.events.find((e) => e.data.label === "Win").data.end, "win");
+  // Every ante is an end of its own: the harness declares the victory when the goal's milestone goes by.
+  const { resolveGoal, goalReached } = await import("../../../packages/core/src/goal.mjs");
+  const ante1 = t.events.find((e) => e.event === "game.milestone" && e.data.label === "Ante 1");
+  assert.ok(goalReached(resolveGoal(t.plugin, "ante1").end, ante1));
+  assert.ok(!goalReached(resolveGoal(t.plugin, "ante2").end, ante1));
+  assert.equal(resolveGoal(t.plugin, null).id, "win");
+  assert.deepEqual(t.plugin.ends.map((e) => e.id), ["ante1", "ante2", "ante3", "ante4", "ante5", "ante6", "ante7", "win"]);
+  for (const file of Object.values(t.plugin.setup.splits)) assert.ok((await import("node:fs")).existsSync(file), file);
   const over = t.events.filter((e) => e.event === "game.over");
   assert.equal(over.length, 1);
   assert.equal(over[0].data.victory, true);
