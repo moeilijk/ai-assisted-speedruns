@@ -352,10 +352,18 @@ export function createObsRecorder(options = {}) {
       await new Promise((r) => setTimeout(r, outroSeconds * 1000));
       const stopped = o.waitFor("RecordStateChanged", (e) => e.outputState === "OBS_WEBSOCKET_OUTPUT_STOPPED", 30000);
       const res = await o.call("StopRecord");
-      outputPath = res.outputPath ?? (await stopped)?.outputPath ?? null;
+      const stoppedEvent = await stopped.catch(() => null);
+      outputPath = res.outputPath ?? stoppedEvent?.outputPath ?? null;
       await o.tryCall("StopReplayBuffer");
-      // Leave OBS pointing at its own recording folder again.
-      if (previousRecordDir) await o.tryCall("SetRecordDirectory", { recordDirectory: previousRecordDir });
+      // Leave OBS pointing at its own recording folder again. OBS refuses the change while the output is still
+      // stopping, so this waits for the stop above; a refusal is reported, not swallowed (measured 2026-09-17: the
+      // folder of the last run stayed OBS's recording folder).
+      if (previousRecordDir) {
+        await o.tryCall("SetRecordDirectory", { recordDirectory: previousRecordDir });
+        const now = (await o.tryCall("GetRecordDirectory"))?.recordDirectory ?? null;
+        if (now !== previousRecordDir) log(`OBS's recording folder could not be set back to ${previousRecordDir} (it is ${now}); set it in OBS → Settings → Output`);
+        else log(`OBS's recording folder set back to ${previousRecordDir}`);
+      }
       o.close();
       obs = null;
       const files = [outputPath, ...replayPaths].filter(Boolean).map(toLocalPath);

@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.1 — 2026-09-17
+
+- The OBS recorder sets OBS's own recording folder back only after the recording has stopped, and says so, or says
+  that it could not: before, OBS refused the change while the recording was still stopping, and the folder of the last
+  run stayed OBS's recording folder.
+
 ## 0.19.0 — 2026-09-17
 
 SPEC 0.38: in a video's description, durations carry a word joiner (U+2060) before each colon.
