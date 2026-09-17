@@ -52,12 +52,12 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(cut.includes(join(runDir, "recording", "AAS_run_1.cut.mp4")));
   assert.ok(cut.includes(`line:  ${fp} · 769 s`), "the cut's own length");
   assert.ok(cut.includes("Title: Claude Sonnet 5 plays Slay the Spire (cut): reached the Act 1 boss in 00:02:57.4"));
-  assert.ok(cut.includes("This cut leaves out the pauses while the model was thinking: 00:25:59 of recording in 00:12:49."));
+  assert.ok(cut.includes("This cut leaves out the pauses while the model was thinking: 00\u2060:25\u2060:59 of recording in 00\u2060:12\u2060:49."));
   assert.ok(cut.includes("\n11:15 The run reaches the Act 1 boss."));
   assert.ok(cut.includes("This run is an example."));
   assert.ok(cut.trim().split("\n").at(-2).startsWith(`${fp} · 769 s`), "the description ends on the cut's line");
   const cutText = cut.split("-".repeat(78))[1].trim().split("\n");
-  assert.equal(cutText[0], "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Goal: the Act 1 boss. The run reached the Act 1 boss after 00:02:57.4 of game time and 00:22:42 of real time.", "the result first");
+  assert.equal(cutText[0], "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Goal: the Act 1 boss. The run reached the Act 1 boss after 00\u2060:02\u2060:57.4 of game time and 00\u2060:22\u2060:42 of real time.", "the result first");
   assert.ok(cut.includes("Run sts-claude-code-01 in the AAS Archive: ai-assisted-speedruns.org"), "the domain and the run id as text, no link YouTube would shorten");
   assert.ok(!cut.includes("https://"), "no links: a viewer has no bundle to check, and a link is shortened in view");
   assert.equal(cutText.at(-2), "Verification line for the AAS Archive:");

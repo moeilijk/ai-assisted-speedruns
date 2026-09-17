@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.0 — 2026-09-17
+
+SPEC 0.38: in a video's description, durations carry a word joiner (U+2060) before each colon.
+
+- YouTube makes every `m:ss` and `h:mm:ss` within a video's length a link to that place, also in the middle of a
+  sentence ("after 00:02:02.0 of game time" in the cut of portal-02). With the word joiner the text looks the same and
+  is not linked (measured by the owner on 2026-09-17). Places in the video ("2:10 The run is resumed.") keep plain
+  colons, on their own line and within the video. Titles are unchanged; the code does not change, so a published video
+  can take the new description as it is.
+
 ## 0.18.4 — 2026-09-17
 
 - `aas gui` (`npm run gui`, or `AAS.cmd` from Windows): a local web page to set up and start runs without a shell.

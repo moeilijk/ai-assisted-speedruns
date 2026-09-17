@@ -22,6 +22,15 @@ export function youtubeChapters(chapters, seconds) {
 
 const endLabel = (summary, id) => summary.ends?.find((e) => e.id === id)?.label ?? id;
 
+/**
+ * A duration as it stands in a description: YouTube makes every m:ss and h:mm:ss within the video's length a link to
+ * that place, also inside a sentence. A word joiner (U+2060) before each colon stops that and looks the same
+ * (measured by the owner on 2026-09-17 on the cut of portal-02). Places in the video ("2:10 The run is resumed.") keep
+ * plain colons.
+ */
+export const WORD_JOINER = "\u2060";
+export const durationText = (text) => String(text).replace(/:/g, `${WORD_JOINER}:`);
+
 /** A moment's label in words a viewer knows: the harness's event names become sentences, goal ids their labels. */
 export function momentLabel(label, summary = {}) {
   const text = String(label);
@@ -68,6 +77,7 @@ const facts = (s) => {
   const reached = Boolean(s.completed_at && ttc);
   const igt = formatDuration(reached ? ttc.igt_seconds : s.recording?.igt_seconds);
   const real = formatDuration(reached ? ttc.rta_seconds : s.recording?.wall_clock_seconds ?? s.recording?.duration_seconds, { whole: true });
+  // The title is not linked by YouTube; the description writes the same durations through durationText.
   return { game, goal, models, several: names.length > 1, reached, igt, real };
 };
 
@@ -104,15 +114,17 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const f = facts(s);
   const domain = String(archiveUrl).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
   const goal = goalPhrase(f.goal);
+  const igt = durationText(f.igt);
+  const real = durationText(f.real);
   const intro = [
     `${f.models}, ${f.several ? "language models, play" : "a language model, plays"} ${f.game} by ${f.several ? "themselves" : "itself"}.`,
     `Goal: ${goal}.`,
     f.reached
-      ? `The run reached ${goal} after ${f.igt} of game time and ${f.real} of real time.`
-      : `The run ended before ${goal}, after ${f.igt} of game time and ${f.real} of real time.`,
+      ? `The run reached ${goal} after ${igt} of game time and ${real} of real time.`
+      : `The run ended before ${goal}, after ${igt} of game time and ${real} of real time.`,
   ].join(" ");
-  const full = formatDuration(s.recording?.duration_seconds, { whole: true });
-  const own = formatDuration(video.seconds, { whole: true });
+  const full = durationText(formatDuration(s.recording?.duration_seconds, { whole: true }));
+  const own = durationText(formatDuration(video.seconds, { whole: true }));
   const which = video.kind === "cut"
     ? `This cut leaves out the pauses while the model was thinking: ${full} of recording in ${own}.`
     : video.kind === "segment"

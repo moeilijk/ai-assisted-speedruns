@@ -97,9 +97,9 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   const one = videoDescription(summary, part1, { archiveUrl: "https://ai-assisted-speedruns.org" });
   const two = videoDescription(summary, part2, { archiveUrl: "https://ai-assisted-speedruns.org" });
   assert.equal(videoTitle(summary, part1), "Claude Sonnet 5 plays Slay the Spire (part 1 of 2): reached the Act 1 boss in 00:02:57.4");
-  assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Goal: the Act 1 boss\. The run reached the Act 1 boss after 00:02:57\.4 of game time and 00:22:42 of real time\.\n/);
-  assert.match(one, /\nThis is part 1 of 2 of the recording: 00:22:48 of 00:25:59\. The run was paused here and continues in part 2\.\n/);
-  assert.match(two, /\nThis is part 2 of 2 of the recording: 00:03:11 of 00:25:59\. The run continues here after a pause\.\n/);
+  assert.match(one, /^Claude Sonnet 5, a language model, plays Slay the Spire by itself\. Goal: the Act 1 boss\. The run reached the Act 1 boss after 00⁠:02⁠:57\.4 of game time and 00⁠:22⁠:42 of real time\.\n/);
+  assert.match(one, /\nThis is part 1 of 2 of the recording: 00⁠:22⁠:48 of 00⁠:25⁠:59\. The run was paused here and continues in part 2\.\n/);
+  assert.match(two, /\nThis is part 2 of 2 of the recording: 00⁠:03⁠:11 of 00⁠:25⁠:59\. The run continues here after a pause\.\n/);
   assert.match(one, /\nTop left: LiveSplit, the speedrun timer\. Bottom left: the current section, real time \(RTA\), game time \(IGT\) and the model's last command\.\n/);
   assert.match(one, /\n22:42 The run reaches the Act 1 boss\.\n/);
   assert.doesNotMatch(one, /Act 3/, "the extension is not in part 1");
@@ -108,6 +108,15 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   assert.doesNotMatch(two + one, /Claude Code|https?:|Moments/);
   assert.equal(one.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
   assert.equal(videoTitle({ ...summary, completed_at: null, category: { goal_end: { id: "credits", label: "End credits" } } }, { kind: "cut" }), "Claude Sonnet 5 plays Slay the Spire (cut): stopped before the end credits");
+  // YouTube links every m:ss / h:mm:ss within the video: a plain one is only a place, on its own line, inside the video.
+  const cut = { kind: "cut", seconds: 199, line: "aas0123456789abcdef0123456789abcdef", chapters: [{ at: 0, label: "Start" }, { at: 130, label: "Human: resumed after stopped" }] };
+  for (const [video, text] of [[part1, one], [part2, two], [cut, videoDescription(summary, cut, { archiveUrl: "https://ai-assisted-speedruns.org" })]]) {
+    for (const m of text.matchAll(/(^|.)(\d{1,2}):(\d{2})(?::(\d{2}))?/gm)) {
+      const lineStart = m[1] === "" || m[1] === "\n";
+      const at = m[4] === undefined ? Number(m[2]) * 60 + Number(m[3]) : Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]);
+      assert.ok(lineStart && at <= video.seconds, `"${m[0]}" in the ${video.kind} description would be a link: ${JSON.stringify(text.slice(Math.max(0, m.index - 30), m.index + 20))}`);
+    }
+  }
 });
 
 test("a recording without a measured length lists no whole video, whose line nothing could back", () => {
