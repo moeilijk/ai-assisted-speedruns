@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.18 — 2026-09-19
+
+- Every row of Setup shows what it tried (owner, 2026-09-19: "IK WIL DE FAIL STATES ZIEN"). A check is no longer a
+  verdict but a list of conditions, each with its outcome, and under it the things this row does **not** try. So
+  "Checked" is not a word to trust: next to it stands what was proved, and every line in that list is a state the
+  row can fail on. OBS names six conditions and says it never connected; LiveSplit four; Steam one, and that
+  whether Steam runs and is logged in is left to the game's launcher; a game names the checks its own plugin
+  answered.
+- Setup names every game in the repository, not only the ones that work. The nine stubs stand between the games
+  with a folder, each saying it has no plugin yet and where to read what it would take. A missing game has to be
+  visible, otherwise a complete-looking list says the machine can do more than it can.
+
 ## 0.19.17 — 2026-09-19
 
 - A check no longer turns green on nothing (owner, 2026-09-19: green stickers without a function lull the operator

@@ -76,6 +76,11 @@
   /* The GUI is gone: the page says so over everything else, because nothing on it works any more. */
   #run.stub .grid label:not(:first-child), #run.stub #savedto, #run.stub .row-actions .b.danger { display: none; }
   #run.stub #stubnote { color: var(--fail); }
+  .tests { grid-column: 1 / -1; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.7; }
+  .tests li { color: var(--muted); }
+  .tests .pass { color: var(--ok); }
+  .tests .miss { color: var(--fail); }
+  .tests .not { font-style: italic; }
   #offline { position: fixed; inset: 0; background: rgba(15, 17, 21, .72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
   #offline.on { display: flex; }
   #offline .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; max-width: 620px; width: 100%; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
@@ -360,7 +365,16 @@ function row(i) {
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
     <div><div class="name">${esc(i.label)}</div>${i.status ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>` : ""}</div>
     <div class="field">${field}${fix}</div>
-    <div class="detail muted">${esc(i.detail)}</div>${suggest}</div>`;
+    <div class="detail muted">${esc(i.detail)}</div>${tests(i)}${suggest}</div>`;
+}
+// What a row really establishes: every condition it tried, with its outcome, and what it left to a run. Without
+// this list "checked" is a colour and nothing else.
+function tests(i) {
+  const rows = [
+    ...(i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : "miss"}">${x.ok ? "✓" : "✗"} ${esc(x.what)}${x.ok || !x.detail ? "" : ` — ${esc(x.detail)}`}</li>`),
+    ...(i.untested ?? []).map((u) => `<li class="not">not tried: ${esc(u)}</li>`),
+  ];
+  return rows.length ? `<ul class="tests">${rows.join("")}</ul>` : "";
 }
 const envOf = (id) => setup.items.find((i) => i.id === id)?.env;
 async function saveValue(id, value) {
