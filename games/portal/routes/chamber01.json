@@ -1,0 +1,617 @@
+{
+  "reaches": "chamber01",
+  "source": {
+    "run": "portal-03",
+    "segment": 1,
+    "started": "2026-09-10T02:07:35.967+02:00",
+    "runtime": "claude-code",
+    "note": "The calls an AI run sent to the game, in order. Taken from that run log; no line of it is written by hand.",
+    "edited": "screenshots removed: they cost wall-clock time and no game time, and a replay does not need to look (owner, 2026-09-19). Consecutive camera turns merged into one call: the same angle, fewer round trips."
+  },
+  "steps": [
+    {
+      "call": "call-00004++",
+      "code": "await portal.look.left(270);"
+    },
+    {
+      "call": "call-00007",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(5));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00008+",
+      "code": "await portal.look.right(270);"
+    },
+    {
+      "call": "call-00010",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(15));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00011",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(30));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00012",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(30));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00013",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(20));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00014",
+      "code": "await portal.look.left(45);"
+    },
+    {
+      "call": "call-00015",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00016+++",
+      "code": "await portal.look.left(135);"
+    },
+    {
+      "call": "call-00021",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00022+",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00024",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(3), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00025",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00026",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00027+",
+      "code": "await portal.look.left(180);"
+    },
+    {
+      "call": "call-00030",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.5), {}, { right: 40 });\nt.hold(portal.seconds(3), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00031",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.3), {}, { left: 20 });\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00032++",
+      "code": "await portal.look.left(270);"
+    },
+    {
+      "call": "call-00035",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(3), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00036",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00037",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00038+",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00041",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.3), {}, { right: 20 });\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00042",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00043",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00044",
+      "code": "const t = portal.tas();\nfor (let i = 0; i < 8; i++) t.hold(5, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00045",
+      "code": "const t = portal.tas();\nfor (let i = 0; i < 15; i++) t.hold(5, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00046",
+      "code": "await portal.look.left(70);"
+    },
+    {
+      "call": "call-00047",
+      "code": "const t = portal.tas();\nfor (let i = 0; i < 10; i++) t.hold(5, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00048",
+      "code": "await portal.look.down(30);"
+    },
+    {
+      "call": "call-00049",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00050+++++",
+      "code": "await portal.look.up(20);"
+    },
+    {
+      "call": "call-00056",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00057",
+      "code": "await portal.look.down(60);"
+    },
+    {
+      "call": "call-00058",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00059+++",
+      "code": "await portal.look.up(70);"
+    },
+    {
+      "call": "call-00063",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00064",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00065",
+      "code": "await portal.look.down(15);"
+    },
+    {
+      "call": "call-00066",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00067",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.4), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00068",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00069",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.3), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00070",
+      "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00071",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(2));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00072",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.7), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00073",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(3));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00074+++++++",
+      "code": "await portal.look.right(300);"
+    },
+    {
+      "call": "call-00083",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true }, { left: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00084",
+      "code": "await portal.look.left(180);"
+    },
+    {
+      "call": "call-00085",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00086+",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00088",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00089",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(2));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00090",
+      "code": "await portal.look.left(180);"
+    },
+    {
+      "call": "call-00091",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00092",
+      "code": "const t = portal.tas();\nfor (let i=0;i<25;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00093",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00094++",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00097",
+      "code": "await portal.look.left(90);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00098++",
+      "code": "await portal.look.left(135);"
+    },
+    {
+      "call": "call-00101",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00102",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00103",
+      "code": "const t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true }, { right: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00104",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.5), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00105",
+      "code": "await portal.look.left(30);"
+    },
+    {
+      "call": "call-00106",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00107",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(5));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00111",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00112",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00113+",
+      "code": "await portal.look.left(90); await portal.look.down(50);"
+    },
+    {
+      "call": "call-00115",
+      "code": "await portal.look.up(50);\nconst t = portal.tas();\nt.hold(portal.seconds(1.5), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00116",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(4));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00117",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(8));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00118",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(8));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00119",
+      "code": "const t = portal.tas();\nt.wait(portal.seconds(4));\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00120",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00121",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00122",
+      "code": "await portal.look.left(60);"
+    },
+    {
+      "call": "call-00123",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00124",
+      "code": "await portal.look.right(45);"
+    },
+    {
+      "call": "call-00125",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00126",
+      "code": "await portal.look.down(20);"
+    },
+    {
+      "call": "call-00127",
+      "code": "await portal.look.up(20);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00128+",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00130",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00131",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00132",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true }, { right: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00133",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00134",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00135",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00136",
+      "code": "const t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00137",
+      "code": "await portal.look.left(60);"
+    },
+    {
+      "call": "call-00138",
+      "code": "await portal.look.right(30);\nconst t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00139",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.5), { left: true });\nt.hold(portal.seconds(1), { forward: true });\nt.hold(portal.seconds(0.5), { right: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00140",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1.5), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00141",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00142",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00143",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00144",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00145",
+      "code": "await portal.look.left(20);\nconst t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00146",
+      "code": "await portal.look.right(30);\nconst t = portal.tas();\nfor (let i=0;i<8;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00147",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00148",
+      "code": "await portal.look.left(15);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00149",
+      "code": "await portal.look.left(40);\nconst t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00150",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { left: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00151",
+      "code": "await portal.look.right(70);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00154",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00155",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00156",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00157",
+      "code": "await portal.look.right(90);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00158",
+      "code": "await portal.look.right(30);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00159",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00160+",
+      "code": "await portal.look.down(30);"
+    },
+    {
+      "call": "call-00162",
+      "code": "await portal.look.up(30);\nconst t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00163",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00164",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00165",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00166++",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00169",
+      "code": "await portal.look.right(180);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00170",
+      "code": "const t = portal.tas();\nfor (let i=0;i<20;i++) t.hold(4, { forward: true }, { left: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00171",
+      "code": "await portal.look.right(15);\nconst t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00172",
+      "code": "const t = portal.tas();\nfor (let i=0;i<10;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00173",
+      "code": "const t = portal.tas();\nfor (let i=0;i<8;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00174",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1.5), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00175",
+      "code": "await portal.look.left(20);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00176",
+      "code": "await portal.look.right(45);\nconst t = portal.tas();\nfor (let i=0;i<12;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00177",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00178",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00179",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 5 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00180",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00181",
+      "code": "await portal.look.right(90);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00182",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00183",
+      "code": "await portal.look.down(60);"
+    },
+    {
+      "call": "call-00184",
+      "code": "await portal.look.up(60);\nconst t = portal.tas();\nt.fire(\"blue\");\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00185",
+      "code": "await portal.look.down(60);\nconst t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00186",
+      "code": "await portal.look.up(60);"
+    },
+    {
+      "call": "call-00187",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.5), { left: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00188",
+      "code": "await portal.look.left(90);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00189",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00190",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 2 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00191",
+      "code": "await portal.look.right(45);"
+    },
+    {
+      "call": "call-00192",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00193",
+      "code": "const t = portal.tas();\nt.hold(portal.seconds(0.5), { right: true });\nt.hold(portal.seconds(1), { forward: true });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00194",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00195",
+      "code": "await portal.look.left(180);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 4 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00196",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00197",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00198",
+      "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 5 });\nconst r = await t.run();\nreturn r;"
+    },
+    {
+      "call": "call-00199",
+      "code": "await portal.look.right(60);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
+    }
+  ]
+}

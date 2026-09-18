@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.20.0 — 2026-09-19
+
+- Portal's mock run plays a real route instead of walking forward for eight steps (owner, 2026-09-19: the AI runs
+  had long since come past chamber 1, so nothing needed inventing). `games/portal/routes/chamber01.json` holds the
+  calls an AI run sent to the game, in the order it sent them, taken from that run's log; its `source` names which
+  run and which segment. The chamber tracker of `games/portal/chambers.mjs` finds 00 and then 01 in that same log,
+  so the route reaches chamber 01. `bot.mjs` replays it.
+- The replay is shorter than the recording without changing a single input: the screenshots the model took are left
+  out (they cost wall-clock time and no game time, and a replay does not look), and camera turns that followed each
+  other are one turn of the same angle. 197 recorded calls become 151 steps.
+- `AAS_BOT_PORTAL_STEPS` now stops earlier in the route instead of being the whole bot.
+
 ## 0.19.21 — 2026-09-19
 
 - A row that fails says it once, in the colour of what it means, with the file it names as a link. A failing row
