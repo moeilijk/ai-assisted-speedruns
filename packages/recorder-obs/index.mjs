@@ -16,6 +16,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import net from "node:net";
+import { fileURLToPath } from "node:url";
 import { connectObs } from "./obs-ws.mjs";
 import { pngMeanLuma } from "./png-luma.mjs";
 
@@ -221,6 +222,8 @@ export function createObsRecorder(options = {}) {
 
   return {
     id: "obs",
+    name: "OBS Studio (video)",
+    launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
     version: "0.1.0",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */

@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.12 — 2026-09-18
+
+- The recording is a choice in the GUI, and a mock run tests the one that is chosen (owner, 2026-09-18: a test tests
+  what you selected for the run, and the recorder is a plugin). A recorder plugin names itself (`name`) and says how
+  to start its program (`launch`, OBS only); a game plugin says which recorders fit it (`setup.recorders`, default
+  `["obs"]`; Portal adds `source-demo`). The GUI's Recording list comes from those two, the step that starts the
+  recorder appears only when the chosen one has a program, and the run is passed `--recorder <chosen>`.
+- The stopped-GUI overlay lost "Copy the details": the report carries the same details, so the button added nothing.
+
 ## 0.19.11 — 2026-09-18
 
 - A mock run is the test of this machine, and it costs no tokens (owner, 2026-09-18). "Check the AI connection

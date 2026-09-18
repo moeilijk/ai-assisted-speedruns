@@ -100,6 +100,7 @@ export default {
     // The splits up to a chamber are the chambers before it (entering a chamber closes the previous one).
     splits: { ...Object.fromEntries(CHAMBERS.slice(1).map((id) => [`chamber${id}`, join(here, "splits", `portal-chamber${id}.lss`)])), credits: join(here, "splits", "portal-credits.lss") },
     bot: join(here, "bot.mjs"),
+    recorders: ["obs", "source-demo"],
     displayEnv: "AAS_PORTAL_WINDOW_POS",
     resolutionEnv: "AAS_PORTAL_RESOLUTION",
   },

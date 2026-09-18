@@ -26,6 +26,7 @@ export default {
     settings: [{ env: "AAS_MY_GAME_ROOT", label: "My Game folder", kind: "dir", expect: "mygame.exe", find: { steam: 123450 } }],
     install: join(here, "install-mod.mjs"), launch: join(here, "launch-game.mjs"), stop: join(here, "stop-all.mjs"),
     splits: { end: join(here, "splits", "mygame.lss") }, bot: join(here, "bot.mjs"), displayEnv: "AAS_MY_GAME_WINDOW_POS",
+    recorders: ["obs"],          // the recorders this game fits, in the order the GUI offers them (default: ["obs"])
   },
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim
@@ -90,12 +91,14 @@ Verify a runtime the way `smoke.mjs` does for Claude Code: a real headless sessi
 
 ## Recorder plugin
 
-A recorder records the run and reacts to events. Examples: [`packages/recorder-obs`](../packages/recorder-obs/index.mjs) (OBS through obs-websocket: the game window and its audio only, LiveSplit and the overlay page as sources, scenes per phase, chapter marks), [`packages/recorder-source-demo`](../packages/recorder-source-demo/index.mjs) (the in-game demo of a Source game), [`packages/recorder-null`](../packages/recorder-null/index.mjs) (nothing; never a valid run).
+A recorder records the run and reacts to events. Examples: [`packages/recorder-obs`](../packages/recorder-obs/index.mjs) (OBS through obs-websocket: the game window and its audio only, LiveSplit and the overlay page as sources, scenes per phase, chapter marks), [`packages/recorder-source-demo`](../packages/recorder-source-demo/index.mjs) (the in-game demo of a Source game), [`packages/recorder-null`](../packages/recorder-null/index.mjs) (nothing; never a valid run). A game plugin's `setup.recorders` says which of them fit it, and the GUI offers exactly those; the run is recorded with the one chosen.
 
 ```js
 export default {
   id: "my-recorder",
+  name: "My recorder (video)",  // how the GUI names it in the run's Recording choice
   version: "0.1.0",
+  launch: join(here, "launch.mjs"),  // optional: a program to start before the run; the GUI makes it a step of its own
   async preflight(brief, game) { /* throw = the run does not start (no mic, not already recording, ...) */ },
   async start(brief, ctx) { /* start recording; return { t0 } */ },
   async onEvent(event) { /* scene, chapter, highlight, pause */ },

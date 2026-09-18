@@ -7,18 +7,29 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readEnv, writeEnv } from "./env-file.mjs";
 import { guiGames, onPath } from "./checks.mjs";
+import { loadRecorder } from "../plugins.mjs";
 import { aasToolsDir, obsWebsocketConfig } from "./detect.mjs";
 import { toLocal, toWindows } from "./windows-paths.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const CLI = path.join(REPO, "packages", "core", "src", "cli.mjs");
 const rel = (p) => path.relative(REPO, p) || p;
+/** "a, b and c": the steps name what they really start and close, which follows the choices. */
+const andList = (parts) => (parts.length < 2 ? (parts[0] ?? "") : `${parts.slice(0, -1).join(", ")} and ${parts.at(-1)}`);
+const shortName = (plugin) => String(plugin.name ?? plugin.id).replace(/ \(.*/, "");
 
 export const RUNTIMES = [
   { id: "scripted", label: "Mock run (script, no AI)", prefix: "mock" },
   { id: "claude-code", label: "Claude Code (AI run)", prefix: "claude", cli: "claude" },
   { id: "codex", label: "Codex (AI run)", prefix: "codex", cli: "codex" },
 ];
+
+/** The recorders a game plugin says fit it (default: OBS), each named by its own plugin. */
+export async function recorderOptions(setup) {
+  const out = [];
+  for (const id of setup.recorders ?? ["obs"]) { const r = await loadRecorder(id); out.push({ id, name: r.name ?? id }); }
+  return out;
+}
 
 /** The agents installed on this machine. Testing an agent that is not here proves nothing, and is not a failure. */
 export const agentsPresent = () => RUNTIMES.filter((r) => r.cli && onPath(r.cli));
@@ -87,7 +98,10 @@ export function createSession() {
     const splits = setup.splits?.[goal];
     const npmScript = (file) => Object.entries(JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8")).scripts).find(([, cmd]) => cmd.endsWith(rel(file)))?.[0];
     const shownScript = (file) => (npmScript(file) ? `npm run ${npmScript(file)}` : `node ${rel(file)}`);
-    const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", "obs", ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
+    const choices = await recorderOptions(setup);
+    const recorderId = choices.some((r) => r.id === opts.recorder) ? opts.recorder : choices[0].id;
+    const recorder = await loadRecorder(recorderId);
+    const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
     if (runtime.id === "scripted") runArgs.push("--bot", setup.bot);
     if (opts.maxMinutes) runArgs.push("--max-minutes", String(Number(opts.maxMinutes)));
     if (opts.seed) runArgs.push("--seed", String(opts.seed));
@@ -110,13 +124,13 @@ export function createSession() {
     const steps = [
       ...agents.map(agentStep),
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
-      { id: "obs", title: "Start OBS (the recording)", args: [path.join(REPO, "packages", "recorder-obs", "launch-obs.mjs")], shown: "npm run obs:launch" },
+      ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
-      { id: "run", title: runtime.id === "scripted" ? "The run, played by the script; it closes the game, LiveSplit and OBS at the end" : "The run, played by the AI; it closes the game, LiveSplit and OBS at the end", args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
+      { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
       { id: "timeline", title: "Times, sections and the cut list", args: [CLI, "timeline", runDir], shown: `${CLI_SHOWN} timeline ${q(runDir)}` },
       { id: "publish", title: "The bundle for the archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
     ];
-    return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
+    return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
 
   async function start(opts) {
@@ -143,7 +157,7 @@ export function createSession() {
         for (const st of agentSteps) await step(st);
         if (runtime.id === "scripted" && !agentSteps.length) log("No agent CLI is installed, so a mock run cannot check one; everything else is tested.", "note");
         await step(byId.game);
-        await step(byId.obs);
+        if (byId.recorder) await step(byId.recorder);
         if (byId.livesplit) await step(byId.livesplit);
         else log("LiveSplit is not set up: the run has no timer on screen (the splits are still published).", "note");
         if (cancelled) throw new Error("stopped");

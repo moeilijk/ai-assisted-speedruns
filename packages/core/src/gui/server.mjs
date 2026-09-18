@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { affectedBy, configItems, guiGames } from "./checks.mjs";
 import { readEnv, writeEnv, ENV_FILE } from "./env-file.mjs";
-import { createSession, RUNTIMES } from "./session.mjs";
+import { createSession, recorderOptions, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
 
@@ -159,18 +159,19 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, listDir(url.searchParams.get("path") ?? ""));
       } else if (req.method === "GET" && url.pathname === "/api/games") {
         const env = readEnv();
-        const games = (await guiGames()).map(({ plugin }) => ({
+        const games = await Promise.all((await guiGames()).map(async ({ plugin }) => ({
           id: plugin.id, name: plugin.name, folder: plugin.setup.folder,
+          recorders: await recorderOptions(plugin.setup),
           ends: plugin.ends.map((e) => ({ id: e.id, label: e.label, final: Boolean(e.final) })),
           mock: Boolean(plugin.setup.bot),
           ready: Boolean(env[plugin.setup.settings[0]?.env]),
           next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
-        }));
+        })));
         send(res, 200, { games, runtimes: RUNTIMES, output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
       } else if (req.method === "GET" && url.pathname === "/api/plan") {
         const o = Object.fromEntries(url.searchParams);
         const p = await session.plan(o);
-        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
+        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), recorder: p.recorder, steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
       } else if (req.method === "GET" && url.pathname === "/api/state") {
         send(res, 200, { state: session.state, lines: session.lines.slice(-500) });
       } else if (req.method === "GET" && url.pathname === "/api/events") {

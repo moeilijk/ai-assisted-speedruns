@@ -97,9 +97,7 @@
   </ol>
   <div class="row-actions">
     <button class="b primary" id="off-reload">Reload</button>
-    <button class="b" id="off-copy">Copy the details</button>
     <a class="b" id="off-issue" target="_blank" rel="noreferrer">Report this</a>
-    <span class="muted" id="off-copied"></span>
   </div>
   <p class="muted" style="margin:10px 0 0">The report opens a new issue that asks for the lines from the window the GUI ran in — that is where the reason is. What this page knows (version, address, browser, its own log if it had one) is filled in; read it over before you send it, it names folders and tools of this machine.</p>
 </div></div>
@@ -116,6 +114,7 @@
       <label class="f">Run type<select id="runtime"></select></label>
       <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
       <label class="f">Goal<select id="goal"></select></label>
+      <label class="f">Recording<select id="recorder"></select></label>
       <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
       <label class="f">Seed (optional)<input id="seed" placeholder="the game picks one" autocomplete="off"></label>
     </div>
@@ -194,6 +193,9 @@ function fillGame() {
   $("runtime").innerHTML = runtimes.filter((r) => r.id !== "scripted" || g.mock).map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join("");
   if ([...$("runtime").options].some((o) => o.value === keepRt)) $("runtime").value = keepRt;
   $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}" ${e.final ? "selected" : ""}>${esc(e.label)}</option>`).join("");
+  const keepRec = $("recorder").value;
+  $("recorder").innerHTML = g.recorders.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
+  if ([...$("recorder").options].some((o) => o.value === keepRec)) $("recorder").value = keepRec;
   fillRuntime();
 }
 function fillRuntime() {
@@ -205,7 +207,7 @@ function fillRuntime() {
   if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
   refreshPlan();
 }
-const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim() });
+const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);
@@ -221,7 +223,7 @@ function refreshPlan() {
     } catch (e) { $("cmds").textContent = e.message; }
   }, 120);
 }
-for (const id of ["game", "runtime", "goal", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
+for (const id of ["game", "runtime", "goal", "recorder", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();
@@ -253,7 +255,7 @@ function showLive(now) {
   // for that window first, and carries what the page can know by itself.
   const url = `${ISSUES}?title=${encodeURIComponent("The GUI stopped while its page was open")}&body=${encodeURIComponent(report())}`;
   // A GitHub link that is too long is refused; then the report is opened empty and Copy the details fills it.
-  $("off-issue").href = url.length > 7500 ? `${ISSUES}?title=${encodeURIComponent("The GUI stopped while its page was open")}&body=${encodeURIComponent(`${ASK}\n\n**Details**\n\nPaste them here: the "Copy the details" button on the page has them.\n`)}` : url;
+  $("off-issue").href = url.length > 7500 ? `${ISSUES}?title=${encodeURIComponent("The GUI stopped while its page was open")}&body=${encodeURIComponent(`${ASK}\n\n**Details**\n\nPaste them here: the page shows its version and address at the top.\n`)}` : url;
 }
 const ASK = `**What I was doing**\n\n\n**What the window the GUI ran in showed** (the black AAS.cmd window or your shell — the reason is there, not in the page)\n\n\`\`\`\npaste those lines here\n\`\`\``;
 function details() {
@@ -264,12 +266,7 @@ function report() {
   return `${ASK}\n\n**Details**\n\n${details()}${log}\n`;
 }
 $("off-reload").onclick = () => location.reload();
-$("off-copy").onclick = async () => {
-  const text = logLines.length ? `${details()}\n\n${logLines.join("\n")}` : details();
-  try { await navigator.clipboard.writeText(text); $("off-copied").textContent = "Copied."; } catch { $("off-copied").textContent = "Select the log on the page and copy it."; }
-  setTimeout(() => ($("off-copied").textContent = ""), 2500);
-};
-const STEPS = { "agent-claude-code": "checking that Claude Code reaches the tools", "agent-codex": "checking that Codex reaches the tools", game: "starting the game", obs: "starting OBS", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
+const STEPS = { "agent-claude-code": "checking that Claude Code reaches the tools", "agent-codex": "checking that Codex reaches the tools", game: "starting the game", recorder: "starting the recording", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
 function showState(s) {
   last = s;
   if (!live) return; // a page without a connection says so; it does not pretend to know the state

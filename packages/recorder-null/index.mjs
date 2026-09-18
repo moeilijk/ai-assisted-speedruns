@@ -2,6 +2,7 @@
 // made with it is never a valid AI Assisted Speedrun.
 export default {
   id: "null",
+  name: "No recording (never a valid run)",
   version: "0.1.0",
   async preflight() {},
   async start() {
