@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.20 — 2026-09-19
+
+- A row's conditions are the whole of what it proved, so naming a few unproved things next to them is taken out
+  (owner, 2026-09-19: "als je groen zegt wat je WEL hebt bewezen dan is alles wat je NIET noemt toch automatisch
+  niet bewezen?"). It was worse than redundant: a partial list of what was not proved suggests everything else was.
+  The Setup tab says once that a row's list is all it establishes, and that the programs working together is proved
+  by a mock run.
+- A game without a plugin is the same row as a game with one (owner, 2026-09-19). Every game row starts with "there
+  is a plugin for this game": a game in the repository passes it without a word, a stub fails on it and says where
+  to read what it would take. Two shapes of row in one group cannot be compared, and "no plugin yet" in a settings
+  field reads as a setting. Its status is "No plugin", in grey: nothing is wrong with the machine.
+
 ## 0.19.19 — 2026-09-19
 
 - What a row does not try is one line, not a list (owner, 2026-09-19: "wat moet ik met al die not tried?"). They are

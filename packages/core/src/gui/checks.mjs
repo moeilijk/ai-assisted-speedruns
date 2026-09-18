@@ -90,9 +90,7 @@ export async function configItems() {
     ...games.flatMap(({ plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect }))),
     // Every other game the repository knows: named here too, so the list of games is the whole list and it is
     // visible which ones this machine cannot run at all.
-    ...(await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => item("Games", `stub-${plugin.id}`, plugin.name, "info", null, {
-      check: false, value: `no plugin yet — what it would take is in games/${dir}/README.md`,
-    })),
+    ...(await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => item("Games", `stub-${plugin.id}`, plugin.name, "info", null, { value: "", doc: `games/${dir}/README.md` })),
   ];
 }
 
@@ -110,20 +108,19 @@ export async function affectedBy(keys) {
 /**
  * What one row of the Setup tab really establishes.
  *
- * A row is a list of conditions, each with its own outcome, plus the things this row does **not** try. The status is
- * the first condition that fails; passing means every condition in the list held, and the list is what "checked"
- * means here — nothing more. A row that tries nothing has no status at all.
+ * A row is a list of conditions, each with its own outcome. The status is the first condition that fails; passing
+ * means every condition in the list held, and that list is the whole of what "checked" means here — whatever is not
+ * in it was not established. A row that tries nothing has no status at all. What these rows cannot establish at all
+ * is said once, on the tab itself: only a run proves that the programs work together.
  */
 export async function checkItem(id) {
   const env = readEnv();
   const tests = [];
   /** A condition and its outcome. `level` is the status when it fails; `fix` is the button that repairs it. */
   const t = (what, ok, { level = "fail", detail = "", fix = null } = {}) => { tests.push({ what, ok: Boolean(ok), level, detail, fix }); return Boolean(ok); };
-  /** What this row leaves to a run: named, so a pass cannot be read as "everything about this works". */
-  const untested = [];
   const done = (extra = {}) => {
     const bad = tests.find((x) => !x.ok);
-    return { status: bad ? bad.level : tests.length ? "ok" : "", detail: bad ? bad.detail : "", tests, untested, ...(bad?.fix ? { fix: bad.fix } : {}), ...extra };
+    return { status: bad ? bad.level : tests.length ? "ok" : "", detail: bad ? bad.detail : "", tests, ...(bad?.fix ? { fix: bad.fix } : {}), ...extra };
   };
 
   if (id === "output") {
@@ -146,7 +143,6 @@ export async function checkItem(id) {
   }
   if (id === "repo") {
     t("package.json is in the repository folder", exists(path.join(REPO, "package.json")), { detail: "The repository is incomplete." });
-    untested.push("whether the working tree is complete and up to date");
     return done();
   }
   if (id === "node") {
@@ -160,7 +156,6 @@ export async function checkItem(id) {
       t("ffprobe answers --version", Boolean(run("ffprobe", ["-version"])), { detail: "ffprobe is missing." });
       t(`it is 6 or newer (${v})`, atLeast(version(v), [6]), { detail: `ffmpeg ${v}; version 6 or newer is needed.` });
     }
-    untested.push("cutting a real recording");
     return done();
   }
   if (id === "claude") {
@@ -168,23 +163,17 @@ export async function checkItem(id) {
     if (t("claude answers --version", Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Claude)." })) {
       t(`it is 2.1.207 or newer (${out})`, atLeast(version(out), [2, 1, 207]), { level: "warn", detail: `${out}; version 2.1.207 or newer is needed.` });
     }
-    untested.push("that it reaches a game's tools (a run checks that first, without tokens)");
-    untested.push("that it is logged in and has budget left");
     return done();
   }
   if (id === "codex") {
     const out = run("codex", ["--version"]);
     t(`codex answers --version${out ? ` (${out})` : ""}`, Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Codex)." });
-    untested.push("that it reaches a game's tools (a run checks that first, without tokens)");
-    untested.push("that it is logged in and has budget left");
     return done();
   }
   if (id === "obs") {
     const exe = toLocal(env.AAS_OBS_EXE ?? "") || defaultPath("AAS_OBS_EXE");
     const found = !exists(exe) ? detect.obs() : null;
     const extra = { suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" };
-    untested.push("connecting to OBS, which is when the password is really proved");
-    untested.push("that a scene records the game and its sound");
     if (!t("obs64.exe is where the setting points", exists(exe), { detail: "OBS Studio was not found: install it from obsproject.com, or choose obs64.exe." })) return done(extra);
     const v = fileVersion(exe);
     if (!t(`OBS is 30 or newer (${v || "?"})`, atLeast(version(v), [30]), { detail: `OBS ${v || "?"}; version 30 or newer is needed.` })) return done(extra);
@@ -199,8 +188,6 @@ export async function checkItem(id) {
     const exe = toLocal(env.AAS_LIVESPLIT_EXE ?? "");
     const mine = detect.portableTools().livesplit;
     const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
-    untested.push("connecting to its server");
-    untested.push("that the splits of a goal fit the game's version");
     if (!t("LiveSplit.exe is there", exists(exe), { level: "missing", detail: exe ? "LiveSplit.exe is not there." : "LiveSplit shows the timer and the splits in the recording.", fix: { id: "install-livesplit", label: "Install LiveSplit 1.8.37" } })) return done(extra);
     const cfg = path.join(path.dirname(exe), "settings.cfg");
     if (!t("its server starts with LiveSplit", /<ServerStartup>1<\/ServerStartup>/.test(exists(cfg) ? fs.readFileSync(cfg, "utf8") : ""), { level: "warn", detail: "Its server does not start with LiveSplit, so the harness cannot use it.", fix: { id: "livesplit-server", label: "Start the server with LiveSplit" } })) return done(extra);
@@ -218,7 +205,6 @@ export async function checkItem(id) {
     const exe = toLocal(env.AAS_STEAM_EXE ?? "") || defaultPath("AAS_STEAM_EXE");
     const found = !exists(exe) ? detect.steam().exe : null;
     t("steam.exe is there", exists(exe), { level: "warn", detail: "Steam was not found; it is needed for Steam games." });
-    untested.push("that Steam runs and is logged in (the game's launcher starts it and waits)");
     return done({ suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" });
   }
   if (id === "display") {
@@ -227,7 +213,6 @@ export async function checkItem(id) {
     try { displays = listDisplays(); } catch { /* not available */ }
     const options = displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height }));
     const current = (await guiGames()).map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
-    untested.push("that the game really lands on it");
     if (!current) return done({ options, detail: "Nothing chosen: Windows decides where the game lands." });
     t(`the chosen display is connected (${current})`, options.some((o) => o.value === current), { level: "warn", detail: "This display is not connected now." });
     return done({ options: options.some((o) => o.value === current) ? options : [...options, { value: current, label: current }] });
@@ -237,7 +222,6 @@ export async function checkItem(id) {
     const mine = detect.portableTools().soundvolumeview;
     const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
     t(`SoundVolumeView.exe is there${exists(exe) ? ` (${fileVersion(exe) || "?"})` : ""}`, exists(exe), { level: "missing", detail: exe ? "SoundVolumeView.exe is not there." : "Only needed to keep game sound off your speakers.", fix: { id: "install-svv", label: "Install SoundVolumeView" } });
-    untested.push("moving the game's sound");
     return done(extra);
   }
   if (id === "quiet") {
@@ -249,13 +233,20 @@ export async function checkItem(id) {
       try { devices = JSON.parse(r.stdout); } catch { devices = []; }
     }
     const options = [{ value: "", label: "Normal (your default device)" }, ...devices.map((d) => ({ value: d, label: d }))];
-    untested.push("that the game's sound really moves there");
     if (!quiet) return done({ options, detail: "Nothing chosen: the game plays on your default device." });
     if (!t("SoundVolumeView is there to move the sound", exists(exe), { level: "warn", detail: "Needs SoundVolumeView." })) return done({ options: [...options, { value: quiet, label: quiet }] });
     t("the chosen device is active now", devices.includes(quiet), { level: "warn", detail: "This device is not active now." });
     return done({ options: devices.includes(quiet) ? options : [...options, { value: quiet, label: quiet }] });
   }
+  if (id.startsWith("stub-")) {
+    // The same row as a game that works, failing on the first condition a working game passes without a word.
+    const g = (await allGames()).find((x) => `stub-${x.plugin.id}` === id);
+    t("there is a plugin for this game", false, { level: "absent", detail: g ? `No plugin yet: what it would take is in games/${g.dir}/README.md.` : "Unknown game." });
+    return done();
+  }
   if (id.startsWith("game-")) {
+    // The first condition of every game row; a game that is in the repository as a plugin passes it by being here.
+    t("there is a plugin for this game", true);
     const g = (await guiGames()).find((x) => `game-${x.plugin.id}` === id);
     if (!g) { t("the game plugin is known", false, { detail: "Unknown game." }); return done(); }
     const st = g.plugin.setup.settings[0];
@@ -263,7 +254,6 @@ export async function checkItem(id) {
     const found = st.find && ON_WINDOWS ? detect.findGame(st.find) : null;
     const extra = { suggest: found && found.path !== current ? toWindows(found.path) : null, suggestSource: found?.source ?? null };
     const install = g.plugin.setup.install ? { id: `install:${g.plugin.id}`, label: "Install what the game needs" } : null;
-    untested.push("starting the game and playing it");
     if (!t("a folder is chosen", current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
     if (!t("the folder exists", exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
     if (st.expect && !t(`${st.expect} is in that folder`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
