@@ -278,7 +278,12 @@ export function createObsRecorder(options = {}) {
       if (recordDir) {
         // The directory must exist before StartRecord, or OBS shows "Bad File Path".
         if (ctx.runDir) fs.mkdirSync(path.join(ctx.runDir, "recording"), { recursive: true });
-        previousRecordDir = (await o.tryCall("GetRecordDirectory"))?.recordDirectory ?? null;
+        // What OBS points at now, but only if that is still a real folder: a run that was killed leaves OBS on its
+        // recording folder, and that folder is gone once the run is cleaned up. Putting a dead path back is how OBS
+        // ends up recording nowhere (owner, reported before 2026-09-19).
+        const before = (await o.tryCall("GetRecordDirectory"))?.recordDirectory ?? null;
+        previousRecordDir = before && fs.existsSync(toLocalPath(before)) && path.basename(toLocalPath(before)) !== "recording" ? before : null;
+        if (before && !previousRecordDir) log(`OBS pointed at ${before}, which is ${fs.existsSync(toLocalPath(before)) ? "a run's own recording folder" : "gone"}; it will be set to the output location afterwards instead`);
         await o.tryCall("SetRecordDirectory", { recordDirectory: recordDir });
       }
       await o.tryCall("SetProfileParameter", { parameterCategory: "Output", parameterName: "FilenameFormatting", parameterValue: `AAS_${brief.id}_%CCYY-%MM-%DD_%hh-%mm-%ss` });
@@ -361,12 +366,15 @@ export function createObsRecorder(options = {}) {
       // Leave OBS pointing at its own recording folder again. OBS refuses the change while the output is still
       // stopping, so this waits for the stop above; a refusal is reported, not swallowed (measured 2026-09-17: the
       // folder of the last run stayed OBS's recording folder).
-      if (previousRecordDir) {
-        await o.tryCall("SetRecordDirectory", { recordDirectory: previousRecordDir });
+      // Somewhere that exists: what OBS had, or else the output location where the runs live. Never the folder of
+      // the run that just finished, which is published and then gone.
+      const back = previousRecordDir ?? (process.env.AAS_OUTPUT_DIR && fs.existsSync(toLocalPath(process.env.AAS_OUTPUT_DIR)) ? toWindowsPath(toLocalPath(process.env.AAS_OUTPUT_DIR)) : null);
+      if (back) {
+        await o.tryCall("SetRecordDirectory", { recordDirectory: back });
         const now = (await o.tryCall("GetRecordDirectory"))?.recordDirectory ?? null;
-        if (now !== previousRecordDir) log(`OBS's recording folder could not be set back to ${previousRecordDir} (it is ${now}); set it in OBS → Settings → Output`);
-        else log(`OBS's recording folder set back to ${previousRecordDir}`);
-      }
+        if (now !== back) log(`OBS's recording folder could not be set to ${back} (it is ${now}); set it in OBS → Settings → Output`);
+        else log(`OBS's recording folder set to ${back}`);
+      } else log("OBS is left pointing at this run's recording folder: there is no other folder to point it at (set AAS_OUTPUT_DIR)");
       o.close();
       obs = null;
       const files = [outputPath, ...replayPaths].filter(Boolean).map(toLocalPath);

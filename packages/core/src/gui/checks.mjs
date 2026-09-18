@@ -133,7 +133,10 @@ export async function checkItem(id) {
         if (rec) { suggest = toWindows(toLocal(rec)); break; }
       }
     } catch { /* no OBS profile */ }
-    const extra = { suggest: suggest && suggest !== toWindows(dir) ? suggest : null, suggestSource: "OBS's recording folder" };
+    // OBS points at the recording folder of a run while one is going, and at whatever was left after one that was
+    // killed. Such a folder is where one run's video goes, never where the runs are kept, so it is not offered.
+    const usable = suggest && path.basename(toLocal(suggest)) !== "recording" && !/[\\/]recording[\\/]?$/.test(suggest);
+    const extra = { suggest: usable && suggest !== toWindows(dir) ? suggest : null, suggestSource: "OBS's recording folder" };
     if (t("a folder is chosen", dir, { level: "missing", detail: "Choose where runs are saved; each run goes to <location>\\<game>\\<run>." })
       && t("the folder exists", exists(dir), { detail: "This folder does not exist." })) {
       t("the harness can write in it", (() => { try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; } })(), { detail: "This folder is not writable." });

@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.20.1 — 2026-09-19
+
+- The game lands on the display that was chosen (owner, reported more than once). A launch option was not enough:
+  measured 2026-09-19, `hl2.exe` took `-x -1920 -y 1` and still put its window at 320,1, centred on the 2560×1440
+  main display, while the setting pointed at the 1920×1080 one at -1920,1. `packages/core/src/windows/move-window.mjs`
+  moves the window after the game is up, the way LiveSplit's and Slay the Spire's launchers already did; Portal and
+  Portal 2 use it. Measured again after the change: `window: moved to -1920,1`, and the window is at -1920,1.
+- OBS is never left pointing at a folder that is gone. It used to be set back to whatever it pointed at before the
+  run, which after a killed run is that run's own recording folder — published and then deleted. Now it is set back
+  only to a folder that exists and is not a run's recording folder, and otherwise to the output location. The Setup
+  tab no longer offers such a folder as the output location either.
+
 ## 0.20.0 — 2026-09-19
 
 - Portal's mock run plays a real route instead of walking forward for eight steps (owner, 2026-09-19: the AI runs

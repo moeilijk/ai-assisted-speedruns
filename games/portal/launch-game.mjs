@@ -15,6 +15,7 @@ import net from "node:net";
 import path from "node:path";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
 import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
+import { moveWindow } from "../../packages/core/src/windows/move-window.mjs";
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i === -1 ? d : args[i + 1]; };
@@ -48,6 +49,9 @@ while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 3000));
   if (await probe()) {
     console.log(`Portal is up; SPT IPC listening on ${port} (autoexec ran exec portal_agent).`);
+    // The engine centres its window on the primary display whatever -x/-y says (measured 2026-09-19), so the window
+    // is moved here, the way Slay the Spire's launcher does it.
+    if (pos) moveWindow({ processName: "hl2", pos, log: console.log });
     quiet.restore();
     quiet.check();
     process.exit(0);
