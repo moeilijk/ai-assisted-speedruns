@@ -116,7 +116,7 @@
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Recording<select id="recorder"></select></label>
       <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
-      <label class="f">Seed (optional)<input id="seed" placeholder="the game picks one" autocomplete="off"></label>
+      <label class="f" id="seedfield">Seed (optional)<input id="seed" autocomplete="off"></label>
     </div>
     <p class="muted" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
     <div class="row-actions">
@@ -193,6 +193,9 @@ function fillGame() {
   $("runtime").innerHTML = runtimes.filter((r) => r.id !== "scripted" || g.mock).map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join("");
   if ([...$("runtime").options].some((o) => o.value === keepRt)) $("runtime").value = keepRt;
   $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}" ${e.final ? "selected" : ""}>${esc(e.label)}</option>`).join("");
+  // Only the choices this game has: a game without a seed does not ask for one.
+  $("seedfield").style.display = g.seed ? "" : "none";
+  if (g.seed) $("seed").placeholder = g.seed.placeholder ?? ""; else $("seed").value = "";
   const keepRec = $("recorder").value;
   $("recorder").innerHTML = g.recorders.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
   if ([...$("recorder").options].some((o) => o.value === keepRec)) $("recorder").value = keepRec;

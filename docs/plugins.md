@@ -27,6 +27,7 @@ export default {
     install: join(here, "install-mod.mjs"), launch: join(here, "launch-game.mjs"), stop: join(here, "stop-all.mjs"),
     splits: { end: join(here, "splits", "mygame.lss") }, bot: join(here, "bot.mjs"), displayEnv: "AAS_MY_GAME_WINDOW_POS",
     recorders: ["obs"],          // the recorders this game fits, in the order the GUI offers them (default: ["obs"])
+    seed: { placeholder: "the game picks one" },   // only for a game whose run has a seed; without it the GUI does not ask
   },
   documentation: readFileSync(join(here, "documentation.md"), "utf8"),   // what <id>_documentation returns; complete
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),           // default agent instructions, published verbatim

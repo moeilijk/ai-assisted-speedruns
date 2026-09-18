@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.13 — 2026-09-19
+
+- The run only asks what the game has (owner, 2026-09-18: Portal offered a seed, and Portal has no seed). A game
+  plugin says whether a run has one (`setup.seed`, with the placeholder it wants); the GUI shows the field only for
+  a game that declares it, and a seed is never passed to a game without one.
+
 ## 0.19.12 — 2026-09-18
 
 - The recording is a choice in the GUI, and a mock run tests the one that is chosen (owner, 2026-09-18: a test tests

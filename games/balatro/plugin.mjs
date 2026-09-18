@@ -77,6 +77,7 @@ export default {
     stop: join(here, "stop-all.mjs"),
     splits: { ...Object.fromEntries(SEGMENTS.slice(0, 7).map((_, i) => [`ante${i + 1}`, join(here, "splits", `balatro-ante${i + 1}.lss`)])), win: join(here, "splits", "balatro-win.lss") },
     bot: join(here, "bot.mjs"),
+    seed: { placeholder: "the game picks one" },
     displayEnv: "AAS_BALATRO_WINDOW_POS",
   },
   readable: [here],

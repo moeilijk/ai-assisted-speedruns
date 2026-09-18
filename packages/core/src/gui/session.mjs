@@ -104,7 +104,8 @@ export function createSession() {
     const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
     if (runtime.id === "scripted") runArgs.push("--bot", setup.bot);
     if (opts.maxMinutes) runArgs.push("--max-minutes", String(Number(opts.maxMinutes)));
-    if (opts.seed) runArgs.push("--seed", String(opts.seed));
+    // A game without a seed never gets one, whatever the page sends.
+    if (opts.seed && setup.seed) runArgs.push("--seed", String(opts.seed));
     // Long command lines are shown one option per line (bash continuation), so they stay readable and still paste.
     const shownArgs = (args) => {
       const words = args.map((a) => (a === g.file || a === setup.bot ? rel(a) : q(a)));

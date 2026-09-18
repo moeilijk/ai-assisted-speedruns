@@ -162,6 +162,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         const games = await Promise.all((await guiGames()).map(async ({ plugin }) => ({
           id: plugin.id, name: plugin.name, folder: plugin.setup.folder,
           recorders: await recorderOptions(plugin.setup),
+          seed: plugin.setup.seed ? { placeholder: plugin.setup.seed.placeholder ?? "" } : null,
           ends: plugin.ends.map((e) => ({ id: e.id, label: e.label, final: Boolean(e.final) })),
           mock: Boolean(plugin.setup.bot),
           ready: Boolean(env[plugin.setup.settings[0]?.env]),

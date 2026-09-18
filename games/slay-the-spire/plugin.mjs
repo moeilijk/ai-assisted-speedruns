@@ -165,6 +165,7 @@ export default {
     stop: join(here, "stop-all.mjs"),
     splits: { act1: join(here, "splits", "sts-act1.lss"), act3: join(here, "splits", "sts-act3.lss") },
     bot: join(here, "bot.mjs"),
+    seed: { placeholder: "the game picks one (AAS_STS_SEED when set)" },
     displayEnv: "AAS_STS_WINDOW_POS",
   },
   readable: [here],
