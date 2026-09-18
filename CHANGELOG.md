@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.10 — 2026-09-18
+
+- The report of a stopped GUI asks for the right thing. The page's own log says what the GUI did, not why it ended:
+  that is in the window it ran in. The issue now asks for those lines first and fills in what the page can know
+  (version, address, browser, and its own log only when it has one). "Copy the log" is "Copy the details", and the
+  version is no longer printed twice (owner, 2026-09-18: "Tooling tooling 0.19.8 · Mozilla/5.0 …").
+- `AAS.cmd` only replaces a drive letter that stands for a WSL share (`\\wsl.localhost\…`, `\\wsl$\…`). A letter
+  mapped to any other share names a place WSL cannot reach under that name either, and is left alone.
+
 ## 0.19.9 — 2026-09-18
 
 - The page says when the GUI is gone. A GUI that ends (its window closed, Ctrl-C, a crash) left the page showing

@@ -97,11 +97,11 @@
   </ol>
   <div class="row-actions">
     <button class="b primary" id="off-reload">Reload</button>
-    <button class="b" id="off-copy">Copy the log</button>
-    <a class="b" id="off-issue" target="_blank" rel="noreferrer">Report this with the log</a>
+    <button class="b" id="off-copy">Copy the details</button>
+    <a class="b" id="off-issue" target="_blank" rel="noreferrer">Report this</a>
     <span class="muted" id="off-copied"></span>
   </div>
-  <p class="muted" style="margin:10px 0 0">The report opens a new issue with the log of this session filled in. Read it over before you send it: it holds the folders and tools of this machine.</p>
+  <p class="muted" style="margin:10px 0 0">The report opens a new issue that asks for the lines from the window the GUI ran in — that is where the reason is. What this page knows (version, address, browser, its own log if it had one) is filled in; read it over before you send it, it names folders and tools of this machine.</p>
 </div></div>
 <header>
   <div class="brand"><h1>AI Assisted Speedruns</h1><span class="ver" id="ver">tooling %VERSION%</span></div>
@@ -255,14 +255,23 @@ function showLive(now) {
   $("start").disabled = true;
   $("stop").disabled = true;
   $("off-url").textContent = location.origin + "/";
-  // A GitHub URL that is too long is refused, so the report carries the end of the log; Copy the log gives all of it.
-  const body = `**What I did**\n\n\n**Tooling** ${$("ver").textContent} · ${navigator.userAgent}\n\n**Log**\n\n\`\`\`\n${logLines.slice(-60).join("\n")}\n\`\`\`\n`;
-  const url = `${ISSUES}?title=${encodeURIComponent("GUI: the page lost its connection")}&body=${encodeURIComponent(body)}`;
-  $("off-issue").href = url.length > 7500 ? `${ISSUES}?title=${encodeURIComponent("GUI: the page lost its connection")}&body=${encodeURIComponent("**What I did**\n\n\n**Log** (paste it here: the button next to this one copies it)\n")}` : url;
+  // The page's own log holds what the GUI did, not why it ended: that is in the window it ran in. The report asks
+  // for that window first, and carries what the page can know by itself.
+  const url = `${ISSUES}?title=${encodeURIComponent("The GUI stopped while its page was open")}&body=${encodeURIComponent(report())}`;
+  // A GitHub link that is too long is refused; then the report is opened empty and Copy the details fills it.
+  $("off-issue").href = url.length > 7500 ? `${ISSUES}?title=${encodeURIComponent("The GUI stopped while its page was open")}&body=${encodeURIComponent(`${ASK}\n\n**Details**\n\nPaste them here: the "Copy the details" button on the page has them.\n`)}` : url;
+}
+const ASK = `**What I was doing**\n\n\n**What the window the GUI ran in showed** (the black AAS.cmd window or your shell — the reason is there, not in the page)\n\n\`\`\`\npaste those lines here\n\`\`\``;
+function details() {
+  return [`${$("ver").textContent} · page ${location.origin}/ · ${new Date().toISOString()}`, navigator.userAgent].join("\n");
+}
+function report() {
+  const log = logLines.length ? `\n\n**What the page itself had logged**\n\n\`\`\`\n${logLines.slice(-60).join("\n")}\n\`\`\`` : "\n\n(The page had no log lines of its own.)";
+  return `${ASK}\n\n**Details**\n\n${details()}${log}\n`;
 }
 $("off-reload").onclick = () => location.reload();
 $("off-copy").onclick = async () => {
-  const text = `Tooling ${$("ver").textContent} · ${navigator.userAgent}\n\n${logLines.join("\n")}`;
+  const text = logLines.length ? `${details()}\n\n${logLines.join("\n")}` : details();
   try { await navigator.clipboard.writeText(text); $("off-copied").textContent = "Copied."; } catch { $("off-copied").textContent = "Select the log on the page and copy it."; }
   setTimeout(() => ($("off-copied").textContent = ""), 2500);
 };

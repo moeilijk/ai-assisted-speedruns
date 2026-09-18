@@ -21,6 +21,7 @@ rem Replaces the drive letter in HERE by the share it is mapped to, if it is map
 :share
 for /f "tokens=2,*" %%A in ('net use %~1 2^>nul ^| findstr /c:"\\"') do if "%%B"=="" (set "REMOTE=%%A") else (set "REMOTE=%%B")
 if not defined REMOTE exit /b
-if not "%REMOTE:~0,2%"=="\\" exit /b
+rem Only a WSL share: any other letter is a path WSL cannot reach under that name either.
+if /i not "%REMOTE:~0,15%"=="\\wsl.localhost" if /i not "%REMOTE:~0,6%"=="\\wsl$" exit /b
 set "HERE=%REMOTE%%HERE:~2%"
 exit /b
