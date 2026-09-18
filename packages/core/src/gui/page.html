@@ -73,11 +73,38 @@
   .dlg-list div:hover { background: var(--code); }
   .dlg-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
   .result a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  /* The GUI is gone: the page says so over everything else, because nothing on it works any more. */
+  #offline { position: fixed; inset: 0; background: rgba(15, 17, 21, .72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
+  #offline.on { display: flex; }
+  #offline .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; max-width: 620px; width: 100%; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
+  #offline h2 { margin: 0 0 6px; color: var(--fail); }
+  #offline ol { margin: 10px 0 0; padding-left: 20px; }
+  #offline li { margin: 6px 0; }
+  #offline code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  #offline .row-actions { margin-top: 18px; }
 </style>
 </head>
 <body>
+<div id="offline"><div class="box">
+  <h2>The GUI has stopped</h2>
+  <p class="muted" style="margin:0">This page can no longer reach <span class="path" id="off-url">the GUI</span>. Nothing on it works until the GUI runs again. A game, OBS or LiveSplit that was started keeps running; the GUI's own window closes them.</p>
+  <ol>
+    <li>Look at the window you started the GUI in (the black <code>AAS.cmd</code> window, or your shell). If it is closed or shows an error, that is the reason.</li>
+    <li>Start it again: double-click <code>AAS.cmd</code> in the repository folder, or run <code>npm run gui</code> in WSL from that folder.</li>
+    <li>This page reconnects by itself as soon as the GUI is back. <b>Reload</b> forces it.</li>
+    <li>Does it say the port is in use by something else? Start it on another port: <code>aas gui --port 8771</code>, and open that address.</li>
+    <li>Is something still open from a run? The game's own stop script closes it and what it started: <code>npm run portal:stop</code>, <code>npm run sts:stop</code> or <code>npm run balatro:stop</code>.</li>
+  </ol>
+  <div class="row-actions">
+    <button class="b primary" id="off-reload">Reload</button>
+    <button class="b" id="off-copy">Copy the log</button>
+    <a class="b" id="off-issue" target="_blank" rel="noreferrer">Report this with the log</a>
+    <span class="muted" id="off-copied"></span>
+  </div>
+  <p class="muted" style="margin:10px 0 0">The report opens a new issue with the log of this session filled in. Read it over before you send it: it holds the folders and tools of this machine.</p>
+</div></div>
 <header>
-  <div class="brand"><h1>AI Assisted Speedruns</h1><span class="ver">tooling %VERSION%</span></div>
+  <div class="brand"><h1>AI Assisted Speedruns</h1><span class="ver" id="ver">tooling %VERSION%</span></div>
   <nav><button id="tab-run" class="on">Run</button><button id="tab-setup">Setup</button></nav>
 </header>
 <main>
@@ -135,7 +162,9 @@
 <script>
 const $ = (id) => document.getElementById(id);
 const api = async (url, body) => {
-  const r = await fetch(url, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  // fetch only rejects when the request never arrived: the GUI is gone, so say so instead of failing silently.
+  const r = await fetch(url, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+    .catch((e) => { showLive(false); throw e; });
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
@@ -210,14 +239,44 @@ $("stop").onclick = async () => {
   try { await api("/api/stop", { game: $("game").value }); } catch (e) { alert(e.message); }
 };
 const PHASES = { idle: ["ok", "Ready"], starting: ["warn", "Starting"], running: ["warn", "Running"], stopping: ["warn", "Stopping"], finishing: ["warn", "Making the bundle"], working: ["warn", "Working"] };
+// The page is only as truthful as its connection: when the GUI is gone (its window closed, Ctrl-C, a crash), the
+// browser keeps the last page it had. Then it must say so instead of showing the last state as if it still held.
+let live = false, last = null;
+const logLines = [];
+const ISSUES = "https://github.com/moeilijk/ai-assisted-speedruns/issues/new";
+function showLive(now) {
+  if (now === live) return;
+  live = now;
+  $("offline").classList.toggle("on", !live);
+  if (live) { if (last) showState(last); return; }
+  $("phase").className = "status fail";
+  $("phase").querySelector(".phase").textContent = "No connection to the GUI";
+  $("step").textContent = "";
+  $("start").disabled = true;
+  $("stop").disabled = true;
+  $("off-url").textContent = location.origin + "/";
+  // A GitHub URL that is too long is refused, so the report carries the end of the log; Copy the log gives all of it.
+  const body = `**What I did**\n\n\n**Tooling** ${$("ver").textContent} · ${navigator.userAgent}\n\n**Log**\n\n\`\`\`\n${logLines.slice(-60).join("\n")}\n\`\`\`\n`;
+  const url = `${ISSUES}?title=${encodeURIComponent("GUI: the page lost its connection")}&body=${encodeURIComponent(body)}`;
+  $("off-issue").href = url.length > 7500 ? `${ISSUES}?title=${encodeURIComponent("GUI: the page lost its connection")}&body=${encodeURIComponent("**What I did**\n\n\n**Log** (paste it here: the button next to this one copies it)\n")}` : url;
+}
+$("off-reload").onclick = () => location.reload();
+$("off-copy").onclick = async () => {
+  const text = `Tooling ${$("ver").textContent} · ${navigator.userAgent}\n\n${logLines.join("\n")}`;
+  try { await navigator.clipboard.writeText(text); $("off-copied").textContent = "Copied."; } catch { $("off-copied").textContent = "Select the log on the page and copy it."; }
+  setTimeout(() => ($("off-copied").textContent = ""), 2500);
+};
 const STEPS = { agent: "checking the AI connection", game: "starting the game", obs: "starting OBS", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
 function showState(s) {
+  last = s;
+  if (!live) return; // a page without a connection says so; it does not pretend to know the state
   phase = s.phase;
   const [cls, label] = PHASES[s.phase] ?? ["warn", s.phase];
   $("phase").className = `status ${cls}`;
   $("phase").querySelector(".phase").textContent = label;
   $("step").textContent = s.step ? (STEPS[s.step] ?? s.step) : "";
   $("start").disabled = s.phase !== "idle";
+  $("stop").disabled = false;
   $("stop").textContent = s.phase === "idle" ? "Close everything" : "Stop";
   if (s.result && s.phase === "idle") {
     const r = s.result;
@@ -228,6 +287,8 @@ function showState(s) {
 }
 $("result").onclick = (e) => { const p = e.target.dataset?.open; if (p) api("/api/open", { path: p }).catch((x) => alert(x.message)); };
 function addLine(l) {
+  logLines.push(`${l.at} ${l.text}`);
+  while (logLines.length > 200) logLines.shift();
   const box = $("log");
   const atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 20;
   const div = document.createElement("div");
@@ -338,14 +399,19 @@ function browse(start, kind, expect) {
   const j = await api("/api/state");
   for (const l of j.lines) addLine(l);
   await loadGames();
-  showState(j.state);
   // ?static: no live connection (page screenshots in tests); the page shows the state it loaded.
-  if (new URLSearchParams(location.search).has("static")) return;
+  const isStatic = new URLSearchParams(location.search).has("static");
+  live = true;
+  showState(j.state);
+  if (isStatic) return;
   const ev = new EventSource("/api/events");
-  ev.addEventListener("state", (e) => showState(JSON.parse(e.data)));
+  ev.onopen = () => showLive(true);
+  // The browser retries an event stream by itself; until it is open again the page is not live.
+  ev.onerror = () => showLive(ev.readyState === EventSource.OPEN);
+  ev.addEventListener("state", (e) => { showLive(true); showState(JSON.parse(e.data)); });
   ev.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
   ev.addEventListener("check", (e) => updateRow(JSON.parse(e.data)));
-})();
+})().catch(() => showLive(false));
 (() => { let tab = new URLSearchParams(location.search).get("tab"); try { tab = tab || localStorage.getItem("aas-tab"); } catch {} if (tab === "setup") $("tab-setup").click(); })();
 </script>
 </body>

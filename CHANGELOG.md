@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.9 — 2026-09-18
+
+- The page says when the GUI is gone. A GUI that ends (its window closed, Ctrl-C, a crash) left the page showing
+  its last state — "Ready", with a green dot — and the Setup tab simply went empty. The page now covers itself with
+  "The GUI has stopped": what is still running, five things to try, and a report button that opens an issue with the
+  log of the session filled in (and a Copy the log button, because a long log does not fit in a link). As soon as the
+  GUI is back the page picks up by itself, without a reload.
+- `AAS.cmd` works from a drive letter that stands for a WSL share. `Y:` mapped to `\\wsl.localhost\Ubuntu` gave
+  `wsl: Failed to translate 'Y:\home\...'`, after which WSL started in the home folder and Node reported
+  `Cannot find module`. The letter is now replaced by the share it points at. A copy of `AAS.cmd` outside the
+  repository says so in a sentence instead of a Node stack trace.
+
 ## 0.19.8 — 2026-09-18
 
 - Only one GUI runs at a time. A running GUI leaves a note (`.local/gui.json`); a second `aas gui` (double-clicking
