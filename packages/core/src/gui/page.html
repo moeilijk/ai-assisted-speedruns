@@ -111,7 +111,8 @@
     <h2>New run</h2>
     <div class="grid">
       <label class="f">Game<select id="game"></select></label>
-      <label class="f">Run type<select id="runtime"></select></label>
+      <label class="f">Played by<select id="playedby"><option value="scripted">The game's script (mock run)</option><option value="ai">An AI</option></select></label>
+      <label class="f" id="aifield">AI<select id="ai"></select></label>
       <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Recording<select id="recorder"></select></label>
@@ -177,10 +178,10 @@ for (const t of ["run", "setup"]) $(`tab-${t}`).onclick = () => {
 };
 
 // Run tab
-let games = [], runtimes = [], phase = "idle", nameTouched = false;
+let games = [], runtimes = [], agents = [], phase = "idle", nameTouched = false, aiTouched = false;
 async function loadGames() {
   const j = await api("/api/games");
-  games = j.games; runtimes = j.runtimes;
+  games = j.games; runtimes = j.runtimes; agents = j.agents;
   const keep = $("game").value;
   $("game").innerHTML = games.map((g) => `<option value="${g.id}">${esc(g.name)}${g.ready ? "" : " (not set up)"}</option>`).join("");
   if (keep) $("game").value = keep;
@@ -189,9 +190,10 @@ async function loadGames() {
 function fillGame() {
   const g = games.find((x) => x.id === $("game").value);
   if (!g) return;
-  const keepRt = $("runtime").value;
-  $("runtime").innerHTML = runtimes.filter((r) => r.id !== "scripted" || g.mock).map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join("");
-  if ([...$("runtime").options].some((o) => o.value === keepRt)) $("runtime").value = keepRt;
+  // Who plays: the game's own script (a mock run, only for a game that has one) or an AI (only one that is installed).
+  const keepBy = $("playedby").value;
+  $("playedby").innerHTML = [...(g.mock ? [["scripted", "The game's script (mock run)"]] : []), ...(agents.length ? [["ai", "An AI"]] : [])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
+  if ([...$("playedby").options].some((o) => o.value === keepBy)) $("playedby").value = keepBy;
   $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}" ${e.final ? "selected" : ""}>${esc(e.label)}</option>`).join("");
   // Only the choices this game has: a game without a seed does not ask for one.
   $("seedfield").style.display = g.seed ? "" : "none";
@@ -199,18 +201,32 @@ function fillGame() {
   const keepRec = $("recorder").value;
   $("recorder").innerHTML = g.recorders.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
   if ([...$("recorder").options].some((o) => o.value === keepRec)) $("recorder").value = keepRec;
+  fillPlayedBy();
+}
+function fillPlayedBy() {
+  const mock = $("playedby").value === "scripted";
+  const keepAi = $("ai").value;
+  // A mock run checks the agents' connection; by default every agent on this machine, which is what makes it the test.
+  const all = mock && agents.length > 1 ? [["all", agents.map((a) => a.name).join(" and ")]] : [];
+  $("ai").innerHTML = [...all, ...agents.map((a) => [a.id, a.name])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
+  // Untouched, a mock run checks every agent (that is what makes it the test) and an AI run takes the first.
+  if (aiTouched && [...$("ai").options].some((o) => o.value === keepAi)) $("ai").value = keepAi;
+  $("aifield").style.display = agents.length ? "" : "none";
+  $("aifield").firstChild.textContent = mock ? "AI connection to check" : "AI";
   fillRuntime();
 }
 function fillRuntime() {
   const g = games.find((x) => x.id === $("game").value);
-  const rt = $("runtime").value;
+  const rt = runtimeId();
   $("runname").placeholder = g?.next?.[rt] ?? "";
   if (!nameTouched) $("runname").value = "";
   if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
   if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
   refreshPlan();
 }
-const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
+// The run type the harness knows: the script, or the agent that plays. The AI field means one or the other.
+const runtimeId = () => ($("playedby").value === "scripted" ? "scripted" : ($("ai").value === "all" ? agents[0]?.id ?? "" : $("ai").value));
+const choices = () => ({ game: $("game").value, runtime: runtimeId(), agents: $("playedby").value === "scripted" ? $("ai").value : "", run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);
@@ -226,7 +242,8 @@ function refreshPlan() {
     } catch (e) { $("cmds").textContent = e.message; }
   }, 120);
 }
-for (const id of ["game", "runtime", "goal", "recorder", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
+for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
+  if (id === "ai") aiTouched = true; if (id === "game") fillGame(); else if (id === "playedby") fillPlayedBy(); else if (id === "ai") fillRuntime(); else refreshPlan(); });
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();

@@ -7,7 +7,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { affectedBy, configItems, guiGames } from "./checks.mjs";
 import { readEnv, writeEnv, ENV_FILE } from "./env-file.mjs";
-import { createSession, recorderOptions, RUNTIMES } from "./session.mjs";
+import { agentsPresent, createSession, recorderOptions, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
 
@@ -168,7 +168,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           ready: Boolean(env[plugin.setup.settings[0]?.env]),
           next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
         })));
-        send(res, 200, { games, runtimes: RUNTIMES, output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
+        send(res, 200, { games, runtimes: RUNTIMES, agents: agentsPresent().map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
       } else if (req.method === "GET" && url.pathname === "/api/plan") {
         const o = Object.fromEntries(url.searchParams);
         const p = await session.plan(o);

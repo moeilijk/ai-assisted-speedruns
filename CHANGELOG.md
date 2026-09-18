@@ -12,6 +12,14 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.14 — 2026-09-19
+
+- The AI is a choice of its own (owner, 2026-09-19: "run type mock test welke ai precies?"). The Run tab asks who
+  plays — the game's script (a mock run) or an AI — and then which AI. For an AI run that is who plays; for a mock
+  run it is whose connection is checked, and it says so ("AI connection to check"). With more than one agent
+  installed a mock run defaults to all of them, which is what makes it the test; choosing one checks only that one.
+  A machine without an agent is offered no AI run and no check.
+
 ## 0.19.13 — 2026-09-19
 
 - The run only asks what the game has (owner, 2026-09-18: Portal offered a seed, and Portal has no seed). A game
