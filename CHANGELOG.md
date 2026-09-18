@@ -12,6 +12,20 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.17 — 2026-09-19
+
+- A check no longer turns green on nothing (owner, 2026-09-19: green stickers without a function lull the operator
+  while a run burns tokens). A pass must say what it proved, in its own words, and the mechanism enforces it: a pass
+  without that sentence has no status at all. Rows that only establish a fact (the repository's package.json is
+  there, steam.exe is there, no display chosen, no sound device chosen) now state the fact and stay grey — finding a
+  file proves nothing about a run. Every other row says what ran and what it showed, and what it did **not** try:
+  OBS and LiveSplit are read, not connected to; the agent CLIs answer `--version`, and whether they reach a game is
+  what `check-agent` in a run does. A game's row names the checks its own plugin answered.
+- The GUI names every game plugin in the repository, including the stubs (owner, 2026-09-19). A stub says it has no
+  plugin yet and points at its README; it has no settings and cannot be started.
+- The confirm of "Close everything" says what it means: "No run is going. Close the game, LiveSplit and OBS if they
+  are still open?" — the old text said nothing is running and then offered to close three things.
+
 ## 0.19.16 — 2026-09-19
 
 - The AI is one select for both kinds of run (owner, 2026-09-19). It plays an AI run, and a mock run checks that it

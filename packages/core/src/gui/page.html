@@ -74,6 +74,8 @@
   .dlg-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
   .result a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   /* The GUI is gone: the page says so over everything else, because nothing on it works any more. */
+  #run.stub .grid label:not(:first-child), #run.stub #savedto, #run.stub .row-actions .b.danger { display: none; }
+  #run.stub #stubnote { color: var(--fail); }
   #offline { position: fixed; inset: 0; background: rgba(15, 17, 21, .72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
   #offline.on { display: flex; }
   #offline .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; max-width: 620px; width: 100%; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
@@ -119,7 +121,8 @@
       <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
       <label class="f" id="seedfield">Seed (optional)<input id="seed" autocomplete="off"></label>
     </div>
-    <p class="muted" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
+    <p class="muted" id="stubnote" style="margin:12px 0 0"></p>
+    <p class="muted" id="savedto" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
     <div class="row-actions">
       <button class="b primary" id="start">Start</button>
       <button class="b danger" id="stop">Stop</button>
@@ -184,13 +187,17 @@ async function loadGames() {
   const j = await api("/api/games");
   games = j.games; runtimes = j.runtimes; agents = j.agents;
   const keep = $("game").value;
-  $("game").innerHTML = games.map((g) => `<option value="${g.id}">${esc(g.name)}${g.ready ? "" : " (not set up)"}</option>`).join("");
+  $("game").innerHTML = games.map((g) => `<option value="${g.id}">${esc(g.name)}${g.stub ? " (no plugin yet)" : g.ready ? "" : " (not set up)"}</option>`).join("");
   if (keep) $("game").value = keep;
   fillGame();
 }
 function fillGame() {
   const g = games.find((x) => x.id === $("game").value);
   if (!g) return;
+  // A stub is a game the framework knows by name and cannot play yet: it has no settings and no run.
+  $("run").classList.toggle("stub", Boolean(g.stub));
+  $("stubnote").innerHTML = g.stub ? `<b>${esc(g.name)}</b> has no plugin yet: the framework knows the game, nothing is implemented. What it would take is in <span class="path">${esc(g.doc)}</span>.` : "";
+  if (g.stub) { $("where").textContent = "—"; $("cmds").textContent = "This game cannot be run yet."; $("start").disabled = true; return; }
   // Who plays: the game's own script (a mock run, only for a game that has one) or an AI (only one that is installed).
   const keepBy = $("playedby").value;
   $("playedby").innerHTML = [...(g.mock ? [["scripted", "The game's script (mock run)"]] : []), ...(agents.length ? [["ai", "An AI"]] : [])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
@@ -249,7 +256,7 @@ $("start").onclick = async () => {
   try { await api("/api/start", c); nameTouched = false; } catch (e) { alert(e.message); }
 };
 $("stop").onclick = async () => {
-  if (phase === "idle" && !confirm("Nothing is running. Close the game, LiveSplit and OBS?")) return;
+  if (phase === "idle" && !confirm("No run is going. Close the game, LiveSplit and OBS if they are still open?")) return;
   try { await api("/api/stop", { game: $("game").value }); } catch (e) { alert(e.message); }
 };
 const PHASES = { idle: ["ok", "Ready"], starting: ["warn", "Starting"], running: ["warn", "Running"], stopping: ["warn", "Stopping"], finishing: ["warn", "Making the bundle"], working: ["warn", "Working"] };
@@ -340,7 +347,7 @@ function updateRow(item) {
   if (typed !== null) { const f = $(`v-${item.id}`); if (f) { f.value = typed; f.focus(); } }
   if (!setup.checked && item.status !== "pending" && item.status !== "unchecked") { setup.checked = true; $("recheck").textContent = "Check again"; $("checkinfo").textContent = ""; }
 }
-const STATUS = { ok: "OK", warn: "Check", fail: "Problem", missing: "Not set", unchecked: "Not checked", pending: "Checking…" };
+const STATUS = { ok: "Checked", warn: "Check", fail: "Problem", missing: "Not set", unchecked: "Not checked", pending: "Checking…" };
 function row(i) {
   let field = "";
   if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? "folder" : i.expect ?? "file"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;

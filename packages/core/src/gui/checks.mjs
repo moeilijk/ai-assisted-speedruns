@@ -24,6 +24,22 @@ const fileVersion = (exe) => (exists(exe) ? powershell(`(Get-Item '${toWindows(e
 const HARNESS = IS_WSL ? "WSL (the harness)" : "The harness";
 
 /** The game plugins that have a GUI set-up (games/<id>/plugin.mjs with `setup`, not stubs). */
+/** Every game plugin in the repository, playable or not: the GUI names the stubs too, so it is clear what exists
+ *  and what a machine would need for it. A stub has no settings and cannot be started. */
+export async function allGames() {
+  const dir = path.join(REPO, "games");
+  const out = [];
+  for (const d of fs.readdirSync(dir).sort()) {
+    const file = path.join(dir, d, "plugin.mjs");
+    if (!exists(file)) continue;
+    try {
+      const plugin = await loadGamePlugin(file);
+      if (plugin.stub || plugin.setup) out.push({ file, dir: d, plugin });
+    } catch { /* a plugin that does not load is not offered */ }
+  }
+  return out;
+}
+
 export async function guiGames() {
   const dir = path.join(REPO, "games");
   const out = [];
@@ -88,7 +104,11 @@ export async function affectedBy(keys) {
 /** One row's check: `{ status, detail, fix?, suggest?, suggestSource?, options? }`. */
 export async function checkItem(id) {
   const env = readEnv();
-  const ok = (detail = "", extra = {}) => ({ status: "ok", detail, ...extra });
+  // A pass says what was proved, in the same words for every row: "<what ran or was read>: <what it showed>".
+  // Without that there is nothing to show, and the row stays without a status instead of turning green on nothing.
+  const ok = (detail = "", extra = {}) => (detail ? { status: "ok", detail, ...extra } : { status: "", detail: "", ...extra });
+  // A row that only established a fact says the fact and stays without a status: no colour for "a file exists".
+  const note = (detail, extra = {}) => ({ status: "", detail, ...extra });
   const bad = (status, detail, extra = {}) => ({ status, detail, ...extra });
 
   if (id === "output") {
@@ -106,25 +126,25 @@ export async function checkItem(id) {
     if (!exists(dir)) return bad("fail", "This folder does not exist.", extra);
     try { fs.accessSync(dir, fs.constants.W_OK); } catch { return bad("fail", "This folder is not writable.", extra); }
     if (ON_WINDOWS && !/^\/mnt\/[a-z]\//.test(`${dir}/`)) return bad("warn", "Not on a Windows drive: OBS cannot record into it.", extra);
-    return ok("", extra);
+    return ok("The folder exists and the harness can write in it.", extra);
   }
-  if (id === "repo") return exists(path.join(REPO, "package.json")) ? ok() : bad("fail", "The repository is incomplete.");
-  if (id === "node") return atLeast(version(process.version), [22]) ? ok() : bad("fail", "Version 22 or newer is needed.");
+  if (id === "repo") return exists(path.join(REPO, "package.json")) ? note("package.json is here; that is all this row looks at.") : bad("fail", "The repository is incomplete.");
+  if (id === "node") return atLeast(version(process.version), [22]) ? ok(`${process.version} is 22 or newer.`) : bad("fail", "Version 22 or newer is needed.");
   if (id === "ffmpeg") {
     const out = run("ffmpeg", ["-version"]);
     const v = out?.match(/ffmpeg version (\S+)/)?.[1];
     if (!out) return bad("fail", `Not installed.${IS_WSL ? " In WSL: sudo apt install ffmpeg" : ""}`);
     if (!run("ffprobe", ["-version"])) return bad("fail", "ffprobe is missing.");
-    return atLeast(version(v), [6]) ? ok(`ffmpeg ${v}`) : bad("fail", `ffmpeg ${v}; version 6 or newer is needed.`);
+    return atLeast(version(v), [6]) ? ok(`ffmpeg ${v} and ffprobe both answered; 6 or newer.`) : bad("fail", `ffmpeg ${v}; version 6 or newer is needed.`);
   }
   if (id === "claude") {
     const out = run("claude", ["--version"]);
     if (!out) return bad("missing", "Not installed (only needed for runs with Claude).");
-    return atLeast(version(out), [2, 1, 207]) ? ok(out) : bad("warn", `${out}; version 2.1.207 or newer is needed.`);
+    return atLeast(version(out), [2, 1, 207]) ? ok(`${out} answered; 2.1.207 or newer. Whether it reaches a game is checked by the run itself (check-agent).`) : bad("warn", `${out}; version 2.1.207 or newer is needed.`);
   }
   if (id === "codex") {
     const out = run("codex", ["--version"]);
-    return out ? ok(out) : bad("missing", "Not installed (only needed for runs with Codex).");
+    return out ? ok(`${out} answered. Whether it reaches a game is checked by the run itself (check-agent).`) : bad("missing", "Not installed (only needed for runs with Codex).");
   }
   if (id === "obs") {
     const exe = toLocal(env.AAS_OBS_EXE ?? "") || defaultPath("AAS_OBS_EXE");
@@ -139,7 +159,7 @@ export async function checkItem(id) {
     const want = `ws://127.0.0.1:${ws.server_port}`;
     if (ws.auth_required && ws.server_password !== env.AAS_OBS_PASSWORD) return bad("warn", `OBS ${v}. The password in the settings is not the one OBS uses.`, { ...extra, fix: { id: "obs-password", label: "Use OBS's password" } });
     if ((env.AAS_OBS_URL || "ws://127.0.0.1:4455") !== want) return bad("warn", `OBS ${v}. OBS listens on ${want}.`, { ...extra, fix: { id: "obs-password", label: "Use OBS's settings" } });
-    return ok(`OBS ${v}, WebSocket port ${ws.server_port}`, extra);
+    return ok(`OBS ${v}, its WebSocket server is on at port ${ws.server_port} and the password here is the one OBS uses. Not tried: connecting to it; the run does that.`, extra);
   }
   if (id === "livesplit") {
     const exe = toLocal(env.AAS_LIVESPLIT_EXE ?? "");
@@ -154,13 +174,14 @@ export async function checkItem(id) {
       const w = windowsSetupStatus(exe);
       if (!w.outboundBlocked || !w.fileTypes) return bad("warn", `LiveSplit asks ${[!w.outboundBlocked && "about updates", !w.fileTypes && "for administrator rights"].filter(Boolean).join(" and ")} at every start.`, { ...extra, fix: { id: "livesplit-windows", label: "Stop LiveSplit's questions (Windows asks permission once)" } });
     }
-    return ok(pin ? `LiveSplit ${pin}` : "", extra);
+    return ok(`${pin ? `LiveSplit ${pin}` : "LiveSplit"}: its server starts with it${ON_WINDOWS ? ", it asks nothing at start" : ""}. Not tried: connecting to it; the run does that.`, extra);
   }
   if (id === "steam") {
     const exe = toLocal(env.AAS_STEAM_EXE ?? "") || defaultPath("AAS_STEAM_EXE");
     const found = !exists(exe) ? detect.steam().exe : null;
     const extra = { suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" };
-    return exists(exe) ? ok("", extra) : bad("warn", "Steam was not found; it is needed for Steam games.", extra);
+    // Finding steam.exe proves nothing about a run: the launcher starts Steam and waits for it to be logged in.
+    return exists(exe) ? note("steam.exe is here. Whether Steam runs and is logged in is not checked: the game's launcher starts it and waits for it.", extra) : bad("warn", "Steam was not found; it is needed for Steam games.", extra);
   }
   if (id === "display") {
     const { listDisplays } = await import("../windows/displays.mjs");
@@ -169,14 +190,16 @@ export async function checkItem(id) {
     const options = displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height }));
     const current = (await guiGames()).map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
     if (current && !options.some((o) => o.value === current)) return bad("warn", "This display is not connected now.", { options: [...options, { value: current, label: current }] });
-    return ok("", { options });
+    // Nothing chosen is a state, not a result: Windows decides where the game lands, and that is not checked.
+    if (!current) return note("Nothing chosen: Windows decides where the game lands, and that is not checked.", { options });
+    return ok(`The chosen display is connected: ${options.find((o) => o.value === current)?.label}.`, { options });
   }
   if (id === "svv") {
     const exe = toLocal(env.AAS_SOUNDVOLUMEVIEW ?? "");
     const mine = detect.portableTools().soundvolumeview;
     const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
     if (!exists(exe)) return bad("missing", exe ? "SoundVolumeView.exe is not there." : "Only needed to keep game sound off your speakers.", { ...extra, fix: { id: "install-svv", label: "Install SoundVolumeView" } });
-    return ok(`SoundVolumeView ${fileVersion(exe) || "?"}`, extra);
+    return ok(`SoundVolumeView ${fileVersion(exe) || "?"} is there. Not tried: moving sound; the run does that.`, extra);
   }
   if (id === "quiet") {
     const exe = toLocal(env.AAS_SOUNDVOLUMEVIEW ?? "");
@@ -189,7 +212,8 @@ export async function checkItem(id) {
     const options = [{ value: "", label: "Normal (your default device)" }, ...devices.map((d) => ({ value: d, label: d }))];
     if (quiet && !exists(exe)) return bad("warn", "Needs SoundVolumeView.", { options: [...options, { value: quiet, label: quiet }] });
     if (quiet && !devices.includes(quiet)) return bad("warn", "This device is not active now.", { options: [...options, { value: quiet, label: quiet }] });
-    return ok("", { options });
+    if (!quiet) return note("Nothing chosen: the game plays on your default device.", { options });
+    return ok("SoundVolumeView lists this device as active.", { options });
   }
   if (id.startsWith("game-")) {
     const g = (await guiGames()).find((x) => `game-${x.plugin.id}` === id);
@@ -206,7 +230,8 @@ export async function checkItem(id) {
     let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "checks", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
     const failed = rows.filter((x) => !x.ok);
     if (failed.length) return bad("warn", `Not ready: ${failed.map((x) => x.what).join(", ")}.`, { ...extra, fix: install });
-    return ok("", { ...extra, fix: install && { ...install, label: "Install again" } });
+    // What the game's own doctor answered, named one by one: that is the whole of what this row proves.
+    return ok(`${st.expect ?? "the game"} is there and ${g.plugin.name}'s own checks passed: ${rows.map((x) => x.what).join(", ")}.`, { ...extra, fix: install && { ...install, label: "Install again" } });
   }
   return bad("fail", `Unknown check: ${id}`);
 }
