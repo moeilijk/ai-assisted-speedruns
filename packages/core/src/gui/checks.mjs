@@ -19,7 +19,7 @@ const version = (text) => String(text ?? "").match(/(\d+)\.(\d+)(?:\.(\d+))?/)?.
 const atLeast = (v, min) => { if (!v) return false; for (let i = 0; i < 3; i += 1) { if ((v[i] ?? 0) !== (min[i] ?? 0)) return (v[i] ?? 0) > (min[i] ?? 0); } return true; };
 const run = (cmd, args) => { const r = spawnSync(cmd, args, { encoding: "utf8", timeout: 20000 }); return r.status === 0 ? `${r.stdout}${r.stderr}`.trim() : null; };
 /** A program on the PATH of the harness (no process started). */
-const onPath = (name) => (process.env.PATH ?? "").split(path.delimiter).map((d) => path.join(d, name)).find((f) => { try { return fs.statSync(f).isFile(); } catch { return false; } }) ?? null;
+export const onPath = (name) => (process.env.PATH ?? "").split(path.delimiter).map((d) => path.join(d, name)).find((f) => { try { return fs.statSync(f).isFile(); } catch { return false; } }) ?? null;
 const fileVersion = (exe) => (exists(exe) ? powershell(`(Get-Item '${toWindows(exe).replace(/'/g, "''")}').VersionInfo.ProductVersion`) : "");
 const HARNESS = IS_WSL ? "WSL (the harness)" : "The harness";
 

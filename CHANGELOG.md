@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.11 — 2026-09-18
+
+- A mock run is the test of this machine, and it costs no tokens (owner, 2026-09-18). "Check the AI connection
+  first" is gone as a choice: a mock run always starts by having every agent CLI that is installed reach the game's
+  tools (`aas check-agent` per agent). An agent that is not installed is skipped and says so; testing only Codex on a
+  machine without Claude Code is not a failure. An AI run does not do the check: the run itself is the proof.
+- The mock run is documented as what it is — everything an AI run needs except the model's own playing — in the
+  README and in [reference.md](docs/reference.md).
+
 ## 0.19.10 — 2026-09-18
 
 - The report of a stopped GUI asks for the right thing. The page's own log says what the GUI did, not why it ended:

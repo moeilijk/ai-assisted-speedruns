@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readEnv, writeEnv } from "./env-file.mjs";
-import { guiGames } from "./checks.mjs";
+import { guiGames, onPath } from "./checks.mjs";
 import { aasToolsDir, obsWebsocketConfig } from "./detect.mjs";
 import { toLocal, toWindows } from "./windows-paths.mjs";
 
@@ -16,9 +16,12 @@ const rel = (p) => path.relative(REPO, p) || p;
 
 export const RUNTIMES = [
   { id: "scripted", label: "Mock run (script, no AI)", prefix: "mock" },
-  { id: "claude-code", label: "Claude Code (AI run)", prefix: "claude" },
-  { id: "codex", label: "Codex (AI run)", prefix: "codex" },
+  { id: "claude-code", label: "Claude Code (AI run)", prefix: "claude", cli: "claude" },
+  { id: "codex", label: "Codex (AI run)", prefix: "codex", cli: "codex" },
 ];
+
+/** The agents installed on this machine. Testing an agent that is not here proves nothing, and is not a failure. */
+export const agentsPresent = () => RUNTIMES.filter((r) => r.cli && onPath(r.cli));
 
 export function createSession() {
   const lines = [];
@@ -97,10 +100,15 @@ export function createSession() {
       }
       return parts.join(" \\\n    ");
     };
-    const agentCheck = String(opts.agentCheck ?? "").trim();
-    const agentArgs = ["check-agent", "--runtime", agentCheck, "--game", g.file];
+    // A mock run is the test of everything this machine has, and it may not cost tokens: so it starts by having
+    // every agent that is installed reach the game's tools, without asking the model anything.
+    const agents = runtime.id === "scripted" ? agentsPresent() : [];
+    const agentStep = (a) => {
+      const args = ["check-agent", "--runtime", a.id, "--game", g.file];
+      return { id: `agent-${a.id}`, title: `Does ${a.label.replace(" (AI run)", "")} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...args], shown: `${CLI_SHOWN} ${shownArgs(args)}` };
+    };
     const steps = [
-      ...(agentCheck ? [{ id: "agent", title: `Does ${RUNTIMES.find((r) => r.id === agentCheck)?.label.replace(" (AI run)", "") ?? agentCheck} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...agentArgs], shown: `${CLI_SHOWN} ${shownArgs(agentArgs)}` }] : []),
+      ...agents.map(agentStep),
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
       { id: "obs", title: "Start OBS (the recording)", args: [path.join(REPO, "packages", "recorder-obs", "launch-obs.mjs")], shown: "npm run obs:launch" },
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
@@ -131,7 +139,9 @@ export function createSession() {
           const code = await node(st.args, st.shown);
           if (code !== 0) throw new Error(`${st.title} failed (exit ${code})`);
         };
-        if (byId.agent) await step(byId.agent);
+        const agentSteps = p.steps.filter((st) => st.id.startsWith("agent-"));
+        for (const st of agentSteps) await step(st);
+        if (runtime.id === "scripted" && !agentSteps.length) log("No agent CLI is installed, so a mock run cannot check one; everything else is tested.", "note");
         await step(byId.game);
         await step(byId.obs);
         if (byId.livesplit) await step(byId.livesplit);

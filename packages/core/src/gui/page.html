@@ -118,7 +118,6 @@
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
       <label class="f">Seed (optional)<input id="seed" placeholder="the game picks one" autocomplete="off"></label>
-      <label class="f">Check the AI connection first<select id="agentcheck"><option value="">No</option></select></label>
     </div>
     <p class="muted" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
     <div class="row-actions">
@@ -200,18 +199,13 @@ function fillGame() {
 function fillRuntime() {
   const g = games.find((x) => x.id === $("game").value);
   const rt = $("runtime").value;
-  // A mock run can also prove that the agent's own CLI reaches the game's tools, which asks the model nothing.
-  const agents = runtimes.filter((r) => r.id !== "scripted");
-  const keepAgent = $("agentcheck").value;
-  $("agentcheck").innerHTML = `<option value="">No</option>${agents.map((r) => `<option value="${r.id}">${esc(r.label.replace(" (AI run)", ""))}</option>`).join("")}`;
-  $("agentcheck").value = [...$("agentcheck").options].some((o) => o.value === keepAgent) ? keepAgent : (rt === "scripted" ? (agents[0]?.id ?? "") : "");
   $("runname").placeholder = g?.next?.[rt] ?? "";
   if (!nameTouched) $("runname").value = "";
   if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
   if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
   refreshPlan();
 }
-const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), agentCheck: $("agentcheck").value });
+const choices = () => ({ game: $("game").value, runtime: $("runtime").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim() });
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);
@@ -227,7 +221,7 @@ function refreshPlan() {
     } catch (e) { $("cmds").textContent = e.message; }
   }, 120);
 }
-for (const id of ["game", "runtime", "goal", "maxmin", "seed", "runname", "agentcheck"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
+for (const id of ["game", "runtime", "goal", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value); if (id === "game") fillGame(); else if (id === "runtime") fillRuntime(); else refreshPlan(); });
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();
@@ -275,7 +269,7 @@ $("off-copy").onclick = async () => {
   try { await navigator.clipboard.writeText(text); $("off-copied").textContent = "Copied."; } catch { $("off-copied").textContent = "Select the log on the page and copy it."; }
   setTimeout(() => ($("off-copied").textContent = ""), 2500);
 };
-const STEPS = { agent: "checking the AI connection", game: "starting the game", obs: "starting OBS", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
+const STEPS = { "agent-claude-code": "checking that Claude Code reaches the tools", "agent-codex": "checking that Codex reaches the tools", game: "starting the game", obs: "starting OBS", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
 function showState(s) {
   last = s;
   if (!live) return; // a page without a connection says so; it does not pretend to know the state

@@ -71,7 +71,13 @@ cp .env.example .env         # machine settings: OBS password, game folders, bud
 npm run claude:smoke         # Claude Code and its permissions, against a fake game
 ```
 
-Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal](games/portal/README.md), [Balatro](games/balatro/README.md)) and OBS, and do a first run:
+Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal](games/portal/README.md), [Balatro](games/balatro/README.md)) and OBS.
+
+**Test the machine first with a mock run.** A mock run is the game played by its own scripted player: no model, no
+tokens. It tests everything an AI run needs — the agents that are installed reaching the game's tools, the game with
+its mods and bridge, OBS, LiveSplit, in-game time and milestones, the timeline and the bundle — except the model's own
+playing. Start it in the GUI (Run type: mock run) or from a shell; when it goes through, an AI run of the same game
+and goal starts on the same tools. Then do a first AI run:
 
 ```bash
 aas doctor --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --runtime claude-code
