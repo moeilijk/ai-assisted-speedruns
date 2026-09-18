@@ -12,6 +12,14 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.16 — 2026-09-19
+
+- The AI is one select for both kinds of run (owner, 2026-09-19). It plays an AI run, and a mock run checks that it
+  reaches the game's tools — so a mock proves the set-up of the AI run you would do next, with the agent you would
+  use. It is no longer a statement, a second question, or every installed agent at once.
+- Every game can also run without a recording ("No recording (never a valid run)"), for testing the rest of the
+  chain (owner, 2026-09-19). The run then has no recorder step.
+
 ## 0.19.15 — 2026-09-19
 
 - The bundle and the recording open **selected** in Explorer instead of being opened (owner, 2026-09-19: a zip that

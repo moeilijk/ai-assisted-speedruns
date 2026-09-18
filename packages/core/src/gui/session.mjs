@@ -27,7 +27,7 @@ export const RUNTIMES = [
 /** The recorders a game plugin says fit it (default: OBS), each named by its own plugin. */
 export async function recorderOptions(setup) {
   const out = [];
-  for (const id of setup.recorders ?? ["obs"]) { const r = await loadRecorder(id); out.push({ id, name: r.name ?? id }); }
+  for (const id of [...(setup.recorders ?? ["obs"]), "null"]) { const r = await loadRecorder(id); out.push({ id, name: r.name ?? id }); }
   return out;
 }
 
@@ -117,7 +117,8 @@ export function createSession() {
     };
     // A mock run is the test of everything this machine has, and it may not cost tokens: so it starts by having
     // every agent that is installed reach the game's tools, without asking the model anything.
-    const agents = runtime.id === "scripted" ? agentsPresent() : [];
+    // A mock run checks the AI of the run: the same agent that would play it live.
+    const agents = runtime.id === "scripted" ? agentsPresent().filter((a) => a.id === opts.ai) : [];
     const agentStep = (a) => {
       const args = ["check-agent", "--runtime", a.id, "--game", g.file];
       return { id: `agent-${a.id}`, title: `Does ${a.label.replace(" (AI run)", "")} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...args], shown: `${CLI_SHOWN} ${shownArgs(args)}` };
