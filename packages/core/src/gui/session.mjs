@@ -117,8 +117,7 @@ export function createSession() {
     };
     // A mock run is the test of everything this machine has, and it may not cost tokens: so it starts by having
     // every agent that is installed reach the game's tools, without asking the model anything.
-    const chosen = String(opts.agents ?? "all").trim();
-    const agents = runtime.id !== "scripted" ? [] : agentsPresent().filter((a) => chosen === "all" || chosen.split(",").includes(a.id));
+    const agents = runtime.id === "scripted" ? agentsPresent() : [];
     const agentStep = (a) => {
       const args = ["check-agent", "--runtime", a.id, "--game", g.file];
       return { id: `agent-${a.id}`, title: `Does ${a.label.replace(" (AI run)", "")} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...args], shown: `${CLI_SHOWN} ${shownArgs(args)}` };

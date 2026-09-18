@@ -74,6 +74,7 @@
   .dlg-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
   .result a { color: var(--accent); cursor: pointer; text-decoration: underline; }
   /* The GUI is gone: the page says so over everything else, because nothing on it works any more. */
+  .said { display: none; align-items: center; min-height: 38px; padding: 0 2px; color: var(--muted); font-size: 14px; }
   #offline { position: fixed; inset: 0; background: rgba(15, 17, 21, .72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
   #offline.on { display: flex; }
   #offline .box { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 22px 24px; max-width: 620px; width: 100%; box-shadow: 0 14px 40px rgba(0,0,0,.35); }
@@ -87,7 +88,7 @@
 <body>
 <div id="offline"><div class="box">
   <h2>The GUI has stopped</h2>
-  <p class="muted" style="margin:0">This page can no longer reach <span class="path" id="off-url">the GUI</span>. Nothing on it works until the GUI runs again. A game, OBS or LiveSplit that was started keeps running; the GUI's own window closes them.</p>
+  <p class="muted" style="margin:0">This page can no longer reach <span class="path" id="off-url">the GUI</span>. Nothing on it works until the GUI runs again. A GUI that was ended with Ctrl-C, or by closing its window, stopped a running session itself and closed the game, OBS and LiveSplit. One that crashed or was killed did not: then those are still running, and step 5 closes them.</p>
   <ol>
     <li>Look at the window you started the GUI in (the black <code>AAS.cmd</code> window, or your shell). If it is closed or shows an error, that is the reason.</li>
     <li>Start it again: double-click <code>AAS.cmd</code> in the repository folder, or run <code>npm run gui</code> in WSL from that folder.</li>
@@ -112,7 +113,7 @@
     <div class="grid">
       <label class="f">Game<select id="game"></select></label>
       <label class="f">Played by<select id="playedby"><option value="scripted">The game's script (mock run)</option><option value="ai">An AI</option></select></label>
-      <label class="f" id="aifield">AI<select id="ai"></select></label>
+      <label class="f" id="aifield">AI<select id="ai"></select><span class="said" id="aitested"></span></label>
       <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Recording<select id="recorder"></select></label>
@@ -168,6 +169,7 @@ const api = async (url, body) => {
   if (!r.ok) throw new Error(j.error || r.statusText);
   return j;
 };
+const andList = (p) => (p.length < 2 ? (p[0] ?? "") : `${p.slice(0, -1).join(", ")} and ${p.at(-1)}`);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 // Tabs
@@ -204,15 +206,16 @@ function fillGame() {
   fillPlayedBy();
 }
 function fillPlayedBy() {
+  // An AI run is played by one AI: that is a choice. A mock run checks every agent on this machine (that is what
+  // makes it the test), so there the field says which ones instead of asking.
   const mock = $("playedby").value === "scripted";
   const keepAi = $("ai").value;
-  // A mock run checks the agents' connection; by default every agent on this machine, which is what makes it the test.
-  const all = mock && agents.length > 1 ? [["all", agents.map((a) => a.name).join(" and ")]] : [];
-  $("ai").innerHTML = [...all, ...agents.map((a) => [a.id, a.name])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
-  // Untouched, a mock run checks every agent (that is what makes it the test) and an AI run takes the first.
+  $("ai").innerHTML = agents.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
   if (aiTouched && [...$("ai").options].some((o) => o.value === keepAi)) $("ai").value = keepAi;
-  $("aifield").style.display = agents.length ? "" : "none";
-  $("aifield").firstChild.textContent = mock ? "AI connection to check" : "AI";
+  $("aifield").style.display = agents.length || mock ? "" : "none";
+  $("ai").style.display = mock ? "none" : "";
+  $("aitested").style.display = mock ? "flex" : "none";
+  $("aitested").textContent = agents.length ? `${andList(agents.map((a) => a.name))}: checked, no tokens` : "none installed; the rest is tested";
   fillRuntime();
 }
 function fillRuntime() {
@@ -225,8 +228,8 @@ function fillRuntime() {
   refreshPlan();
 }
 // The run type the harness knows: the script, or the agent that plays. The AI field means one or the other.
-const runtimeId = () => ($("playedby").value === "scripted" ? "scripted" : ($("ai").value === "all" ? agents[0]?.id ?? "" : $("ai").value));
-const choices = () => ({ game: $("game").value, runtime: runtimeId(), agents: $("playedby").value === "scripted" ? $("ai").value : "", run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
+const runtimeId = () => ($("playedby").value === "scripted" ? "scripted" : $("ai").value);
+const choices = () => ({ game: $("game").value, runtime: runtimeId(), run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);

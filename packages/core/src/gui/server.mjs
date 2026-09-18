@@ -194,9 +194,14 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         // Opens a folder or file from the page in Windows Explorer / the default program.
         const p = toLocal((await body(req)).path ?? "");
         if (!p || !fs.existsSync(p)) { send(res, 404, { error: "not found" }); return; }
-        if (IS_WSL) spawn("explorer.exe", [toWindows(p)], { detached: true, stdio: "ignore" }).unref();
-        else if (process.platform === "win32") spawn("explorer.exe", [p], { detached: true, stdio: "ignore" }).unref();
-        else spawn("xdg-open", [p], { detached: true, stdio: "ignore" }).unref();
+        // A folder is opened; a file is shown selected in its folder, so it can be dragged, copied or uploaded.
+        const file = fs.statSync(p).isFile();
+        if (IS_WSL || process.platform === "win32") {
+          const win = IS_WSL ? toWindows(p) : p;
+          // "/select," and the path as two arguments: as one argument Explorer reads a path with a space in it as
+          // the whole switch and opens Documents instead (measured 19-09).
+          spawn("explorer.exe", file ? ["/select,", win] : [win], { detached: true, stdio: "ignore" }).unref();
+        } else spawn("xdg-open", [file ? path.dirname(p) : p], { detached: true, stdio: "ignore" }).unref();
         send(res, 200, { ok: true });
       } else {
         send(res, 404, { error: "not found" });
@@ -221,7 +226,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   try { fs.mkdirSync(path.dirname(NOTE_FILE), { recursive: true }); fs.writeFileSync(NOTE_FILE, `${JSON.stringify({ url: address, pid: process.pid, startedAt: new Date().toISOString() }, null, 2)}\n`); } catch { /* the port itself stays the lock */ }
   const forget = () => { try { if (JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")).pid === process.pid) fs.rmSync(NOTE_FILE); } catch { /* already gone, or another GUI's note */ } };
   process.once("exit", forget);
-  log(`aas gui: ${address}  (Ctrl-C ends the GUI; a running session is stopped first)`);
+  log(`aas gui: ${address}  (Ctrl-C ends the GUI: a running session is stopped first, saved, with its recording)`);
   if (open) openBrowser(address);
   const shutdown = async () => {
     if (session.state.phase !== "idle") { log("stopping the session first"); await session.stop(); }
@@ -229,7 +234,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
     server.close();
     process.exit(0);
   };
-  process.once("SIGINT", shutdown);
-  process.once("SIGTERM", shutdown);
+  // Ctrl-C, a stop signal, and the window that ends the shell the GUI runs in.
+  for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, shutdown);
   return { url: address, server, session };
 }

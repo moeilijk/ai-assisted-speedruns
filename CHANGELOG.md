@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.15 — 2026-09-19
+
+- The bundle and the recording open **selected** in Explorer instead of being opened (owner, 2026-09-19: a zip that
+  opens as a folder cannot be picked up). `/select,` and the path go as two arguments: as one argument Explorer reads
+  a path with a space in it as the whole switch and opens Documents instead (measured).
+- The AI field states, for a mock run, which agents it checks ("Claude Code and Codex: checked, no tokens") instead
+  of asking. 0.19.14 turned that into a choice, and a mock run has nothing to choose there: it checks everything that
+  is installed. For an AI run it stays the choice of who plays.
+- The GUI's line about Ctrl-C and the stopped-page's text no longer contradict each other: a GUI that is ended
+  (Ctrl-C, its window, a stop signal) stops a running session first and closes the game, OBS and LiveSplit; one that
+  crashes or is killed does not, and the page says so. Closing the window (SIGHUP) now ends it the same way.
+
 ## 0.19.14 — 2026-09-19
 
 - The AI is a choice of its own (owner, 2026-09-19: "run type mock test welke ai precies?"). The Run tab asks who
