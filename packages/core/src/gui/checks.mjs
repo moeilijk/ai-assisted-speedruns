@@ -146,7 +146,7 @@ export async function checkItem(id) {
   }
   if (id === "repo") {
     t("package.json is in the repository folder", exists(path.join(REPO, "package.json")), { detail: "The repository is incomplete." });
-    untested.push("whether the working tree is complete or up to date");
+    untested.push("whether the working tree is complete and up to date");
     return done();
   }
   if (id === "node") {
@@ -160,7 +160,7 @@ export async function checkItem(id) {
       t("ffprobe answers --version", Boolean(run("ffprobe", ["-version"])), { detail: "ffprobe is missing." });
       t(`it is 6 or newer (${v})`, atLeast(version(v), [6]), { detail: `ffmpeg ${v}; version 6 or newer is needed.` });
     }
-    untested.push("cutting a real recording; a run does that");
+    untested.push("cutting a real recording");
     return done();
   }
   if (id === "claude") {
@@ -168,23 +168,23 @@ export async function checkItem(id) {
     if (t("claude answers --version", Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Claude)." })) {
       t(`it is 2.1.207 or newer (${out})`, atLeast(version(out), [2, 1, 207]), { level: "warn", detail: `${out}; version 2.1.207 or newer is needed.` });
     }
-    untested.push("whether it reaches a game's tools; a run checks that first (aas check-agent, no tokens)");
-    untested.push("whether it is logged in and has budget left");
+    untested.push("that it reaches a game's tools (a run checks that first, without tokens)");
+    untested.push("that it is logged in and has budget left");
     return done();
   }
   if (id === "codex") {
     const out = run("codex", ["--version"]);
     t(`codex answers --version${out ? ` (${out})` : ""}`, Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Codex)." });
-    untested.push("whether it reaches a game's tools; a run checks that first (aas check-agent, no tokens)");
-    untested.push("whether it is logged in and has budget left");
+    untested.push("that it reaches a game's tools (a run checks that first, without tokens)");
+    untested.push("that it is logged in and has budget left");
     return done();
   }
   if (id === "obs") {
     const exe = toLocal(env.AAS_OBS_EXE ?? "") || defaultPath("AAS_OBS_EXE");
     const found = !exists(exe) ? detect.obs() : null;
     const extra = { suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" };
-    untested.push("connecting to OBS; the run does that, and only then is the password really proved");
-    untested.push("whether a scene records the game and its sound");
+    untested.push("connecting to OBS, which is when the password is really proved");
+    untested.push("that a scene records the game and its sound");
     if (!t("obs64.exe is where the setting points", exists(exe), { detail: "OBS Studio was not found: install it from obsproject.com, or choose obs64.exe." })) return done(extra);
     const v = fileVersion(exe);
     if (!t(`OBS is 30 or newer (${v || "?"})`, atLeast(version(v), [30]), { detail: `OBS ${v || "?"}; version 30 or newer is needed.` })) return done(extra);
@@ -199,8 +199,8 @@ export async function checkItem(id) {
     const exe = toLocal(env.AAS_LIVESPLIT_EXE ?? "");
     const mine = detect.portableTools().livesplit;
     const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
-    untested.push("connecting to its server; the run does that");
-    untested.push("whether the splits of a goal fit the game's version");
+    untested.push("connecting to its server");
+    untested.push("that the splits of a goal fit the game's version");
     if (!t("LiveSplit.exe is there", exists(exe), { level: "missing", detail: exe ? "LiveSplit.exe is not there." : "LiveSplit shows the timer and the splits in the recording.", fix: { id: "install-livesplit", label: "Install LiveSplit 1.8.37" } })) return done(extra);
     const cfg = path.join(path.dirname(exe), "settings.cfg");
     if (!t("its server starts with LiveSplit", /<ServerStartup>1<\/ServerStartup>/.test(exists(cfg) ? fs.readFileSync(cfg, "utf8") : ""), { level: "warn", detail: "Its server does not start with LiveSplit, so the harness cannot use it.", fix: { id: "livesplit-server", label: "Start the server with LiveSplit" } })) return done(extra);
@@ -218,7 +218,7 @@ export async function checkItem(id) {
     const exe = toLocal(env.AAS_STEAM_EXE ?? "") || defaultPath("AAS_STEAM_EXE");
     const found = !exists(exe) ? detect.steam().exe : null;
     t("steam.exe is there", exists(exe), { level: "warn", detail: "Steam was not found; it is needed for Steam games." });
-    untested.push("whether Steam runs and is logged in: the game's launcher starts it and waits for it");
+    untested.push("that Steam runs and is logged in (the game's launcher starts it and waits)");
     return done({ suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" });
   }
   if (id === "display") {
@@ -227,7 +227,7 @@ export async function checkItem(id) {
     try { displays = listDisplays(); } catch { /* not available */ }
     const options = displays.map((d) => ({ value: `${d.x},${d.y}`, label: `${d.width}×${d.height}${d.primary ? " (main display)" : ""} at ${d.x},${d.y}`, width: d.width, height: d.height }));
     const current = (await guiGames()).map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
-    untested.push("whether the game really lands there: only a run shows that");
+    untested.push("that the game really lands on it");
     if (!current) return done({ options, detail: "Nothing chosen: Windows decides where the game lands." });
     t(`the chosen display is connected (${current})`, options.some((o) => o.value === current), { level: "warn", detail: "This display is not connected now." });
     return done({ options: options.some((o) => o.value === current) ? options : [...options, { value: current, label: current }] });
@@ -237,7 +237,7 @@ export async function checkItem(id) {
     const mine = detect.portableTools().soundvolumeview;
     const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
     t(`SoundVolumeView.exe is there${exists(exe) ? ` (${fileVersion(exe) || "?"})` : ""}`, exists(exe), { level: "missing", detail: exe ? "SoundVolumeView.exe is not there." : "Only needed to keep game sound off your speakers.", fix: { id: "install-svv", label: "Install SoundVolumeView" } });
-    untested.push("moving the game's sound; the run does that");
+    untested.push("moving the game's sound");
     return done(extra);
   }
   if (id === "quiet") {
@@ -249,7 +249,7 @@ export async function checkItem(id) {
       try { devices = JSON.parse(r.stdout); } catch { devices = []; }
     }
     const options = [{ value: "", label: "Normal (your default device)" }, ...devices.map((d) => ({ value: d, label: d }))];
-    untested.push("whether the game's sound really moves there; the run does that");
+    untested.push("that the game's sound really moves there");
     if (!quiet) return done({ options, detail: "Nothing chosen: the game plays on your default device." });
     if (!t("SoundVolumeView is there to move the sound", exists(exe), { level: "warn", detail: "Needs SoundVolumeView." })) return done({ options: [...options, { value: quiet, label: quiet }] });
     t("the chosen device is active now", devices.includes(quiet), { level: "warn", detail: "This device is not active now." });
@@ -263,7 +263,7 @@ export async function checkItem(id) {
     const found = st.find && ON_WINDOWS ? detect.findGame(st.find) : null;
     const extra = { suggest: found && found.path !== current ? toWindows(found.path) : null, suggestSource: found?.source ?? null };
     const install = g.plugin.setup.install ? { id: `install:${g.plugin.id}`, label: "Install what the game needs" } : null;
-    untested.push("starting the game and playing it; a mock run does that without tokens");
+    untested.push("starting the game and playing it");
     if (!t("a folder is chosen", current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
     if (!t("the folder exists", exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
     if (st.expect && !t(`${st.expect} is in that folder`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);

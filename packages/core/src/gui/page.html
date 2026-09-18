@@ -155,6 +155,7 @@
       <span class="muted" id="checkinfo"></span>
       <span class="muted">Settings are saved in <span class="path" id="envfile"></span> — the same file the command line uses.</span>
     </div>
+    <p class="muted" style="margin:0 0 4px">These rows read settings, versions and files, and each says which conditions it tried. That the programs also work <i>together</i> — starting, connecting, recording, playing — is what a mock run proves, on the Run tab, without tokens.</p>
   </div>
   <div id="groups"></div>
 </section>
@@ -372,7 +373,7 @@ function row(i) {
 function tests(i) {
   const rows = [
     ...(i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : "miss"}">${x.ok ? "✓" : "✗"} ${esc(x.what)}${x.ok || !x.detail ? "" : ` — ${esc(x.detail)}`}</li>`),
-    ...(i.untested ?? []).map((u) => `<li class="not">not tried: ${esc(u)}</li>`),
+    ...(i.untested?.length ? [`<li class="not">only a run proves: ${i.untested.map(esc).join("; ")}</li>`] : []),
   ];
   return rows.length ? `<ul class="tests">${rows.join("")}</ul>` : "";
 }

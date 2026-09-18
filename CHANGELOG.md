@@ -12,6 +12,13 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.19 — 2026-09-19
+
+- What a row does not try is one line, not a list (owner, 2026-09-19: "wat moet ik met al die not tried?"). They are
+  not tasks — nothing can be done with them — and as a list under every row they read as work. They exist to stop a
+  pass being read as "this works", so each row now ends with one grey line, "only a run proves: …", and the Setup tab
+  says once at the top what these rows can establish at all and where the rest is proved: a mock run, without tokens.
+
 ## 0.19.18 — 2026-09-19
 
 - Every row of Setup shows what it tried (owner, 2026-09-19: "IK WIL DE FAIL STATES ZIEN"). A check is no longer a
