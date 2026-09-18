@@ -8,6 +8,7 @@ set "HERE=%HERE:~0,-1%"
 wsl.exe --cd "%HERE%" -- bash -lic "node packages/core/src/cli.mjs gui"
 if errorlevel 1 (
   echo.
-  echo The GUI did not start. It needs WSL with Node 22 or newer: see docs\install.md.
+  echo The GUI did not start; the reason is in the lines above. If it says that node was not found,
+  echo it needs WSL with Node 22 or newer: see docs\install.md.
   pause
 )

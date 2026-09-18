@@ -12,6 +12,28 @@ import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+// Only one GUI at a time: it starts games, OBS and runs, so a second one would fight the first over the same run
+// directory. The note below points at the page that is already up; a second start opens that page instead of failing.
+const NOTE_FILE = process.env.AAS_GUI_NOTE || path.join(here, "..", "..", "..", "..", ".local", "gui.json");
+
+// Does an AAS GUI answer here? Under WSL a connection to a closed port hangs for minutes, so the probe has a deadline.
+function probe(url, timeout = 1500) {
+  return new Promise((resolve) => {
+    const req = http.get(`${url}api/gui`, { timeout }, (res) => {
+      let text = "";
+      res.setEncoding("utf8");
+      res.on("data", (d) => (text += d));
+      res.on("end", () => { try { const j = JSON.parse(text); resolve(j?.gui === "aas" ? j : null); } catch { resolve(null); } });
+    });
+    req.on("timeout", () => { req.destroy(); resolve(null); });
+    req.on("error", () => resolve(null));
+  });
+}
+
+function openBrowser(address) {
+  if (IS_WSL || process.platform === "win32") spawn(IS_WSL ? "cmd.exe" : "cmd", ["/c", "start", "", address], { detached: true, stdio: "ignore", cwd: IS_WSL ? "/mnt/c" : undefined }).unref();
+  else spawn("xdg-open", [address], { detached: true, stdio: "ignore" }).unref();
+}
 
 function listDir(p) {
   if (!p) return { path: "", parent: null, entries: drives().map((d) => ({ name: toWindows(d), path: toWindows(d), dir: true })) };
@@ -31,6 +53,14 @@ function listDir(p) {
 }
 
 export async function startGui({ port = 8770, open = true, log = console.log } = {}) {
+  let note = null;
+  try { note = JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")); } catch { /* no GUI has run yet, or the note is gone */ }
+  const live = note?.url ? await probe(note.url) : null;
+  if (live) {
+    log(`aas gui is already running: ${live.url}  (that page is opened again; close its own window to end it)`);
+    if (open) openBrowser(live.url);
+    return { url: live.url, already: true };
+  }
   const session = createSession();
   // Check results per row, kept in <repo>/.local/gui-checks.json so a restart keeps them; a row whose value changed
   // since its check shows as not checked.
@@ -99,6 +129,8 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
       if (req.method === "GET" && url.pathname === "/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION));
+      } else if (req.method === "GET" && url.pathname === "/api/gui") {
+        send(res, 200, { gui: "aas", version: FRAMEWORK_VERSION, url: `http://127.0.0.1:${port}/`, pid: process.pid });
       } else if (req.method === "GET" && url.pathname === "/api/setup") {
         const items = (await configItems()).map(withResult);
         send(res, 200, { items, envFile: toWindows(ENV_FILE), checked: Object.keys(cache).length > 0, configured: Object.keys(readEnv()).some((k) => k.startsWith("AAS_")) });
@@ -171,15 +203,27 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
       send(res, 400, { error: String(error?.message ?? error) });
     }
   });
-  await new Promise((resolve, reject) => { server.once("error", reject); server.listen(port, "127.0.0.1", resolve); });
-  const address = `http://127.0.0.1:${server.address().port}/`;
-  log(`aas gui: ${address}  (Ctrl-C ends the GUI; a running session is stopped first)`);
-  if (open) {
-    if (IS_WSL || process.platform === "win32") spawn(IS_WSL ? "cmd.exe" : "cmd", ["/c", "start", "", address], { detached: true, stdio: "ignore", cwd: IS_WSL ? "/mnt/c" : undefined }).unref();
-    else spawn("xdg-open", [address], { detached: true, stdio: "ignore" }).unref();
+  const listened = await new Promise((resolve) => { server.once("error", resolve); server.listen(port, "127.0.0.1", () => resolve(null)); });
+  if (listened) {
+    if (listened.code !== "EADDRINUSE") throw listened;
+    // The note was missing or stale (a GUI that was killed, or one started from another copy of the repository).
+    const other = await probe(`http://127.0.0.1:${port}/`);
+    if (other) {
+      log(`aas gui is already running: ${other.url}  (that page is opened again; close its own window to end it)`);
+      if (open) openBrowser(other.url);
+      return { url: other.url, already: true };
+    }
+    throw new Error(`Port ${port} is in use by something that is not the AAS GUI. Start the GUI on another port: aas gui --port ${port + 1}`);
   }
+  const address = `http://127.0.0.1:${server.address().port}/`;
+  try { fs.mkdirSync(path.dirname(NOTE_FILE), { recursive: true }); fs.writeFileSync(NOTE_FILE, `${JSON.stringify({ url: address, pid: process.pid, startedAt: new Date().toISOString() }, null, 2)}\n`); } catch { /* the port itself stays the lock */ }
+  const forget = () => { try { if (JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")).pid === process.pid) fs.rmSync(NOTE_FILE); } catch { /* already gone, or another GUI's note */ } };
+  process.once("exit", forget);
+  log(`aas gui: ${address}  (Ctrl-C ends the GUI; a running session is stopped first)`);
+  if (open) openBrowser(address);
   const shutdown = async () => {
     if (session.state.phase !== "idle") { log("stopping the session first"); await session.stop(); }
+    forget();
     server.close();
     process.exit(0);
   };

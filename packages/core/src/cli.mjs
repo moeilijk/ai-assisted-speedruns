@@ -199,8 +199,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "gui": {
         const { startGui } = await import("./gui/server.mjs");
-        await startGui({ port: Number(opts.port ?? 8770), open: !opts["no-open"] });
-        await new Promise(() => {}); // runs until Ctrl-C (or the window's own end)
+        const g = await startGui({ port: Number(opts.port ?? 8770), open: !opts["no-open"] });
+        // A GUI that was already running has been opened again; only the GUI of this process keeps the window busy.
+        if (!g.already) await new Promise(() => {}); // runs until Ctrl-C (or the window's own end)
         break;
       }
       default:

@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.8 — 2026-09-18
+
+- Only one GUI runs at a time. A running GUI leaves a note (`.local/gui.json`); a second `aas gui` (double-clicking
+  `AAS.cmd` again) says "aas gui is already running", opens that page and ends with exit code 0, instead of
+  `EADDRINUSE` and `AAS.cmd`'s "It needs WSL with Node 22 or newer", which sent the operator to the install guide
+  while the GUI was up. A note left behind by a killed GUI does not block a start; a port held by something else
+  names the port to use instead.
+- `AAS.cmd` points at the reason above it when a start fails, instead of always naming Node and WSL.
+
 ## 0.19.7 — 2026-09-17
 
 - Every game can do a mock run: Portal has a scripted player (`games/portal/bot.mjs`), so the whole chain (TAS

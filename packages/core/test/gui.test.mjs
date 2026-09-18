@@ -8,6 +8,7 @@ import path from "node:path";
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gui-"));
 process.env.AAS_ENV_FILE = path.join(dir, ".env");
+process.env.AAS_GUI_NOTE = path.join(dir, "gui.json");
 const { readEnv, writeEnv } = await import("../src/gui/env-file.mjs");
 const { toLocal, toWindows, IS_WSL } = await import("../src/gui/windows-paths.mjs");
 
@@ -47,6 +48,34 @@ test("the page server refuses other hosts and cross-origin changes", async () =>
     assert.equal(await call("POST", "/api/settings", { Host: `127.0.0.1:${port}`, Origin: "http://evil.example", "Content-Type": "application/json" }, "{}"), 403);
   } finally {
     gui.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
+});
+
+test("a second start opens the GUI that is already running instead of failing on the port", async () => {
+  const { startGui } = await import("../src/gui/server.mjs");
+  const first = await startGui({ port: 0, open: false, log() {} });
+  const url = `http://127.0.0.1:${first.server.address().port}/`;
+  try {
+    assert.equal(JSON.parse(fs.readFileSync(process.env.AAS_GUI_NOTE, "utf8")).url, url, "the running GUI leaves a note");
+    const second = await startGui({ port: 0, open: false, log() {} });
+    assert.equal(second.already, true, "the second start does not start a second GUI");
+    assert.equal(second.url, url, "it points at the one that is running");
+    assert.equal(second.server, undefined, "and it holds no server of its own");
+  } finally {
+    first.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
+  // A GUI that was killed leaves its note behind; the next start must not believe it.
+  fs.writeFileSync(process.env.AAS_GUI_NOTE, JSON.stringify({ url, pid: 1 }));
+  const again = await startGui({ port: 0, open: false, log() {} });
+  try {
+    assert.equal(again.already, undefined, "a stale note does not block a start");
+    assert.notEqual(`http://127.0.0.1:${again.server.address().port}/`, url);
+  } finally {
+    again.server.close();
     process.removeAllListeners("SIGINT");
     process.removeAllListeners("SIGTERM");
   }
