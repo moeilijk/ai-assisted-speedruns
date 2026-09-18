@@ -241,7 +241,7 @@ export async function checkItem(id) {
   if (id.startsWith("stub-")) {
     // The same row as a game that works, failing on the first condition a working game passes without a word.
     const g = (await allGames()).find((x) => `stub-${x.plugin.id}` === id);
-    t("there is a plugin for this game", false, { level: "absent", detail: g ? `No plugin yet: what it would take is in games/${g.dir}/README.md.` : "Unknown game." });
+    t("there is a plugin for this game", false, { level: "absent", detail: g ? `not yet; what it would take is in games/${g.dir}/README.md` : "unknown game" });
     return done();
   }
   if (id.startsWith("game-")) {

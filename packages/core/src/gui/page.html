@@ -82,6 +82,8 @@
   .tests li { color: var(--muted); }
   .tests .pass { color: var(--ok); }
   .tests .miss { color: var(--fail); }
+  .tests .absent { color: var(--muted); }
+  .tests a { color: inherit; }
   .tests .not { font-style: italic; }
   #offline { position: fixed; inset: 0; background: rgba(15, 17, 21, .72); display: none; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
   #offline.on { display: flex; }
@@ -368,13 +370,16 @@ function row(i) {
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
     <div><div class="name">${esc(i.label)}</div>${i.status ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>` : ""}</div>
     <div class="field">${field}${fix}</div>
-    <div class="detail muted">${esc(i.detail)}</div>${tests(i)}${suggest}</div>`;
+    <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}</div>`;
 }
 // What a row really establishes: every condition it tried, with its outcome. Whatever is not in this list was not
 // established — so the list is complete, and naming a few unproved things next to it would suggest the rest is
 // covered. Without this list "checked" is a colour and nothing else.
+const REPO_URL = "https://github.com/moeilijk/ai-assisted-speedruns/blob/main/";
+// A file of the repository named in a sentence becomes a link to it, so "see games/portal-2/README.md" can be read.
+const linkFiles = (text) => esc(text).replace(/((?:games|docs|packages)\/[A-Za-z0-9_.\-\/]+\.(?:md|mjs|json))/g, (f) => `<a href="${REPO_URL}${f}" target="_blank" rel="noreferrer">${f}</a>`);
 function tests(i) {
-  const rows = (i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : "miss"}">${x.ok ? "✓" : "✗"} ${esc(x.what)}${x.ok || !x.detail ? "" : ` — ${esc(x.detail)}`}</li>`);
+  const rows = (i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : x.level === "absent" ? "absent" : "miss"}">${x.ok ? "✓" : "✗"} ${linkFiles(x.what)}${x.ok || !x.detail ? "" : ` — ${linkFiles(x.detail)}`}</li>`);
   return rows.length ? `<ul class="tests">${rows.join("")}</ul>` : "";
 }
 const envOf = (id) => setup.items.find((i) => i.id === id)?.env;

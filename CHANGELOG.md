@@ -12,6 +12,13 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.19.21 — 2026-09-19
+
+- A row that fails says it once, in the colour of what it means, with the file it names as a link. A failing row
+  printed its reason twice (as its own line and again behind the condition), a game without a plugin was red while
+  its status said grey "No plugin", and the README it pointed at could not be opened. A file of the repository named
+  in a condition is now a link to it on GitHub.
+
 ## 0.19.20 — 2026-09-19
 
 - A row's conditions are the whole of what it proved, so naming a few unproved things next to them is taken out
