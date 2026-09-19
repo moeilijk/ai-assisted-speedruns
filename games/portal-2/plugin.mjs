@@ -12,7 +12,7 @@
 //   AAS_PORTAL2_GAME_ROOT   the folder with portal2.exe
 //   AAS_PORTAL2_HOST        SAR TAS protocol host (default 127.0.0.1)
 //   AAS_PORTAL2_PORT        SAR TAS protocol port (default 6555, sar_tas_protocol_server)
-import fs from "node:fs";
+import fs, { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connectSar } from "./sar-client.mjs";
@@ -24,6 +24,8 @@ const GAME_ROOT = process.env.AAS_PORTAL2_GAME_ROOT ? resolve(process.env.AAS_PO
 const HOST = process.env.AAS_PORTAL2_HOST || "127.0.0.1";
 const PORT = process.env.AAS_PORTAL2_PORT ? Number(process.env.AAS_PORTAL2_PORT) : 6555;
 const TICK = 1 / 60; // Portal 2 runs at 60 ticks per second
+// The .p2tas version this tooling writes; SAR's docs/p2tas.md names the newest one.
+const SCRIPT_VERSION = UPSTREAM.sar.script_version ?? 9;
 
 /** The campaign's maps are the splits: one per map, named as the game names them. */
 export const SEGMENTS = MAPS.map((m) => m.name);
@@ -51,6 +53,9 @@ export default {
     install: join(here, "install-mod.mjs"),
     installs: "Download SourceAutoRecord (pinned, sha256 checked) and write its config next to the game",
     launch: join(here, "launch-game.mjs"),
+    stop: join(here, "stop-all.mjs"),
+    // One splits file per end, made by make-splits.mjs from the campaign in maps.json.
+    splits: Object.fromEntries(ENDS.map((e) => [e.id, join(here, "splits", `portal2-${e.id}.lss`)])),
     recorders: ["obs"],
     displayEnv: "AAS_PORTAL2_WINDOW_POS",
     resolutionEnv: "AAS_PORTAL2_RESOLUTION",
@@ -93,12 +98,87 @@ export default {
     return rows;
   },
   documentation: fs.readFileSync(join(here, "documentation.md"), "utf8"),
+  /** What the model is told before it starts; `aas publish` carries it into the bundle as AGENTS.md, verbatim. */
+  instructions: fs.readFileSync(join(here, "AGENTS.md"), "utf8"),
   execDescription:
     "Run async JavaScript against Portal 2 through SourceAutoRecord's TAS protocol; `portal2` is in scope. Use `return <value>` for text results.\n" +
     "TAS: `await portal2.tas(script)` plays an inline .p2tas script from the state the game is in (`start now` is added when the script has no header). " +
     "A tickbulk is `tick>movement|angles|buttons|commands|tools`, ticks absolute (`120>`) or relative (`+10>`); buttons J/D/U/Z/B/O (uppercase presses, lowercase releases, a number holds for that many ticks).\n" +
     "Stepping: `portal2.advance(ticks)` plays exactly that many ticks and returns the tick the game is on; `portal2.pause()`, `portal2.play()`, `portal2.pauseAtTick(t)`, `portal2.fastForward(t)`, `portal2.rate(r)`.\n" +
     "Observing: `portal2.position()` and `portal2.entity(selector)` give position, angles and velocity; `portal2.map()` is the map the run is in; `portal2.screenshot()` returns a picture.",
+
+  /** A short connection of its own, for the harness's own calls: they run outside the agent's session. */
+  async withSar(fn) {
+    const sar = await connectSar({ host: HOST, port: PORT });
+    try { return await fn(sar); } finally { sar.close(); }
+  },
+
+  /**
+   * Called by `aas run` once the recorder is going and before the agent starts: load the map the run begins on and
+   * leave the game standing still on it. `start map <name>` is SAR's own way to begin a script on a map
+   * (docs/p2tas.md), and the script this sends does nothing else, so what it leaves behind is a loaded, paused
+   * game — not a game that has already been played for a tick.
+   */
+  async prepareRun({ log = () => {}, goal = null } = {}) {
+    const map = MAPS[0].map;
+    return this.withSar(async (sar) => {
+      log(`loading ${map} (${MAPS[0].name})${goal ? ` for goal ${goal}` : ""}`);
+      await sar.script(`version ${SCRIPT_VERSION}\nstart map ${map}\n+0>||||\n`, "aas_start");
+      await sar.pause();
+      const { position } = await sar.entity("player");
+      log(`Portal 2 is ready: paused in ${map} at ${JSON.stringify(position)}`);
+      return { readyAt: new Date(), map, position };
+    });
+  },
+
+  /**
+   * The engine's own save, run from a one-tick script's commands column — the only channel the TAS protocol has
+   * for a console command. The file the engine writes is what `aas run` copies next to the run.
+   */
+  async saveState({ name, log = () => {} }) {
+    await this.withSar(async (sar) => {
+      await sar.script(`version ${SCRIPT_VERSION}\nstart now\n+0>|||save ${name}|\n`, "aas_save");
+      log(`save ${name} sent`);
+    });
+    const file = GAME_ROOT ? join(GAME_ROOT, "portal2", "SAVE", `${name}.sav`) : null;
+    // The engine makes the file first and fills it a moment later: wait until it is there, is not empty, and has
+    // stopped growing. A copy taken too early is a save of nothing.
+    if (file) {
+      const deadline = Date.now() + 15000;
+      let last = -1;
+      while (Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 250));
+        if (!existsSync(file)) continue;
+        const size = statSync(file).size;
+        if (size > 0 && size === last) return { name, file };
+        last = size;
+      }
+      log(`the engine wrote no finished save at ${file} within 15 s`);
+    }
+    return { name, file };
+  },
+
+  /** `start save <name>` is SAR's own way to begin on a save (docs/p2tas.md), so the game loads it and stands still. */
+  async loadState({ name, log = () => {} }) {
+    return this.withSar(async (sar) => {
+      await sar.script(`version ${SCRIPT_VERSION}\nstart save ${name}\n+0>||||\n`, "aas_load");
+      await sar.pause();
+      const { position } = await sar.entity("player");
+      log(`restored ${name}: paused at ${JSON.stringify(position)}`);
+      return { position };
+    });
+  },
+
+  /** After the agent stopped: stop whatever script is still playing, so the game is not left running a TAS. */
+  async endRun() {
+    try { await this.withSar((sar) => sar.stop()); } catch { /* the game may already be gone */ }
+  },
+
+  /** Closes the game and undoes the launcher's set-up; the harness calls this when a run ends. */
+  async close({ log = () => {} } = {}) {
+    const { closeGame } = await import("./close-game.mjs");
+    return closeGame({ log });
+  },
 
   /**
    * The controller the agent's code runs against. It is SAR's protocol plus the two things the protocol does not
@@ -156,7 +236,7 @@ export default {
        * continues from the state the game is in — the only form that makes sense inside a run that is already going.
        */
       async tas(script, { name = "aas" } = {}) {
-        const text = /^\s*version\s+\d+/m.test(script) ? script : `version ${UPSTREAM.sar.script_version ?? 9}\nstart now\n${script}`;
+        const text = /^\s*version\s+\d+/m.test(script) ? script : `version ${SCRIPT_VERSION}\nstart now\n${script}`;
         globalThis.aas?.event?.("game.playback", { phase: "start", index: ++playbacks, script: text });
         const r = await sar.script(text, name);
         followMaps();
@@ -170,7 +250,7 @@ export default {
        */
       async screenshot() {
         const before = newestShot();
-        await sar.script(`version ${UPSTREAM.sar.script_version ?? 9}\nstart now\n+0>|||jpeg|\n`, "aas_shot");
+        await sar.script(`version ${SCRIPT_VERSION}\nstart now\n+0>|||jpeg|\n`, "aas_shot");
         const deadline = Date.now() + 5000;
         while (Date.now() < deadline) {
           const shot = newestShot();

@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.27.1",
+  "version": "0.28.0",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -55,6 +55,8 @@
     "portal2:doctor": "node packages/core/src/cli.mjs doctor --game games/portal-2/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "portal2:check": "node packages/core/src/cli.mjs check-connection --game games/portal-2/plugin.mjs",
     "portal2:maps": "node games/portal-2/extract-maps.mjs",
+    "portal2:splits": "node games/portal-2/make-splits.mjs",
+    "portal2:stop": "node games/portal-2/stop-all.mjs",
     "sts:install": "node games/slay-the-spire/install-mod.mjs",
     "sts:launch": "node games/slay-the-spire/launch-game.mjs",
     "sts:stop": "node games/slay-the-spire/stop-all.mjs",

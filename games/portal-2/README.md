@@ -42,10 +42,31 @@ never again. Neither is answered by changing SAR — that is upstream's code, no
 - **The picture** comes from the engine's own screenshot command, run from a one-tick script, and the file it
   writes into `portal2/screenshots` is what the tool returns.
 
+## A run
+
+Everything a run needs is here: the instructions the model reads (`AGENTS.md`), the start (`prepareRun` loads the
+campaign's first map and leaves the game standing still), saving and loading through the engine's own `save` and
+SAR's `start save`, the end of a session (`endRun` stops whatever script is playing) and closing the game the way
+a user would (`stop-all.mjs`). A splits file per end comes from `npm run portal2:splits`, made from `maps.json`.
+
+```bash
+aas run --runtime claude-code --game games/portal-2/plugin.mjs --run-dir <runs>/portal2-01 \
+        --recorder obs --timer livesplit --overlay-port 8765
+```
+
+Without `--goal` an AI run aims at the credits and a run no model plays aims at the campaign's first end,
+`sp_a1_intro2` ("Portal Carousel").
+
 ## What is proven, and what is not
 
 `test/protocol.test.mjs` and `test/plugin.test.mjs` run against `test/fake-sar.mjs`, a stand-in that speaks the
 protocol: the ends, the map tracking, stepping, inline scripts and entity info are checked there.
 
 Portal 2 was not installed on the machine this plugin was written on, so nothing here has met the real game yet.
-Unproven against it: the launcher, the exact wording the engine prints on a level load, and the screenshot command.
+Unproven against it: the launcher, the exact wording the engine prints on a level load, the screenshot command,
+and the console commands that go through a tickbulk (`save`, `jpeg`, `quit`).
+
+There is no mock run for this game. A mock replays a published route, and the published Portal 2 TASes I could
+find ([ChaoticWeg/p2tas](https://github.com/ChaoticWeg/p2tas)) are four files in SAR's older `sar_tas_frame_at`
+console format, none of them the campaign's first end. `setup.bot` waits on a route in the `.p2tas` form that
+SAR's protocol plays.

@@ -12,6 +12,27 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.28.0 — 2026-09-19
+
+- **A Portal 2 run can actually be started** (owner, 2026-09-19). 0.25.0 said "Portal 2 is a game plugin, not a
+  stub" and that was not true of a run: `aas configure` refused it outright ("No instructions: the game plugin has
+  none"), and there was no start, no save, no load, no end and no way to close the game. The plugin had the bridge
+  and nothing around it. Now it has:
+  - `AGENTS.md`, the instructions the model reads, which `aas publish` carries into the bundle verbatim.
+  - `prepareRun`: `start map sp_a1_intro1`, SAR's own way to begin on a map (docs/p2tas.md), and the script does
+    nothing else, so what it leaves behind is a loaded game standing still.
+  - `saveState` and `loadState`: the engine's own `save` through the only channel the TAS protocol has for a
+    console command, and `start save <name>` to come back to it. A save is waited for until the engine has
+    finished writing it, because a copy taken too early is a save of nothing.
+  - `endRun`, `close` and `stop-all.mjs` (`npm run portal2:stop`): the script is stopped, `quit` is handed to the
+    game through its own console, and the window gets the time a user would give it. Nothing is killed.
+  - A splits file per end, 62 of them, from `npm run portal2:splits` — made from `maps.json`, not by hand.
+- A test that was missing when this was called finished: a run is configured end to end against the fake, and the
+  plugin is held against everything `aas run` asks a game for. `prepareRun`, `saveState` and `loadState` are
+  checked on the exact script they send.
+- Still not there: a mock run. A mock replays a published route, and the published Portal 2 TASes I could find are
+  four files in SAR's older `sar_tas_frame_at` console format, none of them the campaign's first end.
+
 ## 0.27.1 — 2026-09-19
 
 - **A game you have not got is not a fault** (owner, 2026-09-19: "een missend spel is niet fout. je kan hem alleen
