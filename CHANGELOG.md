@@ -12,6 +12,24 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.0 — 2026-09-19
+
+- **Where Portal 2's published input is, and how to read it** (owner, 2026-09-19: the solution exists, keep
+  looking). Searched properly this time: GitHub code search on `extension:p2tas` (23 files, all SAR's own
+  conformance tests or templates), every repository of the p2sr organisation, and the P2SR wiki's TASing page,
+  which links to no archive at all. The four scripts in `ChaoticWeg/p2tas` are in SAR's older
+  `sar_tas_frame_at` format, and that command is not in SAR 1.15.4 any more, so that archive is dead.
+- What is published, per chamber, is something else: **board.portal2.sr** keeps the top runs of every Portal 2
+  map with the **demo** of each, and a Source demo carries the player's `usercmd` for every tick it lasted —
+  the same thing a `.p2tas` framebulk holds. The route a mock plays can come from a human's published run.
+- `games/portal-2/demo.mjs` reads a Portal 2 demo: the header, every message, and the input of every tick. The
+  layout is not guessed — it is the one p2sr's own parser reads (`p2sr/mdp`, `src/demo.c`): a message is
+  `type(1) tick(4) slot(1)`, a packet carries two PacketInfos, a usercmd carries its number and its payload.
+  Measured against two real published demos: `sp_a1_intro3` by m1a2d3i4n5 (1366 ticks, 1361 usercmds) and
+  `mp_coop_multifling_1` by daver12345 (1718 ticks, 1718 usercmds). Both walk to their stop message with the last
+  tick equal to the tick count in their header.
+- The test builds a demo byte for byte rather than keeping someone else's in the repository.
+
 ## 0.28.1 — 2026-09-19
 
 - **`packages/spec/runtimes.json`**: every runtime plugin this release ships, with the sha256 an archive holds a
