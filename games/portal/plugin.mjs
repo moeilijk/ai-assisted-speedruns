@@ -93,7 +93,9 @@ export default {
    *  install, so its folder is not looked up. */
   setup: {
     folder: "Portal",
-    settings: [{ env: "AAS_PORTAL_GAME_ROOT", label: "Source Unpack folder (Portal)", kind: "dir", expect: "hl2.exe" }],
+    // `what` answers "which folder?" in the Setup tab: it stands in the empty box and under the heading, because
+    // a box that says only "folder" asks a question instead of answering one.
+    settings: [{ env: "AAS_PORTAL_GAME_ROOT", label: "Source Unpack folder (Portal)", kind: "dir", expect: "hl2.exe", what: "The Source Unpack of Portal: the folder with hl2.exe in it. Not the Steam copy of Portal — Source Unpack is a separate download." }],
     install: join(here, "install-game-files.mjs"),
     // What that script does, in the words the Setup tab shows on its button: a person should know what they start.
     installs: "Copy SourcePauseTool and portal-agent's configs into the Source Unpack folder",

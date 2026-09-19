@@ -123,6 +123,19 @@ test("Portal's check covers the controller it runs on, not only the game's own f
   assert.ok(plugin.doctor, "the plugin still has its checks");
 });
 
+test("every folder a game asks for says which folder it is", async () => {
+  // "folder" on its own is a question, not an answer: the empty box and the line under the heading both say which
+  // folder to pick, and the game plugin is what says it (setup.settings[].what).
+  const { guiGames } = await import("../src/gui/checks.mjs");
+  for (const g of await guiGames()) {
+    for (const st of g.plugin.setup.settings.filter((x) => x.kind === "dir")) {
+      assert.equal(typeof st.what, "string", `${g.plugin.id}: ${st.env} does not say which folder it means`);
+      assert.ok(st.expect && st.what.includes(st.expect), `${g.plugin.id}: "${st.what}" does not name ${st.expect}, which is how a person recognises the folder`);
+      assert.ok(st.what.length > 40, `${g.plugin.id}: "${st.what}" is too short to answer "which folder?"`);
+    }
+  }
+});
+
 test("a button in the Setup tab says what it does and which command it runs", async () => {
   // "Install" on its own can mean the game, the mod, the tooling or the harness. Every game plugin that offers an
   // install script says in one sentence what that script puts where, and the command is shown with the button.

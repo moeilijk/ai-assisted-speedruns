@@ -71,7 +71,7 @@ export default {
   /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
   setup: {
     folder: "Balatro",
-    settings: [{ env: "AAS_BALATRO_GAME_ROOT", label: "Balatro folder", kind: "dir", expect: "Balatro.exe", find: { steam: 2379780, epic: "Balatro" } }],
+    settings: [{ env: "AAS_BALATRO_GAME_ROOT", label: "Balatro folder", kind: "dir", expect: "Balatro.exe", find: { steam: 2379780, epic: "Balatro" }, what: "Where Balatro is installed: the folder with Balatro.exe in it, from Steam or from the Epic Games Store." }],
     install: join(here, "install-mod.mjs"),
     installs: "Install Lovely, Steamodded and balatrobot into the game's own mod folder for this harness",
     launch: join(here, "launch-game.mjs"),

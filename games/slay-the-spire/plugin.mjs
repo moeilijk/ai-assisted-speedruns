@@ -159,7 +159,7 @@ export default {
   /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
   setup: {
     folder: "SlayTheSpire",
-    settings: [{ env: "AAS_STS_GAME_ROOT", label: "Slay the Spire folder", kind: "dir", expect: "SlayTheSpire.exe", find: { steam: 646570 } }],
+    settings: [{ env: "AAS_STS_GAME_ROOT", label: "Slay the Spire folder", kind: "dir", expect: "SlayTheSpire.exe", find: { steam: 646570 }, what: "Where Steam installed Slay the Spire: the folder with SlayTheSpire.exe in it, usually steamapps\\common\\SlayTheSpire." }],
     install: join(here, "install-mod.mjs"),
     installs: "Install Communication Mod next to the game and point it at this harness's bridge",
     launch: join(here, "launch-game.mjs"),

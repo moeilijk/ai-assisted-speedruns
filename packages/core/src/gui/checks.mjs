@@ -82,14 +82,16 @@ export async function configItems() {
   const display = games.map((g) => env[g.plugin.setup.displayEnv]).find(Boolean) ?? "";
   const which = (name) => toWindows(onPath(name) ?? "");
   return [
-    item("General", "output", "Output location", "dir", "AAS_OUTPUT_DIR"),
+    // Which folder, said before anything is checked: an empty box that says "folder" asks the question instead of
+    // answering it. A game's own folder setting says it too, in the game plugin (setup.settings[].what).
+    item("General", "output", "Output location", "dir", "AAS_OUTPUT_DIR", { what: "Where your runs are kept. Each run gets its own folder under <this folder>\\<Game>\\<run name>, with its log, its recording and its bundle. Pick a drive with room for video." }),
     item(HARNESS, "repo", "Repository", "info", null, { value: toWindows(REPO) }),
     item(HARNESS, "node", "Node.js", "info", null, { value: `${toWindows(process.execPath)} (${process.version})` }),
     item(HARNESS, "ffmpeg", "ffmpeg (video cut, length)", "info", null, { value: which("ffmpeg") }),
     item(HARNESS, "claude", "Claude Code", "info", null, { value: which("claude") }),
     item(HARNESS, "codex", "Codex", "info", null, { value: which("codex") }),
     item("Windows tools", "obs", "OBS Studio (recording)", "file", "AAS_OBS_EXE", { expect: "obs64.exe", placeholder: "default: C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe" }),
-    item("Windows tools", "livesplit", "LiveSplit (timer)", "file", "AAS_LIVESPLIT_EXE", { expect: "LiveSplit.exe" }),
+    item("Windows tools", "livesplit", "LiveSplit (timer)", "file", "AAS_LIVESPLIT_EXE", { expect: "LiveSplit.exe", what: "LiveSplit.exe itself, wherever you unpacked it: the timer that is shown in the recording and takes the splits." }),
     item("Windows tools", "steam", "Steam", "file", "AAS_STEAM_EXE", { expect: "steam.exe", placeholder: "default: C:\\Program Files (x86)\\Steam\\steam.exe" }),
     ...(ON_WINDOWS ? [
       item("Screen and sound", "display", "Display for the game", "display", null, { value: display, options: display ? [{ value: display, label: display }] : [] }),
@@ -98,7 +100,7 @@ export async function configItems() {
       // A plain preference: there is nothing to check, so this row has no check and no status at all.
       item("Screen and sound", "awake", "Keep displays awake during a run", "check", "AAS_KEEP_DISPLAYS_AWAKE", { check: false }),
     ] : []),
-    ...games.flatMap(({ plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect }))),
+    ...games.flatMap(({ plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, what: st.what ?? null }))),
     // Every other game the repository knows: named here too, so the list of games is the whole list and it is
     // visible which ones this machine cannot run at all.
     ...(await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => item("Games", `stub-${plugin.id}`, plugin.name, "info", null, { value: "", doc: `games/${dir}/README.md` })),

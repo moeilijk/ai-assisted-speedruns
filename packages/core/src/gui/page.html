@@ -37,6 +37,7 @@
   .row-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
   .muted { color: var(--muted); }
   .path { font-family: ui-monospace, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
+  .what { font-size: 12px; line-height: 1.45; margin-top: 4px; max-width: 34ch; }
   .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
@@ -379,7 +380,8 @@ const STATUS = {
 };
 function row(i) {
   let field = "";
-  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? "folder" : i.expect ?? "file"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
+  // An empty box that says "folder" asks the question instead of answering it: the setting says which folder.
+  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? (i.expect ? `the folder with ${i.expect} in it` : "a folder on this machine") : i.expect ? `the path to ${i.expect}` : "a file on this machine"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
   else if (i.kind === "select") field = `<select id="v-${i.id}" data-autosave="${i.id}">${i.options.map((o) => `<option value="${esc(o.value)}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
   else if (i.kind === "display") field = `<select id="v-${i.id}" data-display="1"><option value="">Where Windows puts it</option>${i.options.map((o) => `<option value="${esc(o.value)}" data-size="${o.width}x${o.height}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
   else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${i.id}" data-autosave="${i.id}" ${i.value ? "checked" : ""}> on</label>`;
@@ -388,8 +390,9 @@ function row(i) {
   // A button names what it does, and the command it runs stands under it: nothing here happens unnamed.
   const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
   const fixCommand = i.fix?.command ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
+  const what = i.what ? `<div class="what muted">${linkFiles(i.what)}</div>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
-    <div><div class="name">${esc(i.label)}</div>${i.status && STATUS[i.status] ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status]}</span>` : ""}</div>
+    <div><div class="name">${esc(i.label)}</div>${i.status && STATUS[i.status] ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status]}</span>` : ""}${what}</div>
     <div class="field">${field}${fix}</div>
     <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}${fixCommand}</div>`;
 }

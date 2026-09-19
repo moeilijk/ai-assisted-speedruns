@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.27.0 — 2026-09-19
+
+- **"Folder" is a question; the Setup tab answers it** (owner, 2026-09-19: "wat is folder?"). An empty box said
+  `folder` and a condition said "the Portal 2 folder", which is the same word twice and tells nobody which folder
+  to pick. A game plugin now carries `setup.settings[].what`, the plain answer, and it stands under the heading
+  whether anything has been checked or not: "Where Steam installed Portal 2: the folder with portal2.exe in it,
+  usually steamapps\common\Portal 2", "The Source Unpack of Portal: the folder with hl2.exe in it. Not the Steam
+  copy of Portal — Source Unpack is a separate download."
+- The empty box says it too, instead of `folder`: "the folder with portal2.exe in it", and for a setting that is a
+  file, "the path to LiveSplit.exe". The output location says what is kept there and that it needs room for video.
+- A test holds it: a game plugin whose folder setting does not say which folder it means, and does not name the
+  file a person recognises it by, fails.
+
 ## 0.26.1 — 2026-09-19
 
 - **Fewer statuses, and each one says whether this part can be used** (owner, 2026-09-19: a status has to reflect
