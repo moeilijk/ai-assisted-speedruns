@@ -12,6 +12,20 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.21.0 — 2026-09-19
+
+- **A mock run is marked as one in the bundle, and an archive refuses it** (owner, 2026-09-19). A runtime plugin says
+  whether a model plays (`ai`); `aas publish` writes `mock: true` when none did, next to `harness.plugins.runtime.ai`.
+  Schema 15 and SPEC draft 0.39: such a bundle may be complete, signed and witnessed and is still not an entry — an
+  archive does not publish it, rank it or keep it. A bundle without `mock` is read as `false`. `aas check` refuses a
+  schema 15 bundle whose `mock` and `runtime.ai` disagree.
+- Portal's mock run reaches its goal, and the route is built by a tool instead of by hand:
+  `games/portal/extract-route.mjs` takes the calls of a real run's log, leaves out the screenshots and replaces the
+  waits before the first move by the chamber's countdown (`--wait`, 58 s: the countdown reads 00:00:00:00 and the
+  portal opens at IGT 57.3 in the recording of portal-03). Turns are never merged: a run with merged turns took
+  another path. Measured: merged turns `stopped` at 288 s; the route as recorded `completed` with Victory (Chamber 01)
+  at 214 s; with the countdown at 58 s, `completed` at 172 s.
+
 ## 0.20.1 — 2026-09-19
 
 - The game lands on the display that was chosen (owner, reported more than once). A launch option was not enough:

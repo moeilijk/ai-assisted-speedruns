@@ -1,4 +1,4 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.38
+# AI Assisted Speedruns (AAS) — Specification, draft 0.39
 
 Status: draft 0.38, 2026-09-17. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
@@ -51,6 +51,12 @@ with an id and a label and exactly one of them final (the game's own end, the go
 the same for every game. A resume may extend the goal to a later end; a victory reaches only the goal that held at
 that moment. The extended goal is published only once it is reached: until then a bundle keeps the last goal that was
 reached, and what came after is post-completion time on the timeline (§6).
+
+**A run no model played is not an entry, and an archive refuses it.** The harness can play a run with a script
+instead of a model, to test a machine without spending tokens (a mock run). Such a bundle is marked as one: `mock`
+is `true`, and `harness.plugins.runtime.ai` is `false` for the runtime that played it. It may be complete, signed
+and witnessed, and it is still not a run of an AI: an archive does not publish it, rank it or keep it as an entry.
+A bundle whose `mock` is absent is read as `false` (schema 14 and earlier).
 
 **A run that did not reach its goal is not an entry.** A session that was stopped (a budget, a limit, a
 runtime error) is a valid recording of an attempt and may be published as such, but it is not comparable: an archive
@@ -127,7 +133,7 @@ Where a recording is published is not in the bundle. A run may be published in m
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9 adds a suggested `title` and `description` to each of them. Schema version 10 adds what the runtime reported about each model (`context_window`, `max_output_tokens`, `provider`) and `harness.plugins.runtime.cli_versions`. Schema version 11 adds `parts` to each model. Schema version 12 adds `details` to each mod in `game.mods`. Schema version 13, what `aas publish` writes, adds `recording.overlay`.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9 adds a suggested `title` and `description` to each of them. Schema version 10 adds what the runtime reported about each model (`context_window`, `max_output_tokens`, `provider`) and `harness.plugins.runtime.cli_versions`. Schema version 11 adds `parts` to each model. Schema version 12 adds `details` to each mod in `game.mods`. Schema version 13 adds `recording.overlay`. Schema version 14 is a video's code `aas<32 hex>`. Schema version 15, what `aas publish` writes, adds `mock` and `harness.plugins.runtime.ai`: a run a script played instead of a model, which is never an entry (§3).
 
 ```json
 {
@@ -347,3 +353,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.36 | 2026-09-16 | Schema 14: a video carries the code `aas<32 hex>`, one word and the same for every video of a revision, instead of the line with run id, fingerprint and length |
 | 0.37 | 2026-09-16 | §6: the example video description in the wording the owner approved (goal, which video, what the picture shows, moments as `m:ss`, verification code) |
 | 0.38 | 2026-09-17 | §6: in a description a word joiner (U+2060) before each colon of a duration, so a platform does not link it as a place in the video; plain `m:ss` only for places, on their own line and within the video |
+| 0.39 | 2026-09-19 | Schema 15: `mock` and `harness.plugins.runtime.ai`; §3: a run no model played is not an entry and an archive refuses it |

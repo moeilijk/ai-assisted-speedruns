@@ -8,6 +8,8 @@ import { startBroker } from "../src/mcp-client.mjs";
 let interrupted = null;
 export default {
   id: "stub",
+  /** No model: this runtime plays a session that was written down, so its runs are mocks. */
+  ai: false,
   name: "Stub runtime",
   version: "0.1.0",
   /** The harness asks the session to end (game over): the remaining codes are skipped. */

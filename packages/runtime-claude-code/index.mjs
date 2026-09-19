@@ -76,6 +76,8 @@ export function claudeModelReports(runDir) {
 
 export default {
   id: "claude-code",
+  /** a model plays. */
+  ai: true,
   name: "Claude Code",
   /** The Claude plan's stand: runs stay under AAS_BUDGET_WEEKLY_MAX percent of the week. */
   async budget() { const b = await checkBudget(); return { ok: b.ok, percent: b.percent, max: b.max, detail: b.detail, data: { five_hour_percent: b.usage.fiveHour.percent } }; },

@@ -86,6 +86,8 @@ export function renderConfig(broker, { placeholders = false } = {}) {
 
 export default {
   id: "codex",
+  /** a model plays. */
+  ai: true,
   name: "Codex",
   version: "0.1.0",
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */

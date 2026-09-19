@@ -3,59 +3,75 @@
   "source": {
     "run": "portal-03",
     "segment": 1,
-    "started": "2026-09-10T02:07:35.967+02:00",
     "runtime": "claude-code",
-    "note": "The calls an AI run sent to the game, in order. Taken from that run log; no line of it is written by hand.",
-    "edited": "screenshots removed: they cost wall-clock time and no game time, and a replay does not need to look (owner, 2026-09-19). Consecutive camera turns merged into one call: the same angle, fewer round trips."
+    "started": "2026-09-10T02:07:47.058+02:00"
+  },
+  "built": {
+    "by": "games/portal/extract-route.mjs",
+    "screenshots": "left out",
+    "waitsBeforeFirstMove": "5 waits replaced by one of 58 s (the chamber countdown)",
+    "turns": "never merged"
   },
   "steps": [
     {
-      "call": "call-00004++",
-      "code": "await portal.look.left(270);"
+      "call": "call-00004",
+      "code": "await portal.look.left(90);"
     },
     {
-      "call": "call-00007",
-      "code": "const t = portal.tas();\nt.wait(portal.seconds(5));\nconst r = await t.run();\nreturn r;"
+      "call": "call-00005",
+      "code": "await portal.look.left(90);"
     },
     {
-      "call": "call-00008+",
-      "code": "await portal.look.right(270);"
+      "call": "call-00006",
+      "code": "await portal.look.left(90);"
     },
     {
-      "call": "call-00010",
-      "code": "const t = portal.tas();\nt.wait(portal.seconds(15));\nconst r = await t.run();\nreturn r;"
+      "call": "call-00008",
+      "code": "await portal.look.right(180);"
     },
     {
-      "call": "call-00011",
-      "code": "const t = portal.tas();\nt.wait(portal.seconds(30));\nconst r = await t.run();\nreturn r;"
-    },
-    {
-      "call": "call-00012",
-      "code": "const t = portal.tas();\nt.wait(portal.seconds(30));\nconst r = await t.run();\nreturn r;"
-    },
-    {
-      "call": "call-00013",
-      "code": "const t = portal.tas();\nt.wait(portal.seconds(20));\nconst r = await t.run();\nreturn r;"
+      "call": "call-00009",
+      "code": "await portal.look.right(90);"
     },
     {
       "call": "call-00014",
       "code": "await portal.look.left(45);"
     },
     {
+      "call": "countdown",
+      "code": "const t = portal.tas(); t.wait(portal.seconds(58)); const r = await t.run(); return r;"
+    },
+    {
       "call": "call-00015",
       "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00016+++",
-      "code": "await portal.look.left(135);"
+      "call": "call-00016",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00017",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00018",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00020",
+      "code": "await portal.look.right(135);"
     },
     {
       "call": "call-00021",
       "code": "const t = portal.tas();\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00022+",
-      "code": "await portal.look.right(90);"
+      "call": "call-00022",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00023",
+      "code": "await portal.look.right(180);"
     },
     {
       "call": "call-00024",
@@ -70,8 +86,12 @@
       "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00027+",
-      "code": "await portal.look.left(180);"
+      "call": "call-00027",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00028",
+      "code": "await portal.look.left(90);"
     },
     {
       "call": "call-00030",
@@ -82,8 +102,16 @@
       "code": "const t = portal.tas();\nt.hold(portal.seconds(0.3), {}, { left: 20 });\nt.hold(portal.seconds(2), { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00032++",
-      "code": "await portal.look.left(270);"
+      "call": "call-00032",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00033",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00034",
+      "code": "await portal.look.left(90);"
     },
     {
       "call": "call-00035",
@@ -98,8 +126,12 @@
       "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00038+",
-      "code": "await portal.look.left(90);"
+      "call": "call-00038",
+      "code": "await portal.look.left(180);"
+    },
+    {
+      "call": "call-00039",
+      "code": "await portal.look.right(90);"
     },
     {
       "call": "call-00041",
@@ -138,8 +170,28 @@
       "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00050+++++",
+      "call": "call-00050",
       "code": "await portal.look.up(20);"
+    },
+    {
+      "call": "call-00051",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00052",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00053",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00054",
+      "code": "await portal.look.left(140);"
+    },
+    {
+      "call": "call-00055",
+      "code": "await portal.look.right(140);"
     },
     {
       "call": "call-00056",
@@ -154,8 +206,20 @@
       "code": "const t = portal.tas();\nt.use();\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00059+++",
+      "call": "call-00059",
       "code": "await portal.look.up(70);"
+    },
+    {
+      "call": "call-00060",
+      "code": "await portal.look.down(90);"
+    },
+    {
+      "call": "call-00061",
+      "code": "await portal.look.up(90);\nawait portal.look.left(180);"
+    },
+    {
+      "call": "call-00062",
+      "code": "await portal.look.right(180);"
     },
     {
       "call": "call-00063",
@@ -202,8 +266,36 @@
       "code": "const t = portal.tas();\nt.wait(portal.seconds(3));\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00074+++++++",
-      "code": "await portal.look.right(300);"
+      "call": "call-00074",
+      "code": "await portal.look.down(40);"
+    },
+    {
+      "call": "call-00075",
+      "code": "await portal.look.up(20);\nawait portal.look.left(90);"
+    },
+    {
+      "call": "call-00076",
+      "code": "await portal.look.up(20);\nawait portal.look.right(180);"
+    },
+    {
+      "call": "call-00077",
+      "code": "await portal.look.left(180);"
+    },
+    {
+      "call": "call-00078",
+      "code": "await portal.look.right(120);"
+    },
+    {
+      "call": "call-00079",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00081",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00082",
+      "code": "await portal.look.right(90);"
     },
     {
       "call": "call-00083",
@@ -218,8 +310,12 @@
       "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00086+",
-      "code": "await portal.look.left(90);"
+      "call": "call-00086",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00087",
+      "code": "await portal.look.left(180);"
     },
     {
       "call": "call-00088",
@@ -246,16 +342,32 @@
       "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00094++",
+      "call": "call-00094",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00095",
       "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00096",
+      "code": "await portal.look.right(90);"
     },
     {
       "call": "call-00097",
       "code": "await portal.look.left(90);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00098++",
-      "code": "await portal.look.left(135);"
+      "call": "call-00098",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00099",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00100",
+      "code": "await portal.look.right(45);"
     },
     {
       "call": "call-00101",
@@ -286,6 +398,18 @@
       "code": "const t = portal.tas();\nt.wait(portal.seconds(5));\nconst r = await t.run();\nreturn r;"
     },
     {
+      "call": "call-00108",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00109",
+      "code": "await portal.look.down(40);"
+    },
+    {
+      "call": "call-00110",
+      "code": "await portal.look.up(40);\nawait portal.look.right(90);"
+    },
+    {
       "call": "call-00111",
       "code": "await portal.look.right(90);"
     },
@@ -294,8 +418,12 @@
       "code": "const t = portal.tas();\nt.hold(portal.seconds(1), { back: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00113+",
-      "code": "await portal.look.left(90); await portal.look.down(50);"
+      "call": "call-00113",
+      "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00114",
+      "code": "await portal.look.down(50);"
     },
     {
       "call": "call-00115",
@@ -350,8 +478,12 @@
       "code": "await portal.look.up(20);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { right: 3 });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00128+",
-      "code": "await portal.look.right(180);"
+      "call": "call-00128",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00129",
+      "code": "await portal.look.right(90);"
     },
     {
       "call": "call-00130",
@@ -442,6 +574,14 @@
       "code": "await portal.look.right(70);\nconst t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
+      "call": "call-00152",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00153",
+      "code": "await portal.look.left(180);"
+    },
+    {
       "call": "call-00154",
       "code": "await portal.look.right(90);"
     },
@@ -466,8 +606,12 @@
       "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true }, { left: 3 });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00160+",
-      "code": "await portal.look.down(30);"
+      "call": "call-00160",
+      "code": "await portal.look.right(90);"
+    },
+    {
+      "call": "call-00161",
+      "code": "await portal.look.left(90);\nawait portal.look.down(30);"
     },
     {
       "call": "call-00162",
@@ -486,8 +630,16 @@
       "code": "const t = portal.tas();\nfor (let i=0;i<15;i++) t.hold(4, { forward: true });\nconst r = await t.run();\nreturn r;"
     },
     {
-      "call": "call-00166++",
+      "call": "call-00166",
       "code": "await portal.look.left(90);"
+    },
+    {
+      "call": "call-00167",
+      "code": "await portal.look.right(180);"
+    },
+    {
+      "call": "call-00168",
+      "code": "await portal.look.left(180);"
     },
     {
       "call": "call-00169",

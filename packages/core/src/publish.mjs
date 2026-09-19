@@ -36,7 +36,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.38";
+export const SPEC_VERSION = "0.39";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -152,6 +152,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // `revision` counts republications of the same run: a database keyed on (run_id, revision) can tell an
   // update of a run it already holds from a new run, and `published_at` orders them.
   summary.schema_version = SUMMARY_SCHEMA;
+  // A run no model played is a mock: the harness's own test of a machine. It is said here, in one word, so an
+  // archive does not have to know which runtimes drive a model, and it is never an entry (SPEC §3).
+  summary.mock = rt?.ai === false;
   summary.spec_version = SPEC_VERSION;
   summary.run_id = path.basename(outDir);
   // A name can change: a run directory is renamed, a bundle is published under the naming convention that came
@@ -233,7 +236,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     plugins: {
       game: { id: brief.game?.id ?? brief.category.game ?? null, version: brief.game?.version ?? null },
       // version is the runtime plugin's; cli_versions are the versions of the runtime's own CLI its session log records.
-      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
+      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, ai: rt?.ai ?? null, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
       recorder: { id: recording?.recorder ?? null, version: recording?.recorder_version ?? null },
       timer: { id: recording?.timer?.id ?? null, version: recording?.timer?.version ?? null },
     },

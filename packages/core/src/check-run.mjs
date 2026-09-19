@@ -205,6 +205,15 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
           });
           const cv = summary.harness?.plugins?.runtime?.cli_versions;
           if (!Array.isArray(cv) || !cv.every((v) => typeof v === "string" && v)) problems.push("schema 10 requires harness.plugins.runtime.cli_versions as a list of versions");
+          // Schema 15: a run a script played instead of a model says so, and says it of its runtime too. It is a
+          // complete bundle and never an entry (SPEC §3), so the two must agree: a reader keys on `mock`.
+          if (summary.schema_version >= 15) {
+            const ai = summary.harness?.plugins?.runtime?.ai;
+            if (typeof summary.mock !== "boolean") problems.push("schema 15 requires mock (true when no model played the run)");
+            if (!(ai === true || ai === false || ai === null)) problems.push("schema 15 requires harness.plugins.runtime.ai (true, false or null)");
+            if (summary.mock === true && ai !== false) problems.push("mock is true, so harness.plugins.runtime.ai must be false");
+            if (summary.mock === false && ai === false) problems.push("harness.plugins.runtime.ai is false, so mock must be true");
+          }
         }
         if (summary.schema_version >= 8) {
           // The videos a runner may upload: each line names this run and this fingerprint with that video's length, and

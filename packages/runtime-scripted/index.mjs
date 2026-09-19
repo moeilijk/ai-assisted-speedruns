@@ -15,6 +15,8 @@ import { startBroker } from "../core/src/mcp-client.mjs";
 let interrupted = null;
 export default {
   id: "scripted",
+  /** a script plays, not a model: every run of this runtime is a mock. */
+  ai: false,
   name: "Scripted bot",
   version: "0.1.0",
   interrupt(reason) { interrupted = reason; },

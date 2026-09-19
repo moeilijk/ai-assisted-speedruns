@@ -162,7 +162,11 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   const strange = checkRun(outDir).results.find((r) => r.requirement === "witnessed");
   assert.equal(strange.status, "invalid");
   assert.match(strange.detail, /not signed by a witness key of the archive/);
-  assert.equal(p.summary.schema_version, 14);
+  assert.equal(p.summary.schema_version, 15);
+  // This run is played by the stub runtime, which is not a model: the bundle says so in one word, and its runtime
+  // agrees. An archive refuses such a bundle as an entry (SPEC §3).
+  assert.equal(p.summary.mock, true, "a run no model played is marked as a mock");
+  assert.equal(p.summary.harness.plugins.runtime.ai, false);
   assert.deepEqual(p.summary.recording.overlay, { shown: false, keys: false }, "no --overlay-port in this run: the picture has no overlay, and the text does not describe one");
   assert.ok(p.summary.recording.videos.every((v) => !/Bottom left/.test(v.description)));
   assert.deepEqual(p.summary.game.mods.map((m) => [m.name, m.details]), [["SourcePauseTool", "portal-agent's IPC patch"]], "the mod's own name, the patch in details");
