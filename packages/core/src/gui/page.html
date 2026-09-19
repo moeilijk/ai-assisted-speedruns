@@ -41,8 +41,10 @@
   .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
-  /* One verdict, one look: "Not ready" in three colours would be three verdicts to a reader, and it is one. */
-  .warn .dot, .fail .dot, .missing .dot { background: var(--warn); } .warn, .fail, .missing { color: var(--warn); }
+  /* One verdict, one look: "Not ready" in two colours would be two verdicts to a reader, and it is one. */
+  .warn .dot, .fail .dot { background: var(--warn); } .warn, .fail { color: var(--warn); }
+  /* Not set up is not a fault: it is a game you cannot run, and nothing on this machine is wrong. */
+  .missing .dot { background: var(--muted); } .missing { color: var(--muted); }
   /* Not a fault of this machine: the framework has no plugin for that game yet. */
   .absent .dot { background: var(--muted); } .absent { color: var(--muted); }
   .pending { color: var(--muted); }
@@ -369,11 +371,13 @@ function updateRow(item) {
 // conditions under it say what is still in the way — they are the whole story already, and a second vocabulary
 // next to them ("Not set", "Problem", "Nothing chosen") only gives the same answer in four voices.
 const STATUS = {
-  ok: "Ready",                 // every condition holds
-  warn: "Not ready",           // one does not; the condition below says which
+  ok: "Ready",                 // every condition holds: this can be used in a run
+  warn: "Not ready",           // it is set up, and something it needs is not there
   fail: "Not ready",
-  missing: "Not ready",
-  absent: "No plugin yet",     // nothing to set up here: this game has no plugin
+  // Nothing is wrong here. A game you have not got, or one this framework has no plugin for, is a game you cannot
+  // run — not a fault of your machine and not something to fix. So these stay grey and say what they are.
+  missing: "Not set up",
+  absent: "No plugin yet",
   pending: "Checking…",
   // `unchecked` has no word. Nothing has run, so nothing is true or false about this row yet, and a status that
   // says something about us rather than about the machine is not a status.
@@ -403,7 +407,8 @@ const REPO_URL = "https://github.com/moeilijk/ai-assisted-speedruns/blob/main/";
 // A file of the repository named in a sentence becomes a link to it, so "see games/portal-2/README.md" can be read.
 const linkFiles = (text) => esc(text).replace(/((?:games|docs|packages)\/[A-Za-z0-9_.\-\/]+\.(?:md|mjs|json))/g, (f) => `<a href="${REPO_URL}${f}" target="_blank" rel="noreferrer">${f}</a>`);
 function tests(i) {
-  const rows = (i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : x.level === "absent" ? "absent" : "miss"}">${x.ok ? "✓" : "✗"} ${linkFiles(x.what)}${x.ok || !x.detail ? "" : ` — ${linkFiles(x.detail)}`}</li>`);
+  // A condition that is unmet because something is not set up reads as grey as its row does: nothing is wrong there.
+  const rows = (i.tests ?? []).map((x) => `<li class="${x.ok ? "pass" : x.level === "absent" || x.level === "missing" ? "absent" : "miss"}">${x.ok ? "✓" : "✗"} ${linkFiles(x.what)}${x.ok || !x.detail ? "" : ` — ${linkFiles(x.detail)}`}</li>`);
   return rows.length ? `<ul class="tests">${rows.join("")}</ul>` : "";
 }
 const envOf = (id) => setup.items.find((i) => i.id === id)?.env;

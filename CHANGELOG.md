@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.27.1 — 2026-09-19
+
+- **A game you have not got is not a fault** (owner, 2026-09-19: "een missend spel is niet fout. je kan hem alleen
+  niet runnen"). A game whose folder is not chosen read as "Not ready" in the warning colour, as if something on
+  the machine were wrong. It says **Not set up** now, in grey, and so does its condition: nothing here is broken,
+  there is simply a game you cannot run. "No plugin yet" was already grey and stays that way.
+- The same holds for everything else that is only not there yet: Claude Code, Codex, LiveSplit, SoundVolumeView and
+  the output location. Not installed is not a problem to solve; **Not ready** stays for something that is set up
+  and misses a piece it needs, which is the only one worth a colour.
+
 ## 0.27.0 — 2026-09-19
 
 - **"Folder" is a question; the Setup tab answers it** (owner, 2026-09-19: "wat is folder?"). An empty box said
