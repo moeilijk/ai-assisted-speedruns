@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.23.0",
+  "version": "0.24.0",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -46,6 +46,7 @@
     "portal:doctor": "node packages/core/src/cli.mjs doctor --game games/portal/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "portal:launch": "node games/portal/launch-game.mjs",
     "portal:stop": "node games/portal/stop-all.mjs",
+    "portal:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/portal/plugin.mjs --bot games/portal/bot.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
     "obs:launch": "node --env-file-if-exists=.env packages/recorder-obs/launch-obs.mjs",
     "livesplit:launch": "node --env-file-if-exists=.env packages/timer-livesplit/launch-livesplit.mjs",
     "portal:audio": "node --env-file-if-exists=.env packages/core/src/windows/audio-route.mjs --process hl2.exe",

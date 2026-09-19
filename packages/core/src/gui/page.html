@@ -189,7 +189,7 @@ for (const t of ["run", "setup"]) $(`tab-${t}`).onclick = () => {
 };
 
 // Run tab
-let games = [], runtimes = [], agents = [], phase = "idle", nameTouched = false, aiTouched = false;
+let games = [], runtimes = [], agents = [], phase = "idle", nameTouched = false, aiTouched = false, goalTouched = false;
 async function loadGames() {
   const j = await api("/api/games");
   games = j.games; runtimes = j.runtimes; agents = j.agents;
@@ -205,7 +205,7 @@ function fillGame() {
   const keepBy = $("playedby").value;
   $("playedby").innerHTML = [...(g.mock ? [["scripted", "The game's script (mock run)"]] : []), ...(agents.length ? [["ai", "An AI"]] : [])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
   if ([...$("playedby").options].some((o) => o.value === keepBy)) $("playedby").value = keepBy;
-  $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}" ${e.final ? "selected" : ""}>${esc(e.label)}</option>`).join("");
+  fillGoal();
   // Only the choices this game has: a game without a seed does not ask for one.
   $("seedfield").style.display = g.seed ? "" : "none";
   if (g.seed) $("seed").placeholder = g.seed.placeholder ?? ""; else $("seed").value = "";
@@ -223,9 +223,21 @@ function fillPlayedBy() {
   $("aifield").style.display = agents.length ? "" : "none";
   fillRuntime();
 }
+// The goal offered by default follows who plays: an AI run aims at the game's own end, a mock run at the game's
+// first end, because it is a test of the machine and playing on to the credits proves nothing the first end did
+// not (owner, 2026-09-19). A goal the user picked themselves is kept as long as this game has it.
+function fillGoal() {
+  const g = games.find((x) => x.id === $("game").value);
+  if (!g) return;
+  const keep = $("goal").value;
+  const preferred = runtimeId() === "scripted" ? g.ends[0]?.id : g.ends.find((e) => e.final)?.id;
+  $("goal").innerHTML = g.ends.map((e) => `<option value="${e.id}">${esc(e.label)}</option>`).join("");
+  $("goal").value = goalTouched && g.ends.some((e) => e.id === keep) ? keep : preferred;
+}
 function fillRuntime() {
   const g = games.find((x) => x.id === $("game").value);
   const rt = runtimeId();
+  fillGoal();
   $("runname").placeholder = g?.next?.[rt] ?? "";
   if (!nameTouched) $("runname").value = "";
   if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
@@ -251,7 +263,7 @@ function refreshPlan() {
   }, 120);
 }
 for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
-  if (id === "ai") aiTouched = true; if (id === "game") fillGame(); else if (id === "playedby") fillPlayedBy(); else if (id === "ai") fillRuntime(); else refreshPlan(); });
+  if (id === "ai") aiTouched = true; if (id === "goal") goalTouched = true; if (id === "game") goalTouched = false; if (id === "game") fillGame(); else if (id === "playedby") fillPlayedBy(); else if (id === "ai") fillRuntime(); else refreshPlan(); });
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();

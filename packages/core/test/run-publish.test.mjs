@@ -65,7 +65,9 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   try {
     // configure first so stub-codes.json can be placed before the run
     const { configure } = await import("../src/configure.mjs");
-    await configure({ runtime: join(here, "stub-runtime.mjs"), game: join(root, "games", "portal", "plugin.mjs"), "run-dir": runDir, model: "stub-model" });
+    // This run is about the whole chain up to the credits, so it asks for that goal: a goal that is given stands,
+    // also for a runtime no model drives, whose goal would otherwise be the game's first end (chamber 01).
+    await configure({ runtime: join(here, "stub-runtime.mjs"), game: join(root, "games", "portal", "plugin.mjs"), "run-dir": runDir, model: "stub-model", goal: "credits" });
     writeFileSync(join(runDir, "stub-codes.json"), JSON.stringify([
       "return await portal.observe()",
       "const t = portal.tas(); t.hold(67, { forward: true }); const r = await t.run(); return r.ticks",

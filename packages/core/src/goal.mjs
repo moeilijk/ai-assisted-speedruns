@@ -29,12 +29,26 @@ export function defaultGoal(plugin) {
   return endsOf(plugin).find((e) => e.final).id;
 }
 
-/** `{ id, end }` for a requested goal (or the default), checked against the game's ends. */
-export function resolveGoal(plugin, goal) {
+/**
+ * The game's shortest end: the first one the plugin lists. This is what a run no model plays aims at (owner,
+ * 2026-09-19): a mock run is a test of the machine, and playing on to the game's own end proves nothing the first
+ * end did not, while it costs the whole game's running time.
+ */
+export function lowestGoal(plugin) {
+  return endsOf(plugin)[0].id;
+}
+
+/**
+ * `{ id, end }` for a requested goal, checked against the game's ends. Without one the goal follows who plays:
+ * the game's own end for a model, the game's first end for anything else. `ai` is the runtime plugin's own
+ * declaration, the same one that decides whether a bundle is a mock (SPEC §3).
+ */
+export function resolveGoal(plugin, goal, { ai = true } = {}) {
   const ends = endsOf(plugin);
-  const id = goal || defaultGoal(plugin);
+  const fallback = ai === true ? defaultGoal(plugin) : lowestGoal(plugin);
+  const id = goal || fallback;
   const end = ends.find((e) => e.id === id);
-  if (!end) throw new Error(`Unknown goal "${id}" for ${plugin.id}; its ends are ${ends.map((e) => e.id).join(", ")} (no goal = ${defaultGoal(plugin)}, the game's own end).`);
+  if (!end) throw new Error(`Unknown goal "${id}" for ${plugin.id}; its ends are ${ends.map((e) => e.id).join(", ")} (no goal = ${fallback}, ${ai === true ? "the game's own end" : "the game's first end, because no model plays this run"}).`);
   return { id, end };
 }
 

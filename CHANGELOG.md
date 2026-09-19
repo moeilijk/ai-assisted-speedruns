@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.24.0 — 2026-09-19
+
+- **A run no model plays aims at the game's first end** (owner, 2026-09-19: "voor een mock is het laagste doel
+  standaard. een run die het einde haalt is overkill voor een functionele test"). Without `--goal`, the goal now
+  follows who plays: the game's own end for a model, the game's first end for anything else. For Portal that is
+  chamber 01 instead of the credits, for Balatro ante 1 instead of the win, for Slay the Spire the Act 1 boss
+  instead of Act 3. The runtime plugin's own `ai` decides, the same declaration that decides whether a bundle is a
+  mock (SPEC §3). A goal that is given still stands, for either kind of run.
+- The GUI follows the same rule: choosing the mock run puts the goal on the game's first end and choosing an AI puts
+  it on the game's own end, until the goal is changed by hand; then that choice is kept as long as the game has it.
+- `npm run portal:scripted` — Portal's mock run had no script of its own next to `sts:scripted` and
+  `balatro:scripted`, so the only way to start it was the full command line.
+
 ## 0.23.0 — 2026-09-19
 
 - **A bundle is a mock unless it shows that a model played it** (owner, 2026-09-19: `mock: true` "klinkt als super

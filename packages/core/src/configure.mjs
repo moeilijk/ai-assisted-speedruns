@@ -42,8 +42,9 @@ export async function configure(opts) {
       : plugin.instructions;
   if (!instructions) throw new Error("No instructions: the game plugin has none; pass --instructions <file>.");
   const category = { game: plugin.id, build: "", goal: "", observation: "vision", input: "input", timing: "paused-think", human: "none", ...(plugin.category ?? {}) };
-  // The goal: one of the game's ends, checked against the plugin's list; no goal means the game's own end.
-  const goal = resolveGoal(plugin, opts.goal);
+  // The goal: one of the game's ends, checked against the plugin's list. Without one it follows who plays: the
+  // game's own end for a model, its first end for a run no model plays, which is a test and not an attempt.
+  const goal = resolveGoal(plugin, opts.goal, { ai: runtime.ai });
   category.goal = goal.id;
   if (opts.build) category.build = opts.build;
   // The first prompt names the run's own goal: a plugin may give it per end.

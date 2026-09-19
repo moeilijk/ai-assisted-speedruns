@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 import { writeEnv } from "./env-file.mjs";
 import { readSettings as readEnv } from "../settings.mjs";
 import { guiGames, onPath } from "./checks.mjs";
-import { loadRecorder } from "../plugins.mjs";
+import { loadRecorder, loadRuntime } from "../plugins.mjs";
 import { aasToolsDir, obsWebsocketConfig } from "./detect.mjs";
 import { toLocal, toWindows } from "./windows-paths.mjs";
 
@@ -94,7 +94,10 @@ export function createSession() {
     const run = String(opts.run || nextRunName(setup.folder, runtime.prefix)).trim();
     const runDir = output ? path.join(output, setup.folder, run) : `<output>/${setup.folder}/${run}`;
     const pub = output ? path.join(output, setup.folder, "public", run) : `<output>/${setup.folder}/public/${run}`;
-    const goal = opts.goal || g.plugin.ends.find((e) => e.final)?.id;
+    // Without a goal from the page: the game's own end for an AI run, its first end for a mock run, which is a
+    // test of the machine and not an attempt (owner, 2026-09-19). The runtime plugin says which of the two it is.
+    const runtimePlugin = await loadRuntime(runtime.id).catch(() => null);
+    const goal = opts.goal || (runtimePlugin?.ai === true ? g.plugin.ends.find((e) => e.final)?.id : g.plugin.ends[0]?.id);
     const livesplit = Boolean(env.AAS_LIVESPLIT_EXE) && fs.existsSync(toLocal(env.AAS_LIVESPLIT_EXE));
     const splits = setup.splits?.[goal];
     const npmScript = (file) => Object.entries(JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8")).scripts).find(([, cmd]) => cmd.endsWith(rel(file)))?.[0];

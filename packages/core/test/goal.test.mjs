@@ -12,7 +12,7 @@ import { resume } from "../src/resume.mjs";
 import { configure } from "../src/configure.mjs";
 import { goalHistory } from "../src/goal.mjs";
 import { computeTimeline } from "../src/timeline.mjs";
-import { resolveGoal, defaultGoal, goalReached, laterGoal } from "../src/goal.mjs";
+import { resolveGoal, defaultGoal, lowestGoal, goalReached, laterGoal } from "../src/goal.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 process.env.CODEX_HOME = process.env.CODEX_HOME ?? mkdtempSync(join(tmpdir(), "aas-codex-home-"));
@@ -22,6 +22,7 @@ const gameWithEnds = (dir) => {
   const game = join(dir, "game.mjs");
   writeFileSync(game, `import fake from ${JSON.stringify(join(here, "fake-game.mjs"))};
 export default { ...fake, instructions: "test",
+  goalPrompt: (end) => \`Play until you reach \${end.label}.\`,
   async saveState({ name }) { return { name }; }, async loadState() {},
   ends: [{ id: "half", label: "Halfway", split: "Half" }, { id: "end", label: "The end", split: "End", final: true }],
   async connect() { const g = await fake.connect(); return { ...g,
@@ -46,6 +47,29 @@ test("goal resolution: default is the final end, unknown goals are refused, a la
   assert.throws(() => defaultGoal({ id: "p", category: { goal: "credits" } }), /p declares no ends/, "every game declares its ends; there is no per-game fallback");
   assert.throws(() => defaultGoal({ id: "p", ends: [{ id: "a", final: true }] }), /needs a label/);
   assert.throws(() => defaultGoal({ id: "p", ends: [{ id: "a", label: "A" }, { id: "b", label: "B" }] }), /exactly one end is final/);
+});
+
+test("a run no model plays aims at the game's first end, not at the game's own end", () => {
+  // A mock run tests the machine. Playing on to the credits proves nothing the first end did not, and it costs the
+  // whole game's running time (owner, 2026-09-19). A goal that is given still stands, for either kind of run.
+  const plugin = { id: "g", ends: [{ id: "a", label: "A", split: "A" }, { id: "b", label: "B", split: "B", final: true }, { id: "c", label: "C", split: "C" }] };
+  assert.equal(lowestGoal(plugin), "a");
+  assert.equal(resolveGoal(plugin, "", { ai: false }).id, "a");
+  assert.equal(resolveGoal(plugin, "", { ai: null }).id, "a", "a runtime that does not say a model plays is not a model");
+  assert.equal(resolveGoal(plugin, "", { ai: true }).id, "b");
+  assert.equal(resolveGoal(plugin, "").id, "b", "without a runtime the game's own end stands, as before");
+  assert.equal(resolveGoal(plugin, "c", { ai: false }).id, "c", "a goal that was asked for is the goal");
+  assert.throws(() => resolveGoal(plugin, "x", { ai: false }), /no goal = a, the game's first end, because no model plays this run/);
+});
+
+test("the goal a mock run gets is the game's first end", async () => {
+  // The whole chain, through `aas configure`: the stub runtime declares ai: false, so the brief says "half".
+  const dir = mkdtempSync(join(tmpdir(), "aas-goal-mock-"));
+  const runDir = join(dir, "run");
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game: gameWithEnds(dir), "run-dir": runDir }, { log() {} });
+  const brief = JSON.parse(readFileSync(join(runDir, "brief.json"), "utf8"));
+  assert.equal(brief.category.goal, "half");
+  assert.equal(brief.goalPrompt, "Play until you reach Halfway.", "and the prompt names that goal, not the game's own end");
 });
 
 test("an earlier end as the goal: the harness declares the victory; a resume may extend the goal to the end", async () => {
