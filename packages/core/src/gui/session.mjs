@@ -7,7 +7,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { writeEnv } from "./env-file.mjs";
 import { readSettings as readEnv } from "../settings.mjs";
-import { guiGames, onPath } from "./checks.mjs";
+import { guiGames, onPath, shownScript } from "./checks.mjs";
 import { loadRecorder, loadRuntime } from "../plugins.mjs";
 import { aasToolsDir, obsWebsocketConfig } from "./detect.mjs";
 import { toLocal, toWindows } from "./windows-paths.mjs";
@@ -100,8 +100,6 @@ export function createSession() {
     const goal = opts.goal || (runtimePlugin?.ai === true ? g.plugin.ends.find((e) => e.final)?.id : g.plugin.ends[0]?.id);
     const livesplit = Boolean(env.AAS_LIVESPLIT_EXE) && fs.existsSync(toLocal(env.AAS_LIVESPLIT_EXE));
     const splits = setup.splits?.[goal];
-    const npmScript = (file) => Object.entries(JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8")).scripts).find(([, cmd]) => cmd.endsWith(rel(file)))?.[0];
-    const shownScript = (file) => (npmScript(file) ? `npm run ${npmScript(file)}` : `node ${rel(file)}`);
     const choices = await recorderOptions(setup);
     const recorderId = choices.some((r) => r.id === opts.recorder) ? opts.recorder : choices[0].id;
     const recorder = await loadRecorder(recorderId);

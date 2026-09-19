@@ -49,6 +49,7 @@ export default {
     folder: "Portal2",
     settings: [{ env: "AAS_PORTAL2_GAME_ROOT", label: "Portal 2 folder", kind: "dir", expect: "portal2.exe", find: { steam: 620 } }],
     install: join(here, "install-mod.mjs"),
+    installs: "Download SourceAutoRecord (pinned, sha256 checked) and write its config next to the game",
     launch: join(here, "launch-game.mjs"),
     recorders: ["obs"],
     displayEnv: "AAS_PORTAL2_WINDOW_POS",

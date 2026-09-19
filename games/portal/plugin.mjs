@@ -95,6 +95,8 @@ export default {
     folder: "Portal",
     settings: [{ env: "AAS_PORTAL_GAME_ROOT", label: "Source Unpack folder (Portal)", kind: "dir", expect: "hl2.exe" }],
     install: join(here, "install-game-files.mjs"),
+    // What that script does, in the words the Setup tab shows on its button: a person should know what they start.
+    installs: "Copy SourcePauseTool and portal-agent's configs into the Source Unpack folder",
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
     // The splits up to a chamber are the chambers before it (entering a chamber closes the previous one).

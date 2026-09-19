@@ -73,6 +73,7 @@ export default {
     folder: "Balatro",
     settings: [{ env: "AAS_BALATRO_GAME_ROOT", label: "Balatro folder", kind: "dir", expect: "Balatro.exe", find: { steam: 2379780, epic: "Balatro" } }],
     install: join(here, "install-mod.mjs"),
+    installs: "Install Lovely, Steamodded and balatrobot into the game's own mod folder for this harness",
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
     splits: { ...Object.fromEntries(SEGMENTS.slice(0, 7).map((_, i) => [`ante${i + 1}`, join(here, "splits", `balatro-ante${i + 1}.lss`)])), win: join(here, "splits", "balatro-win.lss") },

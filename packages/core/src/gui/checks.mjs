@@ -15,6 +15,16 @@ import { IS_WSL, ON_WINDOWS, powershell, toLocal, toWindows, windowsFolders } fr
 import { loadGamePlugin } from "../mcp-client.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
+const rel = (p) => path.relative(REPO, p) || p;
+
+/**
+ * A script of this repository as a person would run it: its npm script when it has one, else the node command.
+ * The GUI shows the command it is about to run everywhere, so a button never does something unnamed.
+ */
+export const shownScript = (file) => {
+  const name = Object.entries(JSON.parse(fs.readFileSync(path.join(REPO, "package.json"), "utf8")).scripts).find(([, cmd]) => cmd.endsWith(rel(file)))?.[0];
+  return name ? `npm run ${name}` : `node ${rel(file)}`;
+};
 const exists = (p) => { try { return Boolean(p) && fs.existsSync(p); } catch { return false; } };
 const version = (text) => String(text ?? "").match(/(\d+)\.(\d+)(?:\.(\d+))?/)?.slice(1).map((n) => Number(n ?? 0)) ?? null;
 const atLeast = (v, min) => { if (!v) return false; for (let i = 0; i < 3; i += 1) { if ((v[i] ?? 0) !== (min[i] ?? 0)) return (v[i] ?? 0) > (min[i] ?? 0); } return true; };
@@ -266,14 +276,22 @@ export async function checkItem(id) {
     const current = toLocal(env[st.env] ?? "");
     const found = st.find && ON_WINDOWS ? detect.findGame(st.find) : null;
     const extra = { suggest: found && found.path !== current ? toWindows(found.path) : null, suggestSource: found?.source ?? null };
-    const install = g.plugin.setup.install ? { id: `install:${g.plugin.id}`, label: "Install what the game needs" } : null;
-    if (!t("a folder is chosen", current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
-    if (!t("the folder exists", exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
-    if (st.expect && !t(`${st.expect} is in that folder`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
+    // The button says what it does and which command it runs. "Install" on its own can mean the game, the mod, the
+    // tooling or the harness; the plugin says which of them in one sentence (setup.installs) and the command is
+    // shown with it, the way the Run tab shows every command it would run.
+    const install = g.plugin.setup.install
+      ? { id: `install:${g.plugin.id}`, label: g.plugin.setup.installs ?? `Run this game's install script`, command: shownScript(g.plugin.setup.install) }
+      : null;
+    // Which folder: the setting's own name, so a condition can be read without the heading above it.
+    const folder = st.label ?? "the game folder";
+    if (!t(`${folder}: a folder is chosen`, current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
+    if (!t(`${folder}: that folder exists`, exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
+    if (st.expect && !t(`${st.expect} is in ${folder.toLowerCase().startsWith("the ") ? folder : `the ${folder}`}`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
     const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "game-doctor.mjs"), g.file], { encoding: "utf8", timeout: 60000, env: process.env });
     let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "its own checks answered", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
     for (const row of rows) t(row.what, row.ok, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: install });
-    return done({ ...extra, fix: tests.every((x) => x.ok) && install ? { ...install, label: "Install again" } : undefined });
+    // Everything passed, so the same action is offered again rather than needed: the sentence stays, "again" says why.
+    return done({ ...extra, fix: tests.every((x) => x.ok) && install ? { ...install, label: `${install.label} (again)` } : undefined });
   }
   t("the check is known", false, { detail: `Unknown check: ${id}` });
   return done();

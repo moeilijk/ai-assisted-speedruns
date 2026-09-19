@@ -362,7 +362,17 @@ function updateRow(item) {
   if (typed !== null) { const f = $(`v-${item.id}`); if (f) { f.value = typed; f.focus(); } }
   if (!setup.checked && item.status !== "pending" && item.status !== "unchecked") { setup.checked = true; $("recheck").textContent = "Check again"; $("checkinfo").textContent = ""; }
 }
-const STATUS = { ok: "Checked", warn: "Check", fail: "Problem", missing: "Not set", absent: "No plugin", unchecked: "Not checked", pending: "Checking…" };
+// Two of these are easy to read as each other and are not the same thing: "Not checked yet" means nothing has run
+// here, "Nothing chosen" means it has and the setting is empty. The words say which, so the colour does not have to.
+const STATUS = {
+  ok: "Checked",                 // every condition passed
+  warn: "Not ready",             // the check ran and something it needs is not there
+  fail: "Problem",               // the check ran and something is wrong
+  missing: "Nothing chosen",     // the check ran and this setting is empty
+  absent: "No plugin",           // this game has no plugin yet
+  unchecked: "Not checked yet",  // nothing has run here, so nothing is known either way
+  pending: "Checking…",
+};
 function row(i) {
   let field = "";
   if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? "folder" : i.expect ?? "file"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
@@ -371,11 +381,13 @@ function row(i) {
   else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${i.id}" data-autosave="${i.id}" ${i.value ? "checked" : ""}> on</label>`;
   else field = `<span class="path">${esc(i.value || "—")}</span>`;
   const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${i.id}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
+  // A button names what it does, and the command it runs stands under it: nothing here happens unnamed.
   const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
+  const fixCommand = i.fix?.command ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
     <div><div class="name">${esc(i.label)}</div>${i.status ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>` : ""}</div>
     <div class="field">${field}${fix}</div>
-    <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}</div>`;
+    <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}${fixCommand}</div>`;
 }
 // What a row really establishes: every condition it tried, with its outcome. Whatever is not in this list was not
 // established — so the list is complete, and naming a few unproved things next to it would suggest the rest is

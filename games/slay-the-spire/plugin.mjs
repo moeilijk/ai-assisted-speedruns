@@ -161,6 +161,7 @@ export default {
     folder: "SlayTheSpire",
     settings: [{ env: "AAS_STS_GAME_ROOT", label: "Slay the Spire folder", kind: "dir", expect: "SlayTheSpire.exe", find: { steam: 646570 } }],
     install: join(here, "install-mod.mjs"),
+    installs: "Install Communication Mod next to the game and point it at this harness's bridge",
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
     splits: { act1: join(here, "splits", "sts-act1.lss"), act3: join(here, "splits", "sts-act3.lss") },

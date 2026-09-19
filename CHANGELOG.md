@@ -12,6 +12,21 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.26.0 — 2026-09-19
+
+- **A button in the Setup tab says what it does** (owner, 2026-09-19: "install kan op teveel dingen slaan ... je
+  moet het me niet hier uitleggen maar in de gui"). It said "Install what the game needs", which could mean the
+  game, the mod, the tooling or the harness. A game plugin now carries `setup.installs`, one sentence naming what
+  its install script puts where, and that sentence is the button — "Copy SourcePauseTool and portal-agent's configs
+  into the Source Unpack folder", "Install Communication Mod next to the game and point it at this harness's
+  bridge". When everything already passes the same sentence ends in "(again)". Under the button stands the command
+  it runs (`npm run portal:install`), the way the Run tab shows every command before it runs it.
+- **A condition names which folder it is about.** "a folder is chosen" said nothing about which; the rows now carry
+  the setting's own name: "Source Unpack folder (Portal): a folder is chosen", "hl2.exe is in the Balatro folder".
+- **"Not checked yet" and "Nothing chosen" are two different things and no longer look alike.** A row that has not
+  run says nothing is known either way; a row that has run and found an empty setting says so. The other statuses
+  say what they mean too: `warn` is "Not ready" rather than "Check".
+
 ## 0.25.1 — 2026-09-19
 
 - **The Setup tab ran a game's checks without that game's settings** (owner, 2026-09-19). Since 0.22.0 a game's

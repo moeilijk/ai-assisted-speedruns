@@ -122,3 +122,18 @@ test("Portal's check covers the controller it runs on, not only the game's own f
   }
   assert.ok(plugin.doctor, "the plugin still has its checks");
 });
+
+test("a button in the Setup tab says what it does and which command it runs", async () => {
+  // "Install" on its own can mean the game, the mod, the tooling or the harness. Every game plugin that offers an
+  // install script says in one sentence what that script puts where, and the command is shown with the button.
+  const { shownScript, guiGames } = await import("../src/gui/checks.mjs");
+  const games = await guiGames();
+  assert.ok(games.length, "there are games with a plugin");
+  for (const g of games) {
+    if (!g.plugin.setup.install) continue;
+    const says = g.plugin.setup.installs;
+    assert.equal(typeof says, "string", `${g.plugin.id}: setup.installs is the sentence its button carries`);
+    assert.ok(says.length > 20 && !/^install$/i.test(says), `${g.plugin.id}: "${says}" does not say what it installs`);
+    assert.match(shownScript(g.plugin.setup.install), /^(npm run [a-z0-9:_-]+|node .+\.mjs)$/, g.plugin.id);
+  }
+});
