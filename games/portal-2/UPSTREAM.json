@@ -12,12 +12,14 @@
     "docs": {
       "protocol": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/tas_proto.txt",
       "script": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/p2tas.md",
-      "cvars": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/cvars.md"
+      "cvars": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/cvars.md",
+      "maps": "https://github.com/p2sr/SourceAutoRecord/blob/master/src/Games/Portal2.cpp"
     },
     "commands": {
       "load": "plugin_load sar",
       "server": "sar_tas_protocol_server 6555",
       "stop": "sar_tas_protocol_stop"
-    }
+    },
+    "commit": "ffc921e8281628de308f3b5613d4a58735f6b305"
   }
 }

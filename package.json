@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -35,7 +35,7 @@
     "packages/timer-livesplit"
   ],
   "scripts": {
-    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/core/src/gui/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/balatro/*.mjs; do node --check \"$f\" || exit 1; done",
+    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/core/src/gui/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/portal-2/*.mjs games/balatro/*.mjs games/slay-the-spire/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "AAS_WITNESS_URL=off node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
     "gui": "node packages/core/src/cli.mjs gui",
     "portal:fetch": "node games/portal/fetch-portal-agent.mjs",
@@ -50,6 +50,11 @@
     "obs:launch": "node --env-file-if-exists=.env packages/recorder-obs/launch-obs.mjs",
     "livesplit:launch": "node --env-file-if-exists=.env packages/timer-livesplit/launch-livesplit.mjs",
     "portal:audio": "node --env-file-if-exists=.env packages/core/src/windows/audio-route.mjs --process hl2.exe",
+    "portal2:install": "node games/portal-2/install-mod.mjs",
+    "portal2:launch": "node games/portal-2/launch-game.mjs",
+    "portal2:doctor": "node packages/core/src/cli.mjs doctor --game games/portal-2/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
+    "portal2:check": "node packages/core/src/cli.mjs check-connection --game games/portal-2/plugin.mjs",
+    "portal2:maps": "node games/portal-2/extract-maps.mjs",
     "sts:install": "node games/slay-the-spire/install-mod.mjs",
     "sts:launch": "node games/slay-the-spire/launch-game.mjs",
     "sts:stop": "node games/slay-the-spire/stop-all.mjs",

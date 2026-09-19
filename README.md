@@ -26,7 +26,8 @@ games/
   slay-the-spire/       Slay the Spire through Communication Mod
   portal/               Portal through the controller from portal-agent
   balatro/              Balatro through balatrobot
-  half-life-2/ slay-the-spire-2/ portal-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
+  portal-2/             Portal 2 through SourceAutoRecord's TAS protocol
+  half-life-2/ slay-the-spire-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
                         planned, not implemented; each README has the route, license and risks
 docs/                   install, command reference, plugins, design
 ```

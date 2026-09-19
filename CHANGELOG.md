@@ -12,6 +12,34 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.25.0 — 2026-09-19
+
+- **Portal 2 is a game plugin, not a stub** (owner, 2026-09-19: "maak eerst de portal 2 zoals afgesproken"). The
+  SAR client, the protocol and the installer were written on 2026-09-16 and then left behind a stub that refused
+  every run. `games/portal-2/plugin.mjs` now runs on them: inline `.p2tas` scripts, stepping a tick at a time,
+  pause, play, pause-at-tick, fast-forward, and the position, angles and velocity of any entity.
+- **The campaign comes from SourceAutoRecord's own table, not from anyone's memory.** `npm run portal2:maps`
+  (`extract-maps.mjs`) takes the 62 single-player maps in order, with the name the game gives each one, from
+  `src/Games/Portal2.cpp` at the commit now pinned in `UPSTREAM.json`; SAR carries that table because its own
+  speedrun timer needs it. `maps.json` records the commit it came from. Every map after the first is an end
+  (`sp_a1_intro2` "Portal Carousel" … `sp_a4_finale4` "Finale 4"), and the credits are the game's own end.
+- **What the protocol does not carry is answered by the engine, not by patching SAR.** `docs/tas_proto.txt` has no
+  screenshot message and names the map once, when the controller connects. So the launcher adds `-condebug` and
+  `maps.mjs` follows the level loads in the game's own `portal2/console.log` (forward only), and
+  `portal2.screenshot()` runs the engine's own screenshot command from a one-tick script and returns the file it
+  wrote.
+- Two things our own code claimed about the protocol were not what the protocol says, and both are corrected:
+  packet 10 is sent **when a script has finished playing**, not when it was accepted, so `tas()` returns at the end
+  of the script; and a pause or play request has no documented answer, so those calls report what was asked for and,
+  beside it, the last state the game itself sent — never a claim that the request landed.
+- `npm run portal2:install|launch|doctor|check|maps`. The syntax check (`npm run check`) covers `games/portal-2`
+  and `games/slay-the-spire`, which it never did.
+- The stub test names the eight games still waiting for a plugin instead of counting them, so finishing one is a
+  change that has to be written down.
+- Portal 2 is not installed on the machine this was written on: the ends, the map tracking, stepping, inline
+  scripts and entity info are proven against `test/fake-sar.mjs`, and the launcher, the engine's wording on a level
+  load and the screenshot command have not met the real game.
+
 ## 0.24.0 — 2026-09-19
 
 - **A run no model plays aims at the game's first end** (owner, 2026-09-19: "voor een mock is het laagste doel

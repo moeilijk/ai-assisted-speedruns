@@ -81,6 +81,8 @@ export async function connectSar({ host = process.env.AAS_PORTAL2_HOST || "127.0
       }
       return state.tick;
     },
+    // The protocol documents no answer to a state request: the game sends 3/4/5 when its own state changes, and
+    // `state.playback` is the last one it sent. These calls therefore say what was asked for, never what happened.
     async pauseAtTick(tick) { await send(6, { tick }); },
     async play() { await send(3); },
     async pause() { await send(4); },
@@ -89,9 +91,10 @@ export async function connectSar({ host = process.env.AAS_PORTAL2_HOST || "127.0
     async stop() { await send(1); },
     /** An inline .p2tas script, played without a file on disk; `start now` continues from the state the game is in. */
     async script(text, name = "aas") {
-      // The game answers with "processed script" (id 10), which is what says it parsed it; without waiting a caller
-      // cannot tell a script that was refused from one that was never read.
-      const answer = expect((p) => p.id === 10, "processed script");
+      // Packet 10 is "sent when protocol script finished playing" (docs/tas_proto.txt), so this call returns when
+      // the script has been played, not when it was accepted: a caller that awaits it has the run at the end of
+      // the script. A script that is never played never answers, and the deadline says so.
+      const answer = expect((p) => p.id === 10, "the script to finish playing");
       await send(10, { script1name: name, script1: text, script2name: "", script2: "" });
       const p = await answer;
       return { slot: p.slot, script: p.script };

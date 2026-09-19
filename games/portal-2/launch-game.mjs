@@ -42,7 +42,9 @@ if (await probe()) {
 console.log(`steam: ${await ensureSteam({ log: console.log })}`);
 const quiet = await beforeGameStart({ processName: "portal2.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
 // +snd_mute_losefocus 0: the Source engine mutes itself without focus, which would make the recording silent.
-const gameArgs = ["-novid", "-console", "-noborder", "-window", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0", "+exec", CONFIG_NAME];
+// -condebug: the engine writes portal2/console.log, which is where the plugin reads the map a run is in from
+// (games/portal-2/maps.mjs; SAR's TAS protocol names the map once and never again).
+const gameArgs = ["-novid", "-console", "-condebug", "-noborder", "-window", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0", "+exec", CONFIG_NAME];
 console.log(`starting ${exe} ${gameArgs.join(" ")}`);
 const child = spawn(exe, gameArgs, { cwd: root, detached: true, stdio: "ignore" });
 child.on("error", (e) => { throw new Error(`could not start portal2.exe: ${e.message}`); });
