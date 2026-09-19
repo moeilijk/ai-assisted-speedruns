@@ -2,12 +2,13 @@
 // the recorder, starts the runtime (the agent), forwards game events to the
 // recorder, stops the recorder and collects the recording.
 import fs from "node:fs";
+import { createHash } from "node:crypto";
 import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached } from "./goal.mjs";
 import path from "node:path";
 import { configure } from "./configure.mjs";
 import { createEventLog, followEvents } from "./events.mjs";
-import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
+import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, runtimeIdentity, toolingIdentity } from "./plugins.mjs";
 import { witnessSegment } from "./witness.mjs";
 import { formatDuration } from "./videos.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
@@ -96,10 +97,39 @@ export function writeRecordingSegment(runDir, segment, { recorder, timer }) {
   return info;
 }
 
-/** The archive witnesses the end of a segment: its end and its length, as recording.json has them. */
-export async function witnessEnd(events, { runUid, segment, tooling, recorded, log }) {
+const sha256 = (data) => createHash("sha256").update(data).digest("hex");
+/** The sha256 of a file in the run directory, null when it is not there (nothing is guessed). */
+export function fileDigest(runDir, name) {
+  const file = path.join(runDir, name);
+  return fs.existsSync(file) ? sha256(fs.readFileSync(file)) : null;
+}
+
+/** The run log as it stands: its sha256 and how many records are in it. */
+export function runLogState(runDir) {
+  const file = path.join(runDir, "run.jsonl");
+  if (!fs.existsSync(file)) return { logSha256: null, records: null };
+  const data = fs.readFileSync(file);
+  return { logSha256: sha256(data), records: data.toString("utf8").split("\n").filter((l) => l.trim()).length };
+}
+
+/**
+ * What a start statement says about the segment it is about to run (SPEC §8.9): the runtime with its own hash,
+ * the hash of the instructions the model gets, and the goal with the hash of the prompt that names it. The
+ * archive counter-signs these before the run, so none of them can be swapped for another afterwards.
+ */
+export function startFields({ runtime, runtimeId, runDir, brief, goal }) {
+  return {
+    runtime: runtimeIdentity(runtime, runtimeId),
+    instructionsSha256: fileDigest(runDir, "AGENTS.md"),
+    goal: goal ?? brief.category?.goal ?? null,
+    goalPromptSha256: brief.goalPrompt ? sha256(Buffer.from(brief.goalPrompt, "utf8")) : null,
+  };
+}
+
+/** The archive witnesses the end of a segment: its end, its length and the run log it produced. */
+export async function witnessEnd(events, { runUid, segment, tooling, recorded, runDir, log }) {
   const seconds = (Date.parse(recorded.ended_at) - Date.parse(recorded.t0)) / 1000;
-  const ended = await witnessSegment({ phase: "end", runUid, segment, tooling, endedAt: recorded.ended_at, seconds });
+  const ended = await witnessSegment({ phase: "end", runUid, segment, tooling, endedAt: recorded.ended_at, seconds, ...(runDir ? runLogState(runDir) : {}) });
   events.append(ended.event, ended.data);
   if (ended.event === "run.unwitnessed") log(`the end of this segment is not witnessed: ${ended.data.reason}`);
 }
@@ -168,7 +198,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   const goal = resolveGoal(plugin, brief.category?.goal);
   // The archive witnesses the start once the game is up, so a start that fails is never witnessed.
-  const started = await witnessSegment({ phase: "start", runUid: brief.run_uid, segment: 1, tooling, t0: t0.toISOString() });
+  const started = await witnessSegment({ phase: "start", runUid: brief.run_uid, segment: 1, tooling, t0: t0.toISOString(), ...startFields({ runtime, runtimeId: opts.runtime, runDir, brief, goal: goal.id }) });
   events.append(started.event, started.data);
   if (started.event === "run.unwitnessed") log(`the start of this segment is not witnessed: ${started.data.reason}`);
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
@@ -234,7 +264,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds });
-  await witnessEnd(events, { runUid: brief.run_uid, segment: 1, tooling, recorded: info.segments.at(-1), log });
+  await witnessEnd(events, { runUid: brief.run_uid, segment: 1, tooling, recorded: info.segments.at(-1), runDir, log });
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify(outcome, null, 2)}\n`);
   log(`run ${outcome.status}; ${files.length} recording file(s); ${formatDuration(info.wall_clock_seconds, { whole: true })} wall clock`);
   // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is

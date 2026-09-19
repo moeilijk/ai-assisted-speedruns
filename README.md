@@ -77,7 +77,9 @@ Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal]
 tokens. It tests everything an AI run needs — the agents that are installed reaching the game's tools, the game with
 its mods and bridge, OBS, LiveSplit, in-game time and milestones, the timeline and the bundle — except the model's own
 playing. Start it in the GUI (Run type: mock run) or from a shell; when it goes through, an AI run of the same game
-and goal starts on the same tools. Then do a first AI run:
+and goal starts on the same tools. Its bundle is a complete bundle and never an entry: an archive reads which runtime
+drove the run, what the timeline holds and what was witnessed before the run began, and publishes nothing a script
+played (SPEC §3). Then do a first AI run:
 
 ```bash
 aas doctor --game games/slay-the-spire/plugin.mjs --recorder obs --timer livesplit --runtime claude-code

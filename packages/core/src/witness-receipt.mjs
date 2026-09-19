@@ -4,7 +4,10 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { publicInfo, publicKeyFromLine } from "./sign.mjs";
 
-export const STATEMENT_KIND = "aas-witness v1";
+/** The statement this tooling writes. v2 adds what a start and an end are about (witness.mjs, SPEC §8.9). */
+export const STATEMENT_KIND = "aas-witness v2";
+/** Every statement kind a reader accepts: a bundle from before draft 0.40 carries v1, and stays valid. */
+export const STATEMENT_KINDS = Object.freeze(["aas-witness v1", "aas-witness v2"]);
 export const RECEIPT_KIND = "aas-witness-receipt v1";
 
 /** The archive's witness keys, as published at /.well-known/aas-witness.txt. A key in an answer is never trusted. */

@@ -17,6 +17,7 @@ import { CODE_SCHEMA, bindingLine, formatDuration, hasCode, videoCode } from "./
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
 const CALL_RE = /^call-\d{5,}$/;
+const HEX64 = /^[0-9a-f]{64}$/;
 const CATEGORY_VALUES = {
   observation: ["vision", "state", "full"],
   input: ["input", "api"],
@@ -211,8 +212,43 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
             const ai = summary.harness?.plugins?.runtime?.ai;
             if (typeof summary.mock !== "boolean") problems.push("schema 15 requires mock (true when no model played the run)");
             if (!(ai === true || ai === false || ai === null)) problems.push("schema 15 requires harness.plugins.runtime.ai (true, false or null)");
-            if (summary.mock === true && ai !== false) problems.push("mock is true, so harness.plugins.runtime.ai must be false");
-            if (summary.mock === false && ai === false) problems.push("harness.plugins.runtime.ai is false, so mock must be true");
+            if (summary.schema_version === 15) {
+              if (summary.mock === true && ai !== false) problems.push("mock is true, so harness.plugins.runtime.ai must be false");
+              if (summary.mock === false && ai === false) problems.push("harness.plugins.runtime.ai is false, so mock must be true");
+            } else {
+              // Schema 16 turns it around (SPEC §3): only a runtime that says a model plays makes a bundle
+              // something other than a mock, so a runtime whose `ai` is unknown is a mock as well. What a reader
+              // goes on is not this word: it is the runtime's own hash, the evidence below, and the witnessed
+              // start, which said the same before the run had begun.
+              if (typeof summary.mock === "boolean" && summary.mock !== (ai !== true)) problems.push(`mock is ${summary.mock} while harness.plugins.runtime.ai is ${ai}: since schema 16 a bundle is a mock unless its runtime says a model plays`);
+              const sha = summary.harness?.plugins?.runtime?.sha256;
+              if (!(sha === null || HEX64.test(String(sha)))) problems.push("schema 16 requires harness.plugins.runtime.sha256 (the runtime plugin as it ran) or null");
+              const ev = summary.ai_evidence;
+              if (!ev || typeof ev !== "object") problems.push("schema 16 requires ai_evidence");
+              else for (const k of ["assistant_records", "tool_calls", "output_tokens", "models", "human_turns"]) {
+                if (!(k in ev) || !(ev[k] === null || (Number.isInteger(ev[k]) && ev[k] >= 0))) problems.push(`ai_evidence.${k} must be a non-negative integer or null`);
+              }
+              // The prompt as it was fixed before the run: both hashes are recomputable from this bundle.
+              const b = summary.brief;
+              if (!b || typeof b !== "object") problems.push("schema 16 requires a brief block { instructions_sha256, goal_prompt_sha256 }");
+              else {
+                for (const k of ["instructions_sha256", "goal_prompt_sha256"]) {
+                  if (!(k in b) || !(b[k] === null || HEX64.test(String(b[k])))) problems.push(`brief.${k} must be a sha256 or null`);
+                }
+                if (b.instructions_sha256 && exists("AGENTS.md")) {
+                  const own = createHash("sha256").update(fs.readFileSync(file("AGENTS.md"))).digest("hex");
+                  if (own !== b.instructions_sha256) problems.push("brief.instructions_sha256 is not the sha256 of the published AGENTS.md");
+                }
+                const prompt = summary.category?.goal_prompt ?? null;
+                if (!(prompt === null || typeof prompt === "string")) problems.push("category.goal_prompt must be the prompt verbatim, or null");
+                const own = prompt === null ? null : createHash("sha256").update(Buffer.from(prompt, "utf8")).digest("hex");
+                if (own !== (b.goal_prompt_sha256 ?? null)) problems.push("brief.goal_prompt_sha256 is not the sha256 of category.goal_prompt");
+              }
+              // A message typed into a running session is help, whatever it said (SPEC §8.3).
+              if (Number.isInteger(ev?.human_turns) && ev.human_turns > 0 && summary.category?.human !== "assisted") {
+                problems.push(`${ev.human_turns} message(s) to the agent beyond the goal prompt of each segment, so category.human must be assisted`);
+              }
+            }
           }
         }
         if (summary.schema_version >= 8) {
@@ -318,6 +354,74 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
     else if (!segments) add("witnessed", "unmet", "no run.started in the timeline");
     else if (missing.length) add("witnessed", "unmet", `the archive did not witness segment ${missing.join(", ")}${why.length ? ` (${why.join("; ")})` : " (made before the witness existed)"}`);
     else add("witnessed", "met", `${segments} segment(s), start and end, receipts by ${[...keys].join(", ")}`);
+  }
+  // What was fixed before the run, and by whom (SPEC §8.10). The start statement of every segment names the
+  // runtime with its own hash and the hashes of the instructions and the goal prompt, and the archive signed it
+  // before a tick was played. A bundle whose prompt or runtime differs from what was witnessed is a bundle that
+  // was changed afterwards; one that matches has published exactly what the model was told.
+  {
+    let summary = null;
+    try { summary = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")); } catch { /* reported above */ }
+    const starts = records.filter((r) => r?.kind === "event" && r.event === "run.witnessed" && r.data?.phase === "start" && verifyReceipt(r.data).valid);
+    const field = (statement, name) => String(statement).split("\n").find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2) ?? null;
+    const witnessed = starts.map((r) => ({
+      segment: r.data.segment,
+      runtime: field(r.data.statement, "runtime"),
+      instructions: field(r.data.statement, "instructions"),
+      goal: field(r.data.statement, "goal"),
+    })).filter((w) => w.runtime || w.instructions || w.goal);
+    if (!summary || summary.schema_version < 16) { /* a bundle from before draft 0.40: its statements say nothing about this */ }
+    else if (!witnessed.length) add("prompt witnessed", "unmet", starts.length ? "the witnessed starts are aas-witness v1: they name no runtime and no prompt (made before draft 0.40)" : "no witnessed start: nothing fixed what this run was told before it ran");
+    else {
+      const rt = summary.harness?.plugins?.runtime ?? {};
+      const expected = `${rt.id ?? "-"} ${rt.version ?? "-"} ${rt.ai === true ? "ai" : rt.ai === false ? "no-ai" : "ai-unknown"} ${rt.sha256 ?? "-"}`;
+      const bad = [];
+      for (const w of witnessed) {
+        if (w.runtime && w.runtime !== expected) bad.push(`segment ${w.segment} ran under "${w.runtime}", the bundle says "${expected}"`);
+        if (w.instructions && w.instructions !== "-" && w.instructions !== summary.brief?.instructions_sha256) bad.push(`segment ${w.segment} was witnessed with other instructions than the published AGENTS.md`);
+        const [goalId, promptSha] = String(w.goal ?? "").split(" ");
+        if (goalId && goalId !== "-" && promptSha && promptSha !== "-" && promptSha !== summary.brief?.goal_prompt_sha256) bad.push(`segment ${w.segment} was witnessed with another goal prompt than the published one`);
+      }
+      if (bad.length) add("prompt witnessed", "invalid", bad.join("; "));
+      else add("prompt witnessed", "met", `${witnessed.length} segment(s): the runtime and the prompt were signed by the archive before the run`);
+    }
+  }
+  // Did a model play this run (SPEC §3)? `mock` is one word in a file the publisher signs themselves, so it is
+  // not what this answers on: the runtime's own hash, what the timeline actually holds, and the start the archive
+  // witnessed. A bundle that shows none of it is read as a mock, which is the safe way round: a mock that is read
+  // as a run is the forgery worth making, a run that is read as a mock costs a republication.
+  {
+    let summary = null;
+    try { summary = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")); } catch { /* reported above */ }
+    if (summary && summary.schema_version >= 16) {
+      const rt = summary.harness?.plugins?.runtime ?? {};
+      const ev = summary.ai_evidence ?? {};
+      const why = [];
+      if (rt.ai !== true) why.push(`the runtime ${rt.id ?? "(none)"} does not say a model plays (ai: ${rt.ai})`);
+      if (!rt.sha256) why.push("the runtime plugin has no sha256, so an archive cannot tell which runtime this was");
+      if (!(ev.assistant_records > 0)) why.push("the timeline holds no message from a model");
+      if (!(ev.output_tokens > 0)) why.push("no output tokens were reported");
+      if (!(ev.models > 0)) why.push("no model answered");
+      if (summary.mock === true) add("a model played", "unmet", `mock: ${why.join("; ") || "the bundle says so"}`);
+      else if (why.length) add("a model played", "invalid", `mock is false, but ${why.join("; ")}`);
+      else add("a model played", "met", `${ev.assistant_records} message(s) from ${ev.models} model(s), ${ev.tool_calls} tool call(s), ${ev.output_tokens} output tokens, runtime ${rt.id} ${rt.sha256.slice(0, 12)}`);
+    }
+  }
+  // Every input came from a tool call (SPEC §8.11). Game time advances only inside a playback, and a playback the
+  // agent did not ask for was played by something else: a second hand on the controls, or a timeline assembled
+  // from parts. The timeline answers this on its own, so a reader checks it without the run directory.
+  {
+    const stray = [];
+    let openCall = null;
+    for (const r of records) {
+      if (r?.kind === "tool_call") openCall = r.call ?? true;
+      else if (r?.kind === "tool_result") openCall = null;
+      else if (r?.kind === "event" && r.event === "game.playback" && r.data?.phase === "start" && !openCall) stray.push(r.sequence);
+    }
+    const playbacks = records.filter((r) => r?.kind === "event" && r.event === "game.playback" && r.data?.phase === "start").length;
+    if (!playbacks) add("input from tool calls", "met", "no playback on the timeline: this game's input is not played in intervals");
+    else if (stray.length) add("input from tool calls", "invalid", `${stray.length} playback(s) outside any tool call (record ${stray.slice(0, 5).join(", ")}${stray.length > 5 ? ", …" : ""}): input the agent did not ask for`);
+    else add("input from tool calls", "met", `${playbacks} playback(s), each inside the tool call that asked for it`);
   }
   // Reproduction: the game's build and the mods that were loaded, from the game plugin.
   try {

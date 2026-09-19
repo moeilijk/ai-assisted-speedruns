@@ -10,7 +10,7 @@ import { readKey } from "./sign.mjs";
 import { STATEMENT_KIND, trustedWitnessKeys, verifyReceipt } from "./witness-receipt.mjs";
 import { resolveSignKey } from "./publish.mjs";
 
-export { RECEIPT_KIND, STATEMENT_KIND, WITNESS_KEYS, parseWitnessKeys, trustedWitnessKeys, verifyReceipt } from "./witness-receipt.mjs";
+export { RECEIPT_KIND, STATEMENT_KIND, STATEMENT_KINDS, WITNESS_KEYS, parseWitnessKeys, trustedWitnessKeys, verifyReceipt } from "./witness-receipt.mjs";
 
 /** Where statements go: AAS_WITNESS_URL, `off` for none (the test suite), else the archive's own witness. */
 export function witnessUrl() {
@@ -22,8 +22,23 @@ export function witnessUrl() {
 /** "<version> <commit> <clean|modified>", with `-` for no commit (not a git clone) and `unknown` when unreadable. */
 export const toolingField = (t) => `${t.version} ${t.commit ?? "-"} ${t.modified === null || t.modified === undefined ? "unknown" : t.modified ? "modified" : "clean"}`;
 
-/** The signed statement for one phase of one segment. */
-export function makeStatement({ phase, runUid, segment, tooling, at = new Date().toISOString(), t0, endedAt, seconds }, keyFile) {
+/** "<id> <version> <ai|no-ai|ai-unknown> <sha256 of the plugin>", `-` for anything this machine cannot say. */
+export const runtimeField = (r) => `${r?.id ?? "-"} ${r?.version ?? "-"} ${r?.ai === true ? "ai" : r?.ai === false ? "no-ai" : "ai-unknown"} ${r?.sha256 ?? "-"}`;
+
+/**
+ * The signed statement for one phase of one segment.
+ *
+ * A start says what the segment is about to run under: the runtime with its own hash (what drove the run is then
+ * not the publisher's word afterwards), the hash of the instructions the model is given, and the goal with the
+ * hash of the prompt that names it. All three are fixed before a tick is played, and the archive counter-signs
+ * them, so a run whose route was dictated in its prompt publishes that prompt or nothing.
+ *
+ * An end says what the segment produced: the run log's hash and its number of records at that moment. A reader
+ * cannot recompute it (the run log is private, SPEC §4) and it is not meant to be recomputed: it fixes the log at
+ * a time on the archive's clock, so what is published later either derives from that log or from one that never
+ * existed when the archive was looking.
+ */
+export function makeStatement({ phase, runUid, segment, tooling, at = new Date().toISOString(), t0, endedAt, seconds, runtime, instructionsSha256, goal, goalPromptSha256, logSha256, records }, keyFile) {
   const { privateKey, publicLine } = readKey(keyFile);
   const lines = [
     STATEMENT_KIND,
@@ -32,7 +47,9 @@ export function makeStatement({ phase, runUid, segment, tooling, at = new Date()
     `segment: ${segment}`,
     `tooling: ${toolingField(tooling)}`,
     `at: ${at}`,
-    ...(phase === "start" ? [`t0: ${t0}`] : [`ended_at: ${endedAt}`, `seconds: ${seconds}`]),
+    ...(phase === "start"
+      ? [`t0: ${t0}`, `runtime: ${runtimeField(runtime)}`, `instructions: ${instructionsSha256 ?? "-"}`, `goal: ${goal ?? "-"} ${goalPromptSha256 ?? "-"}`]
+      : [`ended_at: ${endedAt}`, `seconds: ${seconds}`, `log: ${logSha256 ?? "-"} ${Number.isInteger(records) ? records : "-"}`]),
     `key: ${publicLine}`,
   ];
   const body = lines.join("\n");

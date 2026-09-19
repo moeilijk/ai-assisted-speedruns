@@ -5,7 +5,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import { join } from "node:path";
 import { publicInfo, publicKeyFromLine } from "../src/sign.mjs";
-import { RECEIPT_KIND } from "../src/witness-receipt.mjs";
+import { RECEIPT_KIND, STATEMENT_KINDS } from "../src/witness-receipt.mjs";
 
 export async function startFakeWitness(dir, { registered = [] } = {}) {
   const { privateKey, publicKey } = crypto.generateKeyPairSync("ed25519");
@@ -29,7 +29,8 @@ export async function startFakeWitness(dir, { registered = [] } = {}) {
       const signed = lines.slice(0, -1).join("\n");
       let ok = false;
       try { ok = crypto.verify(null, Buffer.from(signed), publicKeyFromLine(value("key")), Buffer.from(value("signature") ?? "", "base64")); } catch { /* not valid */ }
-      if (lines[0] !== "aas-witness v1" || !lines.at(-1).startsWith("signature: ")) return reply(400, { error: "not a statement" });
+      // Every kind the standard has had: a witness that only knows the newest one refuses the runs still on the older tooling.
+      if (!STATEMENT_KINDS.includes(lines[0]) || !lines.at(-1).startsWith("signature: ")) return reply(400, { error: "not a statement" });
       if (!ok) return reply(401, { error: "the signature does not verify" });
       const id = `${value("run_uid")} ${value("segment")} ${value("phase")}`;
       if (done.has(id)) return reply(409, { error: "already witnessed" });

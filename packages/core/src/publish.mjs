@@ -18,7 +18,7 @@ import { zipBuffer } from "./zip.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
-import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin } from "./plugins.mjs";
+import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin, runtimeIdentity } from "./plugins.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
 import { CODE_SCHEMA, bindingLine, recordingVideos } from "./videos.mjs";
@@ -31,12 +31,19 @@ const copyTree = (src, dst) => {
   return true;
 };
 
+/** The published timeline as it stands in the bundle: the same file a reader of the bundle has. */
+const readPublishedTimeline = (outDir) => {
+  const f = path.join(outDir, "session.sanitized.jsonl");
+  if (!fs.existsSync(f)) return [];
+  return fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+};
+
 const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if (!fs.existsSync(f)) return []; return fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r && r.kind === "event"); };
 
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.39";
+export const SPEC_VERSION = "0.40";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -152,9 +159,12 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // `revision` counts republications of the same run: a database keyed on (run_id, revision) can tell an
   // update of a run it already holds from a new run, and `published_at` orders them.
   summary.schema_version = SUMMARY_SCHEMA;
-  // A run no model played is a mock: the harness's own test of a machine. It is said here, in one word, so an
-  // archive does not have to know which runtimes drive a model, and it is never an entry (SPEC §3).
-  summary.mock = rt?.ai === false;
+  // A run no model played is a mock: the harness's own test of a machine, never an entry (SPEC §3). Since draft
+  // 0.40 it is the other way round: only a runtime that says a model plays makes a bundle not a mock, so a
+  // runtime this tooling cannot read (`ai` null) is a mock too. Nothing about a run is easier to change than one
+  // word in a file the publisher signs themselves, so the word is not what an archive goes on: `ai_evidence` and
+  // the runtime's own hash below are, and the witnessed start says the same before the run began.
+  summary.mock = rt?.ai !== true;
   summary.spec_version = SPEC_VERSION;
   summary.run_id = path.basename(outDir);
   // A name can change: a run directory is renamed, a bundle is published under the naming convention that came
@@ -235,11 +245,41 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     framework: `ai-assisted-speedruns ${FRAMEWORK_VERSION}`,
     plugins: {
       game: { id: brief.game?.id ?? brief.category.game ?? null, version: brief.game?.version ?? null },
-      // version is the runtime plugin's; cli_versions are the versions of the runtime's own CLI its session log records.
-      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, ai: rt?.ai ?? null, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
+      // version is the runtime plugin's; cli_versions are the versions of the runtime's own CLI its session log
+      // records; sha256 is the plugin as it ran, so an archive reads which runtime drove the run instead of
+      // believing a name and an `ai` the plugin declares about itself (SPEC §3).
+      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, ai: rt?.ai ?? null, sha256: runtimeIdentity(rt, brief.runtimeModule ?? brief.runtime).sha256, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
       recorder: { id: recording?.recorder ?? null, version: recording?.recorder_version ?? null },
       timer: { id: recording?.timer?.id ?? null, version: recording?.timer?.version ?? null },
     },
+  };
+  // What in this bundle shows that a model played it, all of it countable from the published timeline itself, so
+  // a reader checks the run instead of the word `mock` (SPEC §3). `human_turns` is the other side of the same
+  // question: the harness sends one prompt per segment, and every further message from a user is someone typing.
+  const published = readPublishedTimeline(outDir);
+  const segmentsStarted = published.filter((r) => r.kind === "event" && r.event === "run.started").length;
+  const userMessages = published.filter((r) => r.kind === "message" && r.role === "user").length;
+  const humanTurns = Math.max(0, userMessages - Math.max(segmentsStarted, 1));
+  summary.ai_evidence = {
+    assistant_records: published.filter((r) => r.kind === "message" && r.role === "assistant").length,
+    tool_calls: published.filter((r) => r.kind === "tool_call").length,
+    output_tokens: summary.last_reported_thread_token_usage?.output_tokens ?? null,
+    models: summary.models.length,
+    human_turns: humanTurns,
+  };
+  // A message typed into a running session is not "only resumed": it is help, whatever it said, so the axis is
+  // `assisted` and the count says how often. A resume is a run.human record and stays restart-only (above).
+  if (humanTurns > 0 && summary.category.human !== "assisted") {
+    summary.category.human = "assisted";
+    summary.category.human_notes = [summary.category.human_notes, `${humanTurns} message(s) to the agent beyond the goal prompt of each segment`].filter(Boolean).join("; ");
+  }
+  // The prompt, fixed before the run. AGENTS.md is in the bundle verbatim and the goal prompt is here verbatim, so
+  // a reader recomputes both hashes; the witnessed start of segment 1 carries the same two, signed by the archive
+  // before a tick was played. A run that was told its route therefore publishes that route.
+  summary.category.goal_prompt = brief.goalPrompt ?? null;
+  summary.brief = {
+    instructions_sha256: fs.existsSync(path.join(outDir, "AGENTS.md")) ? createHash("sha256").update(fs.readFileSync(path.join(outDir, "AGENTS.md"))).digest("hex") : null,
+    goal_prompt_sha256: brief.goalPrompt ? createHash("sha256").update(Buffer.from(brief.goalPrompt, "utf8")).digest("hex") : null,
   };
   // What the run asked for, next to what the API answered with (summary.models, one entry per model seen in the
   // session log). A silent fallback to another model is then visible in the bundle itself; `aas check` reports it.

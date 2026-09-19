@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import net from "node:net";
-import { generateKeyPairSync } from "node:crypto";
+import { createHash, generateKeyPairSync } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
@@ -107,8 +107,10 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
     assert.equal(witness.statements.length, 4);
     const stops = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"recording.stopped"'));
     assert.equal(stops.length, 2, "each segment's recording is logged as stopped, the resumed one too");
-    assert.match(witness.statements[0], /^aas-witness v1\nphase: start\nrun_uid: [0-9a-f]{32}\nsegment: 1\ntooling: \d+\.\d+\.\d+ [0-9a-f]{40} (clean|modified)\nat: .+\nt0: .+\nkey: ssh-ed25519 \S+\nsignature: \S+$/);
-    assert.match(witness.statements[1], /\nphase: end\n[\s\S]*\nended_at: .+\nseconds: \d+(\.\d+)?\n/);
+    // A start fixes what the segment runs under, before a tick is played: the runtime with its own hash, the
+    // instructions and the goal prompt. An end fixes what it produced: the run log and its number of records.
+    assert.match(witness.statements[0], /^aas-witness v2\nphase: start\nrun_uid: [0-9a-f]{32}\nsegment: 1\ntooling: \d+\.\d+\.\d+ [0-9a-f]{40} (clean|modified)\nat: .+\nt0: .+\nruntime: \S+ \S+ (ai|no-ai|ai-unknown) [0-9a-f]{64}\ninstructions: [0-9a-f]{64}\ngoal: \S+ [0-9a-f]{64}\nkey: ssh-ed25519 \S+\nsignature: \S+$/);
+    assert.match(witness.statements[1], /\nphase: end\n[\s\S]*\nended_at: .+\nseconds: \d+(\.\d+)?\nlog: [0-9a-f]{64} \d+\n/);
     assert.ok(spt.seen.some((m) => m.type === "cmd" && /^load aas_/.test(m.cmd)), "load sent");
   } finally {
     delete process.env.AAS_PORTAL_GAME_ROOT;
@@ -155,14 +157,29 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.equal(witnessCheck.status, "met", witnessCheck.detail);
   assert.match(witnessCheck.detail, new RegExp(`2 segment\\(s\\), start and end, receipts by ${witness.fingerprint.replace(/[+/]/g, "\\$&")}`));
   assert.deepEqual(p.scan.findings, [], JSON.stringify(p.scan.findings));
-  assert.ok(p.check.results.every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met")));
+  // A script played this run, so "a model played" is the one requirement it does not meet, and that is the point
+  // of it (SPEC §3): a mock is a complete, witnessed, signed bundle that an archive still refuses as an entry.
+  const played = p.check.results.find((r) => r.requirement === "a model played");
+  assert.equal(played.status, "unmet");
+  assert.match(played.detail, /^mock: the runtime stub does not say a model plays/);
+  assert.ok(p.check.results.filter((r) => r.requirement !== "a model played").every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met" && r.requirement !== "a model played")));
+  // What was fixed before the run, and published after it: the runtime with its own hash and both prompt hashes,
+  // each recomputable from this bundle and each signed by the archive before a tick was played (SPEC §8.10).
+  const promptWitnessed = p.check.results.find((r) => r.requirement === "prompt witnessed");
+  assert.equal(promptWitnessed.status, "met", promptWitnessed.detail);
+  assert.match(p.check.results.find((r) => r.requirement === "input from tool calls").detail, /playback\(s\), each inside the tool call that asked for it/);
+  assert.match(p.summary.harness.plugins.runtime.sha256, /^[0-9a-f]{64}$/, "which runtime drove this run, as a number an archive can place");
+  assert.equal(p.summary.brief.instructions_sha256, createHash("sha256").update(readFileSync(join(outDir, "AGENTS.md"))).digest("hex"));
+  assert.equal(p.summary.brief.goal_prompt_sha256, p.summary.category.goal_prompt === null ? null : createHash("sha256").update(Buffer.from(p.summary.category.goal_prompt, "utf8")).digest("hex"));
+  assert.equal(p.summary.ai_evidence.human_turns, 0, "nobody typed into this session");
+  assert.equal(p.summary.category.human, "restart-only", "it was resumed once, and nothing else was given to it");
   // Without the test witness's key the receipts are not the archive's: the check says so.
   for (const [k, v] of Object.entries(savedEnv)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   const { checkRun } = await import("../src/check-run.mjs");
   const strange = checkRun(outDir).results.find((r) => r.requirement === "witnessed");
   assert.equal(strange.status, "invalid");
   assert.match(strange.detail, /not signed by a witness key of the archive/);
-  assert.equal(p.summary.schema_version, 15);
+  assert.equal(p.summary.schema_version, 16);
   // This run is played by the stub runtime, which is not a model: the bundle says so in one word, and its runtime
   // agrees. An archive refuses such a bundle as an entry (SPEC §3).
   assert.equal(p.summary.mock, true, "a run no model played is marked as a mock");

@@ -13,7 +13,8 @@ const dir = mkdtempSync(join(tmpdir(), "aas-witness-"));
 const keyFile = join(dir, "publisher.pem");
 writeFileSync(keyFile, crypto.generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
 const tooling = { version: "0.14.0", commit: "a".repeat(40), modified: false };
-const start = { phase: "start", runUid: "0123456789abcdef0123456789abcdef", segment: 1, tooling, t0: "2026-09-16T20:00:00.000Z" };
+const runtime = { id: "claude-code", version: "0.1.0", ai: true, sha256: "b".repeat(64) };
+const start = { phase: "start", runUid: "0123456789abcdef0123456789abcdef", segment: 1, tooling, t0: "2026-09-16T20:00:00.000Z", runtime, instructionsSha256: "c".repeat(64), goal: "chamber01", goalPromptSha256: "d".repeat(64) };
 
 test("the tooling field names version, commit and state, also outside a clone", () => {
   assert.equal(toolingField(tooling), `0.14.0 ${"a".repeat(40)} clean`);
@@ -57,12 +58,21 @@ test("without a witness, a key or a network the run goes on unwitnessed", async 
 test("a statement is signed text in a fixed order", () => {
   const text = makeStatement({ ...start, at: "2026-09-16T20:00:01.000Z" }, keyFile);
   const lines = text.split("\n");
-  assert.deepEqual(lines.slice(0, 7), ["aas-witness v1", "phase: start", `run_uid: ${start.runUid}`, "segment: 1", `tooling: 0.14.0 ${"a".repeat(40)} clean`, "at: 2026-09-16T20:00:01.000Z", "t0: 2026-09-16T20:00:00.000Z"]);
-  assert.match(lines[7], /^key: ssh-ed25519 /);
-  assert.match(lines[8], /^signature: /);
-  assert.equal(lines.length, 9);
-  const end = makeStatement({ ...start, phase: "end", endedAt: "2026-09-16T20:05:00.000Z", seconds: 300.5 }, keyFile).split("\n");
-  assert.deepEqual(end.slice(6, 8), ["ended_at: 2026-09-16T20:05:00.000Z", "seconds: 300.5"]);
+  assert.deepEqual(lines.slice(0, 7), ["aas-witness v2", "phase: start", `run_uid: ${start.runUid}`, "segment: 1", `tooling: 0.14.0 ${"a".repeat(40)} clean`, "at: 2026-09-16T20:00:01.000Z", "t0: 2026-09-16T20:00:00.000Z"]);
+  // The start fixes what the run is about to be driven by and what it is about to be told (SPEC §8.9).
+  assert.deepEqual(lines.slice(7, 10), [`runtime: claude-code 0.1.0 ai ${"b".repeat(64)}`, `instructions: ${"c".repeat(64)}`, `goal: chamber01 ${"d".repeat(64)}`]);
+  assert.match(lines[10], /^key: ssh-ed25519 /);
+  assert.match(lines[11], /^signature: /);
+  assert.equal(lines.length, 12);
+  const end = makeStatement({ ...start, phase: "end", endedAt: "2026-09-16T20:05:00.000Z", seconds: 300.5, logSha256: "e".repeat(64), records: 412 }, keyFile).split("\n");
+  assert.deepEqual(end.slice(6, 9), ["ended_at: 2026-09-16T20:05:00.000Z", "seconds: 300.5", `log: ${"e".repeat(64)} 412`]);
+});
+
+test("a field this machine cannot fill is a dash, never a guess", () => {
+  const lines = makeStatement({ ...start, runtime: null, instructionsSha256: null, goal: null, goalPromptSha256: null }, keyFile).split("\n");
+  assert.deepEqual(lines.slice(7, 10), ["runtime: - - ai-unknown -", "instructions: -", "goal: - -"]);
+  const end = makeStatement({ ...start, phase: "end", endedAt: "2026-09-16T20:05:00.000Z", seconds: 1 }, keyFile).split("\n");
+  assert.equal(end[8], "log: - -");
 });
 
 test("doctor says whether the witness knows the publisher key", async () => {

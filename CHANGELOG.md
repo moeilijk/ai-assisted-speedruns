@@ -12,6 +12,39 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.23.0 — 2026-09-19
+
+- **A bundle is a mock unless it shows that a model played it** (owner, 2026-09-19: `mock: true` "klinkt als super
+  makkelijk te vervalsen"). It was: `mock` is one word in a file the publisher signs with their own key, and until
+  now a bundle without it was read as a run of an AI. SPEC draft 0.40 turns it around. Whether a model plays is a
+  property of the runtime, not of the run, so a bundle now names its runtime with `sha256`, the plugin as it ran
+  (`pluginDigest`: every `.mjs`, `.json` and `.md` of the package, `test/` left out), and an archive reads its own
+  list of runtimes instead of the `ai` a plugin declares about itself. A runtime it cannot place is a mock.
+  `aas publish` writes `mock: true` unless the runtime says a model plays, where it used to write `false` for every
+  runtime whose `ai` was unknown.
+- **What a model leaves behind is counted, and a reader recounts it.** Schema 16 adds `ai_evidence`: the model's
+  messages, its tool calls, how many models answered and their output tokens, all countable from
+  `session.sanitized.jsonl` itself. `aas check` reports "a model played" met, unmet or invalid from the runtime, that
+  evidence and the witnessed start together — a bundle that claims `mock: false` with none of it is invalid, not
+  merely unmet.
+- **The prompt is fixed before the run and published after it** (§8.10). Nothing stops a publisher from running the
+  model for real and dictating its play, and no flag can. What the tooling does instead: `AGENTS.md` was already in
+  the bundle verbatim, and `category.goal_prompt` now holds the first prompt verbatim next to it; `brief` carries the
+  sha256 of both, recomputable from the bundle; and the witnessed start of every segment carries the same two hashes,
+  counter-signed by the archive before the recording ran. Writing the route into the prompt therefore means
+  publishing that route, and it cannot be swapped for an innocent prompt afterwards.
+- The witness statement is `aas-witness v2` (§8.9): a start adds `runtime:`, `instructions:` and `goal:`, an end adds
+  `log:` (the run log's sha256 and its number of records, which fixes what the segment produced on the archive's
+  clock). A field this machine cannot fill is `-`, never a guess. `aas-witness v1` statements in existing bundles
+  stay valid and are still verified; the archive's witness accepts both kinds.
+- **A message typed into a running session is help, whatever it said** (§8.3). The harness sends one prompt per
+  segment; every further `role: user` message in the timeline is counted in `ai_evidence.human_turns` and forces the
+  human axis to `assisted`. A resume is a restart and stays `restart-only`.
+- **Every input came from a tool call** (§8.11). Game time advances only inside `game.playback`, and `aas check` now
+  reports a playback that stands outside any tool call: input the agent never asked for was played by something else.
+- Schema 16 and SPEC draft 0.40. A mock bundle is still complete, signed and witnessed — the Portal mock run of
+  0.21.0 meets every requirement except "a model played", which is the whole point of it.
+
 ## 0.22.1 — 2026-09-19
 
 - A game without a plugin is not in the Run tab's list (owner, 2026-09-19: "??? nut?"). Choosing it emptied the
