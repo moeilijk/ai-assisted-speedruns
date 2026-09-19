@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.22.1 — 2026-09-19
+
+- A game without a plugin is not in the Run tab's list (owner, 2026-09-19: "??? nut?"). Choosing it emptied the
+  form and disabled Start: a choice that cannot be acted on. Setup keeps naming every game the repository knows,
+  which is where it belongs — what the framework supports and what this machine has.
+
 ## 0.22.0 — 2026-09-19
 
 - **A game's settings live with that game** (owner, 2026-09-19). `.local/games/<game>.env` holds what belongs to one

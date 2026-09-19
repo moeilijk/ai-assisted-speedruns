@@ -169,9 +169,6 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, listDir(url.searchParams.get("path") ?? ""));
       } else if (req.method === "GET" && url.pathname === "/api/games") {
         const env = readEnv();
-        const stubs = (await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => ({
-          id: plugin.id, name: plugin.name, stub: true, doc: `games/${dir}/README.md`,
-        }));
         const games = await Promise.all((await guiGames()).map(async ({ plugin }) => ({
           id: plugin.id, name: plugin.name, folder: plugin.setup.folder,
           recorders: await recorderOptions(plugin.setup),
@@ -181,7 +178,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           ready: Boolean(env[plugin.setup.settings[0]?.env]),
           next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
         })));
-        send(res, 200, { games: [...games, ...stubs], runtimes: RUNTIMES, agents: agentsPresent().map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
+        send(res, 200, { games, runtimes: RUNTIMES, agents: agentsPresent().map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
       } else if (req.method === "GET" && url.pathname === "/api/plan") {
         const o = Object.fromEntries(url.searchParams);
         const p = await session.plan(o);
