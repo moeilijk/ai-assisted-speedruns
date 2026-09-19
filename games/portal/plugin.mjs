@@ -11,8 +11,8 @@
 //   AAS_PORTAL_SPT_PORT    SPT IPC port (default 27182, portal-agent's y_spt_ipc_port)
 import { readFileSync, existsSync, statSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { CHAMBERS, createChamberTracker } from "./chambers.mjs";
-import { spawn } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
+import { execFileSync, spawn } from "node:child_process";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { sptSession, waitUntilReady } from "./spt-session.mjs";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
@@ -116,11 +116,31 @@ export default {
       settings: { resolution: process.env.AAS_PORTAL_RESOLUTION ?? "1920x1080", cvars: "game-config/ (portal_agent.cfg, agent_run.cfg)" },
     };
   },
-  /** Read-only checks for `aas doctor`: the Source Unpack, the SPT files, the audio routing, the autoexec. Steam is not
-   *  checked: the launcher starts it when it is not running. */
+  /** Read-only checks for `aas doctor`: the controller this plugin runs on, the Source Unpack, the SPT files, the
+   *  audio routing, the autoexec. Steam is not checked: the launcher starts it when it is not running. */
   async doctor() {
     const rows = [];
     const add = (ok, what, detail = "") => rows.push({ ok, what, detail });
+    // The controller is not in this repository: it is cozyblaze's portal-agent, cloned at the pinned commit by
+    // fetch-portal-agent.mjs. Without it a run does not start (connect() refuses) and a bundle cannot be published
+    // (his license and game-config travel with it), so the check says so here instead of leaving it to the run.
+    const checkout = existsSync(controllerModule);
+    add(checkout, "portal-agent checkout (controller/index.mjs)", checkout ? PORTAL_AGENT_DIR : `not at ${PORTAL_AGENT_DIR}; run: npm run portal:fetch`);
+    if (checkout) {
+      add(existsSync(documentationFile), "portal-agent controller/mcp/portal-documentation.md", "the API reference the agent is served");
+      add(existsSync(instructionsFile), "portal-agent run/AGENTS.md", "the instructions the agent is given");
+      // These travel into every bundle as game-config/ and LICENSE, so a missing one is a run that cannot be published.
+      for (const f of [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json"), join(PORTAL_AGENT_DIR, "controller", "LICENSE")]) {
+        add(existsSync(f), `portal-agent ${relative(PORTAL_AGENT_DIR, f).replaceAll("\\", "/")}`, "published with the bundle");
+      }
+      // A checkout that has moved off the pinned commit is a run nobody else can reproduce.
+      let head = null;
+      try { head = execFileSync("git", ["-C", PORTAL_AGENT_DIR, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { head = null; }
+      add(head === UPSTREAM.commit, "portal-agent is at the pinned commit", head ? `${head.slice(0, 12)}${head === UPSTREAM.commit ? "" : `, pinned ${UPSTREAM.commit.slice(0, 12)}; run: npm run portal:fetch`}` : "not a git checkout, so the commit cannot be read");
+    }
+    // What install-game-files.mjs copies from. Without it the Setup tab's install button fails on its first file.
+    const sptDll = process.env.AAS_PORTAL_SPT_DLL || join(repoRoot, ".local", "SourcePauseTool", "build", "Release", "spt.dll");
+    add(existsSync(sptDll), "spt.dll to install from", existsSync(sptDll) ? sptDll : `${sptDll} is not there; build it with portal-agent's tools/prepare-spt.ps1 and tools/build-spt.ps1`);
     const root = process.env.AAS_PORTAL_GAME_ROOT;
     add(Boolean(root && existsSync(join(root, "portal", "cfg"))), "AAS_PORTAL_GAME_ROOT (Source Unpack)", root ?? "not set");
     if (!root) return rows;

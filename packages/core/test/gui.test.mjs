@@ -80,3 +80,45 @@ test("a second start opens the GUI that is already running instead of failing on
     process.removeAllListeners("SIGTERM");
   }
 });
+
+test("the game check reads the game's own settings, not only the machine's", async () => {
+  // Since 0.22.0 a game's folder lives in .local/games/<game>.env. The GUI runs a plugin's checks in a process of
+  // its own (game-doctor.mjs), and a process that loads only .env reports a game that is set up as one that is not.
+  const { execFileSync } = await import("node:child_process");
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gamesettings-"));
+  const games = path.join(home, "games");
+  fs.mkdirSync(games);
+  const plugin = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "aas-g-")), "make-believe");
+  fs.mkdirSync(plugin);
+  fs.writeFileSync(path.join(plugin, "plugin.mjs"), `export default { id: "make_believe", name: "Make Believe", ends: [{ id: "end", label: "End", final: true }],
+  async doctor() { return [{ ok: Boolean(process.env.AAS_MAKE_BELIEVE_ROOT), what: "its folder", detail: process.env.AAS_MAKE_BELIEVE_ROOT ?? "not set" }]; } };
+`);
+  fs.writeFileSync(path.join(games, "make-believe.env"), "AAS_MAKE_BELIEVE_ROOT=/somewhere\n");
+  const doctor = path.join(process.cwd(), "packages", "core", "src", "gui", "game-doctor.mjs");
+  const run = (env) => JSON.parse(execFileSync(process.execPath, [doctor, path.join(plugin, "plugin.mjs")], { encoding: "utf8", env: { ...process.env, ...env } }));
+  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: true, what: "its folder", detail: "/somewhere" }]);
+  // And without that file the plugin says so itself, instead of the check inventing a reason.
+  fs.rmSync(path.join(games, "make-believe.env"));
+  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: false, what: "its folder", detail: "not set" }]);
+});
+
+test("Portal's check covers the controller it runs on, not only the game's own files", async () => {
+  // portal-agent is not in this repository: without the checkout a run does not start and a bundle cannot be
+  // published, so the check has to say so before the run does.
+  const plugin = (await import("../../../games/portal/plugin.mjs")).default;
+  const previous = process.env.AAS_PORTAL_AGENT_DIR;
+  process.env.AAS_PORTAL_AGENT_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "aas-no-agent-"));
+  try {
+    const fresh = (await import(`../../../games/portal/plugin.mjs?nocheckout=${Date.now()}`)).default;
+    const rows = await fresh.doctor();
+    const checkout = rows.find((r) => /portal-agent checkout/.test(r.what));
+    assert.ok(checkout, "the checkout is one of the conditions");
+    assert.equal(checkout.ok, false);
+    assert.match(checkout.detail, /npm run portal:fetch/, "and it says what makes it true");
+    // What install-game-files.mjs copies from is a condition too: the Setup tab's button fails without it.
+    assert.ok(rows.some((r) => r.what === "spt.dll to install from"), "the file the install button needs");
+  } finally {
+    if (previous === undefined) delete process.env.AAS_PORTAL_AGENT_DIR; else process.env.AAS_PORTAL_AGENT_DIR = previous;
+  }
+  assert.ok(plugin.doctor, "the plugin still has its checks");
+});

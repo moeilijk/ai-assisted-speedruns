@@ -12,6 +12,22 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.25.1 — 2026-09-19
+
+- **The Setup tab ran a game's checks without that game's settings** (owner, 2026-09-19). Since 0.22.0 a game's
+  folder lives in `.local/games/<game>.env`, and `gui/game-doctor.mjs` — the process the GUI runs a plugin's checks
+  in — loaded neither that file nor `.env`. So the row above said the folder was chosen while the plugin's own
+  checks reported a game that was not set up. It now loads the same two files every other command reads, in the
+  same order.
+- **Portal's check covers the controller it runs on.** It checked the Source Unpack, the game files, the audio and
+  the autoexec, and said nothing about portal-agent — which is not in this repository, which `connect()` refuses to
+  start without, and whose `game-config` and license travel into every bundle. The conditions now include the
+  checkout, its `controller/mcp/portal-documentation.md` and `run/AGENTS.md`, the three files that are published
+  with a bundle, and whether the checkout still sits at the commit `UPSTREAM.json` pins — a checkout that has moved
+  is a run nobody else can reproduce. Each failing row says what makes it true (`npm run portal:fetch`).
+- The check also names `spt.dll to install from`, the file `install-game-files.mjs` copies. Without it the Setup
+  tab's install button fails on its first file, which is now visible before the button is pressed instead of after.
+
 ## 0.25.0 — 2026-09-19
 
 - **Portal 2 is a game plugin, not a stub** (owner, 2026-09-19: "maak eerst de portal 2 zoals afgesproken"). The
