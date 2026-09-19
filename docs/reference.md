@@ -51,6 +51,13 @@ Machine settings live in `.env` in the repository root, copied from [`.env.examp
 | `AAS_TIME_ZONE` | broker, publish | time zone of the run log (default the machine's) |
 | `AAS_WITNESS_URL`, `AAS_WITNESS_KEYS` | run, resume, check | where the start and end of each segment are witnessed (default the AAS Archive's `/witness/`; `off` for none, as `npm test` sets); a file with another witness's keys (its `aas-witness.txt`) to trust besides the archive's |
 | `AAS_STEAM_EXE` | launchers, close | Steam executable, when not at its default path |
+A setting that belongs to one game lives in that game's own file, `.local/games/<game>.env`; everything that is
+true for the whole machine (OBS, LiveSplit, the output location, budgets, sound, screens) stays in `.env`. Which
+settings belong to a game is what its plugin declares (`env`, `setup.settings`, `setup.displayEnv`,
+`setup.resolutionEnv`), so nothing is guessed. Both files are read by every command; the game's file is read first
+and its value therefore stands, and a variable already set in the shell beats both.
+`node packages/core/src/gui/migrate-settings.mjs` moves the game settings out of an older `.env`.
+
 | `AAS_OUTPUT_DIR` | `aas gui` | where the GUI saves runs: `<output>/<game folder>/<run>/`, bundles in `<output>/<game folder>/public/<run>` |
 | `AAS_QUIET_AUDIO_DEVICE`, `AAS_SOUNDVOLUMEVIEW`, `AAS_KEEP_DISPLAYS_AWAKE` | launchers | optional: route the game's audio to another device while it starts; keep the displays awake |
 | `AAS_PORTAL_*` | Portal plugin and scripts | see [../games/portal/README.md](../games/portal/README.md) |

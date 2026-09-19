@@ -12,6 +12,10 @@
 //   node games/slay-the-spire/save-track.mjs <run-dir>
 import fs from "node:fs";
 import path from "node:path";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const XOR_KEY = Buffer.from("key");
 /** The game obfuscates saves as base64 of the JSON XORed with "key"; run-history files are plain JSON. */

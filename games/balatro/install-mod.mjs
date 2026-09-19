@@ -12,6 +12,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
 import { toolsDir } from "./plugin.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const root = process.env.AAS_BALATRO_GAME_ROOT;
 if (!root) throw new Error("AAS_BALATRO_GAME_ROOT is not set (the Balatro folder, with Balatro.exe)");

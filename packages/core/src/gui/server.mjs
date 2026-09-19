@@ -5,8 +5,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { affectedBy, allGames, configItems, guiGames } from "./checks.mjs";
-import { readEnv, writeEnv, ENV_FILE } from "./env-file.mjs";
+import { affectedBy, allGames, configItems, guiGames, settingOwners } from "./checks.mjs";
+import { gameEnvFile } from "../settings.mjs";
+import { writeEnv, ENV_FILE } from "./env-file.mjs";
+import { readSettings as readEnv } from "../settings.mjs";
 import { agentsPresent, createSession, recorderOptions, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
@@ -151,7 +153,15 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           }
           changes.AAS_LIVESPLIT_POS = b.display ? `${x + 20},${y + 40}` : "";
         }
-        writeEnv(changes);
+        // A setting of a game goes into that game's own file, the rest into the machine's .env (settings.mjs).
+        const owners = await settingOwners();
+        const perFile = new Map();
+        for (const [k, v] of Object.entries(changes)) {
+          const file = owners[k] ? gameEnvFile(owners[k]) : ENV_FILE;
+          if (!perFile.has(file)) perFile.set(file, {});
+          perFile.get(file)[k] = v;
+        }
+        for (const [file, values] of perFile) { fs.mkdirSync(path.dirname(file), { recursive: true }); writeEnv(values, file); }
         // What was saved is checked at once.
         await startChecks(await affectedBy(Object.keys(changes)));
         send(res, 200, { ok: true });

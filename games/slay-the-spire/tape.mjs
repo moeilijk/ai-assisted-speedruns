@@ -6,6 +6,10 @@
 //   node games/slay-the-spire/tape.mjs <run-dir> [--until-floor N] [--out tape.json]
 import fs from "node:fs";
 import path from "node:path";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 /** Every command the run sent, in order, with what the game showed when it was sent. */
 export function tapeFromRun(runDir, { untilFloor = Infinity } = {}) {

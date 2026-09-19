@@ -18,6 +18,10 @@ import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs
 import { BOT_PORT, BRIDGE_PORT, gamePath, readBridgeState } from "./bridge.mjs";
 import { toolsDir } from "./plugin.mjs";
 import { listDisplays } from "../../packages/core/src/windows/displays.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = process.env.AAS_BALATRO_GAME_ROOT;

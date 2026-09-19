@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.22.0 — 2026-09-19
+
+- **A game's settings live with that game** (owner, 2026-09-19). `.local/games/<game>.env` holds what belongs to one
+  game — its folder, its window, its own variables — and `.env` keeps what is true for the whole machine. Which
+  setting belongs to which game is what the plugin declares, so nothing is guessed. `.local/` is never published, so
+  no machine path ends up in `games/`, which is the plugin as everyone else receives it.
+- The order is the same everywhere (`packages/core/src/settings.mjs`): the game's file is read first and its value
+  stands, then `.env`, and a variable already set in the shell beats both. `aas run --game …`, every `npm run
+  <game>:…` script and the GUI read the same two files; the `--env-file-if-exists=.env` in those npm scripts is gone,
+  because loading `.env` first would have made it win over the game's own file.
+- `node packages/core/src/gui/migrate-settings.mjs` moves the game settings out of an older `.env`, by what the
+  plugins declare. Run here: eight settings moved to portal.env, slay-the-spire.env and balatro.env.
+
 ## 0.21.0 — 2026-09-19
 
 - **A mock run is marked as one in the bundle, and an archive refuses it** (owner, 2026-09-19). A runtime plugin says

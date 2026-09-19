@@ -1,0 +1,23 @@
+{
+  "sar": {
+    "name": "SourceAutoRecord",
+    "repo": "https://github.com/p2sr/SourceAutoRecord",
+    "license": "MIT",
+    "version": "1.15.4",
+    "released": "2026-08-25",
+    "file": "sar.dll",
+    "url": "https://github.com/p2sr/SourceAutoRecord/releases/download/1.15.4/sar.dll",
+    "sha256": "3ad268eed2fac435ee505d833b7cd20ffb6b3d0028516f8823a5c48b8b41cd9c",
+    "bytes": 16788992,
+    "docs": {
+      "protocol": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/tas_proto.txt",
+      "script": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/p2tas.md",
+      "cvars": "https://github.com/p2sr/SourceAutoRecord/blob/master/docs/cvars.md"
+    },
+    "commands": {
+      "load": "plugin_load sar",
+      "server": "sar_tas_protocol_server 6555",
+      "stop": "sar_tas_protocol_stop"
+    }
+  }
+}

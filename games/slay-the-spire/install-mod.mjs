@@ -8,6 +8,10 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const root = process.env.AAS_STS_GAME_ROOT;
 if (!root) throw new Error("AAS_STS_GAME_ROOT is not set (the Slay the Spire folder)");

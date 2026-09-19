@@ -30,6 +30,10 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { seedNumber } from "./plugin.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const BIN = process.env.AAS_STS_PLAYOUT || path.resolve(here, "../../.local/sts_lightspeed/build/aas");

@@ -16,6 +16,10 @@ import path from "node:path";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
 import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
 import { moveWindow } from "../../packages/core/src/windows/move-window.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i === -1 ? d : args[i + 1]; };

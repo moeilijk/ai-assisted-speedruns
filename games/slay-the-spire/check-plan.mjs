@@ -11,6 +11,10 @@
 //
 //   node games/slay-the-spire/check-plan.mjs <plan.jsonl>...
 import fs from "node:fs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const GENERATES_A_CARD = /DISCOVERY|LIQUID_MEMORIES|GAMBLE|COLORLESS|SKILL_POTION|ATTACK_POTION|POWER_POTION|TRANSMUTATION|CHRYSALIS|METAMORPHOSIS/;
 const KNOWN_SCREENS = new Set(["EVENT", "MAP", "REWARDS", "BATTLE", "BATTLE_END", "SHOP", "REST", "TREASURE", "BOSS_RELIC", "POTION", "CARD_SELECT"]);

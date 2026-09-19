@@ -7,6 +7,10 @@
 import fs from "node:fs";
 import path from "node:path";
 import { createChamberTracker } from "./chambers.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 export function parseDemo(file) {
   const d = fs.readFileSync(file);

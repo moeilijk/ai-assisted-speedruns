@@ -7,15 +7,16 @@
 //   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
 import fs from "node:fs";
 import path from "node:path";
+import { loadSettings } from "./settings.mjs";
 import { pathToFileURL } from "node:url";
 import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
 export { brokerSpec, configure };
 
-// Machine settings come from the repository's .env (copied from .env.example). The CLI loads it itself, so
-// that the same command works from any shell; a variable already in the environment keeps its value.
-const dotEnv = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..", ".env");
-if (fs.existsSync(dotEnv)) process.loadEnvFile(dotEnv);
+// Settings come from two files: the game's own (.local/games/<game>.env) and the machine's (.env). The CLI loads
+// them itself, so the same command works from any shell; see settings.mjs for the order and why.
+const gameArg = (() => { const i = process.argv.indexOf("--game"); return i === -1 ? null : process.argv[i + 1]; })();
+loadSettings(gameArg);
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
 const BOOLEAN_FLAGS = new Set(["keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);

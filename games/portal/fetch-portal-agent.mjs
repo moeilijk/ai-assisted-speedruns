@@ -6,6 +6,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const upstream = JSON.parse(readFileSync(join(here, "UPSTREAM.json"), "utf8"));

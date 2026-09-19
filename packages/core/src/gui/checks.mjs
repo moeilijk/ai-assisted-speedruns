@@ -9,7 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as detect from "./detect.mjs";
-import { ENV_FILE, readEnv } from "./env-file.mjs";
+import { ENV_FILE } from "./env-file.mjs";
+import { readSettings as readEnv } from "../settings.mjs";
 import { IS_WSL, ON_WINDOWS, powershell, toLocal, toWindows, windowsFolders } from "./windows-paths.mjs";
 import { loadGamePlugin } from "../mcp-client.mjs";
 
@@ -92,6 +93,15 @@ export async function configItems() {
     // visible which ones this machine cannot run at all.
     ...(await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => item("Games", `stub-${plugin.id}`, plugin.name, "info", null, { value: "", doc: `games/${dir}/README.md` })),
   ];
+}
+
+/** The game a setting belongs to, by the plugin that declares it: {AAS_PORTAL_GAME_ROOT: "portal", ...}. */
+export async function settingOwners() {
+  const owners = {};
+  for (const { dir, plugin } of await allGames()) {
+    for (const key of [...(plugin.env ?? []), ...(plugin.setup?.settings ?? []).map((x) => x.env), plugin.setup?.displayEnv, plugin.setup?.resolutionEnv].filter(Boolean)) owners[key] = dir;
+  }
+  return owners;
 }
 
 /** The rows a changed setting affects (checked again after a save). */

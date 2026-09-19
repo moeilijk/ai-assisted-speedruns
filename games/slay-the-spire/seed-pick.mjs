@@ -4,6 +4,10 @@
 //   node games/slay-the-spire/seed-pick.mjs <seedsearch.log> [--top 20] [--json]
 import fs from "node:fs";
 import { seedString } from "./plugin.mjs";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 export const GOOD_CARDS = ["Pommel Strike", "Shrug It Off", "Iron Wave", "Cleave", "Thunderclap", "Uppercut", "Carnage", "Inflame", "Battle Trance", "Feel No Pain", "Whirlwind", "Immolate", "Bludgeon"];
 export const GOOD_RELICS = ["Bag of Marbles", "Vajra", "Anchor", "Red Skull", "Bronze Scales", "Oddly Smooth Stone", "Blood Vial", "Lantern", "Orichalcum"];

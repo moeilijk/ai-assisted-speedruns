@@ -10,6 +10,10 @@
 import net from "node:net";
 import readline from "node:readline";
 import { spawnSync } from "node:child_process";
+import { loadSettings } from "../../packages/core/src/settings.mjs";
+
+// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
+loadSettings(import.meta.url);
 
 const port = Number(process.argv[2] || process.env.AAS_STS_PORT || 27183);
 const title = process.env.AAS_STS_WINDOW_TITLE || "Slay the Spire";
