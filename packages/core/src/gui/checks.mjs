@@ -282,11 +282,12 @@ export async function checkItem(id) {
     const install = g.plugin.setup.install
       ? { id: `install:${g.plugin.id}`, label: g.plugin.setup.installs ?? `Run this game's install script`, command: shownScript(g.plugin.setup.install) }
       : null;
-    // Which folder: the setting's own name, so a condition can be read without the heading above it.
-    const folder = st.label ?? "the game folder";
-    if (!t(`${folder}: a folder is chosen`, current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
-    if (!t(`${folder}: that folder exists`, exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
-    if (st.expect && !t(`${st.expect} is in ${folder.toLowerCase().startsWith("the ") ? folder : `the ${folder}`}`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
+    // Every condition is the thing that has to be true, named in full: read on its own it still says which folder
+    // and what has to be in it, so the list is the whole answer and the heading above it is only a heading.
+    const folder = (st.label ?? "the game folder").replace(/^the /i, "");
+    if (!t(`the ${folder} is chosen`, current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
+    if (!t(`the ${folder} exists`, exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
+    if (st.expect && !t(`${st.expect} is in the ${folder}`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
     const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "game-doctor.mjs"), g.file], { encoding: "utf8", timeout: 60000, env: process.env });
     let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "its own checks answered", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
     for (const row of rows) t(row.what, row.ok, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: install });

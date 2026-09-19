@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.26.1 — 2026-09-19
+
+- **Fewer statuses, and each one says whether this part can be used** (owner, 2026-09-19: a status has to reflect
+  something, and "Not checked"/"Nothing chosen" read as a refusal). 0.26.0 made it worse by adding words. There were
+  seven labels for three states, and four ways of saying no — "Check", "Problem", "Not set", "Nothing chosen" —
+  while the condition underneath already said which one it was. A row is now **Ready** or **Not ready**, with the
+  failing condition below it, plus **No plugin yet** for a game the framework does not support and **Checking…**
+  while it runs. One verdict, one colour: "Not ready" no longer appears in two colours for the same meaning.
+- A row that has not been checked has no verdict at all instead of a word of its own. Nothing has run, so nothing is
+  true or false about it yet, and whether this page has checked anything is said once at the top, where it belongs.
+- Each condition is the thing that has to be true, in full: "the Source Unpack folder (Portal) is chosen",
+  "hl2.exe is in the Balatro folder" — readable on its own, without the heading above it.
+
 ## 0.26.0 — 2026-09-19
 
 - **A button in the Setup tab says what it does** (owner, 2026-09-19: "install kan op teveel dingen slaan ... je

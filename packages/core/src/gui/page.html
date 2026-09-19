@@ -40,11 +40,11 @@
   .status { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
   .ok .dot { background: var(--ok); } .ok { color: var(--ok); }
-  .warn .dot { background: var(--warn); } .warn { color: var(--warn); }
-  .fail .dot, .missing .dot { background: var(--fail); } .fail, .missing { color: var(--fail); }
+  /* One verdict, one look: "Not ready" in three colours would be three verdicts to a reader, and it is one. */
+  .warn .dot, .fail .dot, .missing .dot { background: var(--warn); } .warn, .fail, .missing { color: var(--warn); }
   /* Not a fault of this machine: the framework has no plugin for that game yet. */
   .absent .dot { background: var(--muted); } .absent { color: var(--muted); }
-  .unchecked, .pending { color: var(--muted); }
+  .pending { color: var(--muted); }
   .pending .dot { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
   @keyframes pulse { 50% { opacity: .25; } }
   @media (prefers-reduced-motion: reduce) { .pending .dot { animation: none; } }
@@ -345,7 +345,9 @@ async function loadSetup() {
   setup = await api("/api/setup");
   $("envfile").textContent = setup.envFile;
   $("recheck").textContent = setup.checked ? "Check again" : (setup.configured ? "Check" : "Initial check: find my tools and games");
-  $("checkinfo").textContent = setup.checked ? "" : (setup.configured ? "Not checked yet." : "Nothing is set yet: the initial check finds what it can.");
+  // Whether anything has been checked is about this page, not about the machine, so it is said here once instead of
+  // on every row: a row without a verdict has not been tried yet.
+  $("checkinfo").textContent = setup.checked ? "" : (setup.configured ? "Nothing has been tried yet; the check tries every condition below." : "Nothing is set yet: the first check finds what it can.");
   const groups = [...new Set(setup.items.map((i) => i.group))];
   $("groups").innerHTML = groups.map((g) => `<div class="panel"><h2>${esc(g)}</h2>${setup.items.filter((i) => i.group === g).map(row).join("")}</div>`).join("");
 }
@@ -362,16 +364,18 @@ function updateRow(item) {
   if (typed !== null) { const f = $(`v-${item.id}`); if (f) { f.value = typed; f.focus(); } }
   if (!setup.checked && item.status !== "pending" && item.status !== "unchecked") { setup.checked = true; $("recheck").textContent = "Check again"; $("checkinfo").textContent = ""; }
 }
-// Two of these are easy to read as each other and are not the same thing: "Not checked yet" means nothing has run
-// here, "Nothing chosen" means it has and the setting is empty. The words say which, so the colour does not have to.
+// What a row is for: this part of the machine can be used in a run. So the status says whether it can, and the
+// conditions under it say what is still in the way — they are the whole story already, and a second vocabulary
+// next to them ("Not set", "Problem", "Nothing chosen") only gives the same answer in four voices.
 const STATUS = {
-  ok: "Checked",                 // every condition passed
-  warn: "Not ready",             // the check ran and something it needs is not there
-  fail: "Problem",               // the check ran and something is wrong
-  missing: "Nothing chosen",     // the check ran and this setting is empty
-  absent: "No plugin",           // this game has no plugin yet
-  unchecked: "Not checked yet",  // nothing has run here, so nothing is known either way
+  ok: "Ready",                 // every condition holds
+  warn: "Not ready",           // one does not; the condition below says which
+  fail: "Not ready",
+  missing: "Not ready",
+  absent: "No plugin yet",     // nothing to set up here: this game has no plugin
   pending: "Checking…",
+  // `unchecked` has no word. Nothing has run, so nothing is true or false about this row yet, and a status that
+  // says something about us rather than about the machine is not a status.
 };
 function row(i) {
   let field = "";
@@ -385,7 +389,7 @@ function row(i) {
   const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
   const fixCommand = i.fix?.command ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
-    <div><div class="name">${esc(i.label)}</div>${i.status ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status] ?? i.status}</span>` : ""}</div>
+    <div><div class="name">${esc(i.label)}</div>${i.status && STATUS[i.status] ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status]}</span>` : ""}</div>
     <div class="field">${field}${fix}</div>
     <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}${fixCommand}</div>`;
 }
