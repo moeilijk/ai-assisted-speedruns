@@ -1,0 +1,27 @@
+{
+  "covers": "every .mjs, .json and .md of packages/runtime-<id>/, test/ excluded; see pluginDigest in packages/core/src/plugins.mjs",
+  "generated_by": "node packages/spec/make-runtimes.mjs --write",
+  "runtimes": [
+    {
+      "id": "claude-code",
+      "name": "Claude Code",
+      "version": "0.1.0",
+      "ai": true,
+      "sha256": "789ba8307874f03cd1d3edce210223087571862906086bdd57adc2a0b42551d5"
+    },
+    {
+      "id": "codex",
+      "name": "Codex",
+      "version": "0.1.0",
+      "ai": true,
+      "sha256": "c56e6837bafa13d8fb3b99e67f799a050a0ba2ff03eeb93ca70d0e020bf09d70"
+    },
+    {
+      "id": "scripted",
+      "name": "Scripted bot",
+      "version": "0.1.0",
+      "ai": false,
+      "sha256": "0d95c5c74b7a96ddf5456c187979b828853b9f6481e40885254e537e9d9c92d5"
+    }
+  ]
+}

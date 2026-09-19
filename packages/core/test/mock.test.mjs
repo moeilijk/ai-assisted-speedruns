@@ -121,3 +121,22 @@ test("input the agent did not ask for is input somebody else played", () => {
   assert.equal(status(r, "input from tool calls"), "invalid");
   assert.match(detail(r, "input from tool calls"), /1 playback\(s\) outside any tool call/);
 });
+
+test("the hashes an archive holds a bundle against are the hashes this release ships", async () => {
+  // The archive keeps its own list of runtime plugins by sha256 and decides for itself whether a run is a mock
+  // (SPEC §3). It reads packages/spec/runtimes.json, so that file has to be the number `aas publish` writes into
+  // a bundle — not one near it. A runtime plugin that changes gets a new hash, and this fails until the file is
+  // made again with `node packages/spec/make-runtimes.mjs --write`.
+  const { RUNTIMES_FILE, runtimeRows } = await import("../../spec/make-runtimes.mjs");
+  const { readFileSync } = await import("node:fs");
+  const published = JSON.parse(readFileSync(RUNTIMES_FILE, "utf8"));
+  assert.deepEqual(published.runtimes, await runtimeRows(), "packages/spec/runtimes.json is out of date: node packages/spec/make-runtimes.mjs --write");
+  assert.ok(published.covers.includes("pluginDigest"), "the file says what the hash is over, because an archive cannot guess it");
+  for (const r of published.runtimes) {
+    assert.match(r.sha256, /^[0-9a-f]{64}$/, r.id);
+    assert.equal(typeof r.ai, "boolean", `${r.id}: whether a model plays is the runtime's own answer`);
+  }
+  // And a bundle's own number is made by the same function, so the two can never drift apart.
+  const rt = await loadRuntime("scripted");
+  assert.equal(runtimeIdentity(rt, "scripted").sha256, published.runtimes.find((r) => r.id === "scripted").sha256);
+});

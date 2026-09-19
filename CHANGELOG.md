@@ -12,6 +12,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.28.1 — 2026-09-19
+
+- **`packages/spec/runtimes.json`**: every runtime plugin this release ships, with the sha256 an archive holds a
+  bundle against (SPEC §3). The AAS Archive's witness takes `aas-witness v2` as of today and no longer reads a
+  bundle's own `mock`; it keeps its own list of runtime hashes and decides for itself, and its list was empty,
+  which means every schema 16 bundle would be refused. The file is made by `node packages/spec/make-runtimes.mjs
+  --write`, never by hand, and it says what the hash covers so an archive does not have to guess: every `.mjs`,
+  `.json` and `.md` of `packages/runtime-<id>/`, `test/` left out.
+- A test holds the file against what `aas publish` would write, with the same function, so the two cannot drift.
+  A release that changes a runtime plugin fails until the file is made again.
+
 ## 0.28.0 — 2026-09-19
 
 - **A Portal 2 run can actually be started** (owner, 2026-09-19). 0.25.0 said "Portal 2 is a game plugin, not a
