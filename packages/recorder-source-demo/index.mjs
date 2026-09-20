@@ -22,7 +22,7 @@ export function createSourceDemoRecorder(options = {}) {
   return {
     id: "source-demo",
     name: "In-game demo (Source engine)",
-    version: "0.1.0",
+    version: "0.29.1",
     async preflight(brief, game) {
       if (!demoDir) throw new Error("source-demo recorder needs the game folder: set AAS_PORTAL_GAME_ROOT (the Source Unpack root) or pass gameRoot/demoDir.");
       if (!game?.prepareRun) throw new Error(`source-demo recorder needs a game plugin with prepareRun/endRun (start_run / stop_run); ${game?.id} has none.`);

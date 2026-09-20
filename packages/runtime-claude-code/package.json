@@ -1,6 +1,6 @@
 {
   "name": "@aas/runtime-claude-code",
-  "version": "0.1.0",
+  "version": "0.29.1",
   "description": "AAS runtime plugin: claude-code",
   "type": "module",
   "engines": { "node": ">=22" },

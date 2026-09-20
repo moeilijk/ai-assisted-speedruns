@@ -2,10 +2,13 @@
 // spawns the broker under node --permission and speaks newline-delimited
 // JSON-RPC 2.0 with it. No dependencies.
 import { spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const CORE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+/** What this client is: the framework's own version, so a broker log never says 0.1.0 for a 0.29.1 harness. */
+export const CLIENT_VERSION = JSON.parse(readFileSync(join(CORE_DIR, "package.json"), "utf8")).version;
 export const BROKER_PATH = resolve(CORE_DIR, "src", "broker.mjs");
 
 /** Node flags that sandbox the broker: read core, the game plugin, extra dirs and its own run dir; write only the run dir. */
@@ -103,7 +106,7 @@ export function startBroker({ gameModule, runDir, readable, endpoints, timeZone,
     if (result.isError) throw new Error(result.content.map((c) => c.text ?? "").join("\n"));
     return result;
   }
-  async function initialize(clientInfo = { name: "aas", version: "0.1.0" }) {
+  async function initialize(clientInfo = { name: "aas", version: CLIENT_VERSION }) {
     const init = await request("initialize", { protocolVersion: "2025-06-18", capabilities: {}, clientInfo });
     notify("notifications/initialized");
     return init;

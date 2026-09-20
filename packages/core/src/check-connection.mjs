@@ -6,7 +6,7 @@
 // Usage: node check-connection.mjs --game <plugin.mjs> --run-dir <dir> [--exercise]
 import fs from "node:fs";
 import path from "node:path";
-import { loadGamePlugin, startBroker } from "./mcp-client.mjs";
+import { CLIENT_VERSION, loadGamePlugin, startBroker } from "./mcp-client.mjs";
 
 export async function checkConnection({ gameModule, runDir, exercise = false, log = console.log }) {
   const plugin = await loadGamePlugin(gameModule);
@@ -20,7 +20,7 @@ export async function checkConnection({ gameModule, runDir, exercise = false, lo
     passThrough: plugin.env ?? [],
   });
   try {
-    const init = await client.initialize({ name: "aas-connection-check", version: "0.1.0" });
+    const init = await client.initialize({ name: "aas-connection-check", version: CLIENT_VERSION });
     log(`PASS: MCP handshake (${init.serverInfo.name} ${init.serverInfo.version})`);
     const names = (await client.request("tools/list")).tools.map((t) => t.name).sort();
     const expected = [`${plugin.id}_documentation`, `${plugin.id}_exec`, `${plugin.id}_screenshot`];

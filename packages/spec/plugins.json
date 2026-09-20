@@ -1,0 +1,173 @@
+{
+  "covers": "every .mjs, .json and .md of the plugin's own directory, test/ and node_modules/ excluded, each as \"<relative path> <sha256 of its bytes>\", sorted by path, joined with newlines and hashed",
+  "generated_by": "node packages/spec/make-plugins.mjs --write",
+  "plugins": [
+    {
+      "kind": "runtime",
+      "dir": "packages/runtime-claude-code",
+      "id": "claude-code",
+      "name": "Claude Code",
+      "version": "0.29.1",
+      "ai": true,
+      "sha256": "1d83a972131ccb4b358b77261aa85828c8aa82b5f9fba3b97f7bbc2c98fb2a46"
+    },
+    {
+      "kind": "runtime",
+      "dir": "packages/runtime-codex",
+      "id": "codex",
+      "name": "Codex",
+      "version": "0.29.1",
+      "ai": true,
+      "sha256": "54e29db6edcef4e6c70dc21b1d84bc7212152bbd10b094ecf6754d45d5d0996d"
+    },
+    {
+      "kind": "runtime",
+      "dir": "packages/runtime-scripted",
+      "id": "scripted",
+      "name": "Scripted bot",
+      "version": "0.29.1",
+      "ai": false,
+      "sha256": "a6b52fce8ceba7c1e765c0a84f921eff6573a5edec53fc4eda167992a5de5f3a"
+    },
+    {
+      "kind": "recorder",
+      "dir": "packages/recorder-null",
+      "id": "null",
+      "name": "No recording (never a valid run)",
+      "version": "0.29.1",
+      "sha256": "463075d9c21f9329f8a20a36e56efb85a9d614fe8552902a22394792ffd91330"
+    },
+    {
+      "kind": "recorder",
+      "dir": "packages/recorder-obs",
+      "id": "obs",
+      "name": "OBS Studio (video)",
+      "version": "0.29.1",
+      "sha256": "a72fbd84f80c1df076db9318f74f5c6f308b679d1048b81094bbf2e90b036d6a"
+    },
+    {
+      "kind": "recorder",
+      "dir": "packages/recorder-source-demo",
+      "id": "source-demo",
+      "name": "In-game demo (Source engine)",
+      "version": "0.29.1",
+      "sha256": "3017212e38426032ded224627e6ab469c3b42af61a4d4db6a154537e94d192a8"
+    },
+    {
+      "kind": "timer",
+      "dir": "packages/timer-livesplit",
+      "id": "livesplit",
+      "name": null,
+      "version": "0.29.1",
+      "sha256": "72e6c89e4fe75a5092ec51e95c67ab92a5710a99ccfae46ca02e57d44fc7e999"
+    },
+    {
+      "kind": "game",
+      "dir": "games/balatro",
+      "id": "balatro",
+      "name": "Balatro",
+      "version": "0.29.1",
+      "stub": false,
+      "sha256": "4696eed89329a120dad9c6066733329e8996953261853940e1bf5c473a7b0ccb"
+    },
+    {
+      "kind": "game",
+      "dir": "games/bizhawk",
+      "id": "bizhawk",
+      "name": "BizHawk emulator (generic, with game profiles)",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "28919b507c872b2f1573c681aab6999dd182214078e9e166d148af67627f83e0"
+    },
+    {
+      "kind": "game",
+      "dir": "games/celeste",
+      "id": "celeste",
+      "name": "Celeste",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "a2a145b64c9beb4d53bcc47c480818d33f2116fe307f9ac114efe9c3d7336e82"
+    },
+    {
+      "kind": "game",
+      "dir": "games/half-life-2",
+      "id": "half_life_2",
+      "name": "Half-Life 2 / Episode One / Half-Life: Source",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "76e1b1393c6e7a5df2e28d48de0668e23db85a65e5de1bdaa1e9e63f895c1ffc"
+    },
+    {
+      "kind": "game",
+      "dir": "games/kerbal-space-program",
+      "id": "kerbal_space_program",
+      "name": "Kerbal Space Program",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "ad02a61e0e70440ef4431614d46bbd8a6704127cce8f0d5fdad798be7dea36ba"
+    },
+    {
+      "kind": "game",
+      "dir": "games/openrct2",
+      "id": "openrct2",
+      "name": "OpenRCT2 (RollerCoaster Tycoon 2 scenarios)",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "7725f8c1e07eb913c320b41db879f91532d06710f486c7b273e914024b51b3b0"
+    },
+    {
+      "kind": "game",
+      "dir": "games/portal",
+      "id": "portal",
+      "name": "Portal",
+      "version": "0.29.1",
+      "stub": false,
+      "sha256": "3459eec3bf838c408b5d0f0200b6ba28536f016c30b268dbe2a8e80c91c9f391"
+    },
+    {
+      "kind": "game",
+      "dir": "games/portal-2",
+      "id": "portal_2",
+      "name": "Portal 2",
+      "version": "0.29.1",
+      "stub": false,
+      "sha256": "94859ce10b720464ad9a186f8774fa69eabcd43add83bf7ef26bc94cc4a7b2f8"
+    },
+    {
+      "kind": "game",
+      "dir": "games/slay-the-spire",
+      "id": "slay_the_spire",
+      "name": "Slay the Spire",
+      "version": "0.29.1",
+      "stub": false,
+      "sha256": "c2d1aacf598c0765806a6333d33cf15d9f93ac1862d6da4d116afaf163c35e28"
+    },
+    {
+      "kind": "game",
+      "dir": "games/slay-the-spire-2",
+      "id": "slay_the_spire_2",
+      "name": "Slay the Spire 2",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "e9104210ab577d78f404ba742f137ed490c0b1267821974f48eb3cb66324c827"
+    },
+    {
+      "kind": "game",
+      "dir": "games/unity-bepinex",
+      "id": "unity_bepinex",
+      "name": "Unity games through BepInEx (generic bridge)",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "ab477638b0b299787613e915a2dffdbc288771b68c41d0c1f551dcf90347b7b8"
+    },
+    {
+      "kind": "game",
+      "dir": "games/unreal-ue4ss",
+      "id": "unreal_ue4ss",
+      "name": "Unreal Engine games through UE4SS (generic bridge)",
+      "version": "0.0.0",
+      "stub": true,
+      "sha256": "93220e98bd0fd217ac00154268c87e8df9997f71f7f24890bea59ae9e83a4519"
+    }
+  ]
+}

@@ -97,7 +97,7 @@ export function createLiveSplitTimer(options = {}) {
       return closeWindows([{ name: "LiveSplit", title: "LiveSplit", seconds: 15, dialogTitle: "Save Splits?", dialogButton: "&No" }], { report: ["LiveSplit"] });
     },
     id: "livesplit",
-    version: "0.1.0",
+    version: "0.29.1",
     sent,
     async preflight() {
       const probe = await connectLiveSplit({ host, port });

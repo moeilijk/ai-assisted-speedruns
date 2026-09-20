@@ -28,8 +28,11 @@ test("a runtime plugin has a hash of its own, over everything of it that runs", 
   writeFileSync(own, "export default { id: 'x', name: 'X', ai: true }; // changed\n");
   assert.notEqual(pluginDigest(own), pluginDigest(join(here, "stub-runtime.mjs")));
   // And what a statement and a bundle carry: id, version, ai and that number, nothing guessed.
-  const id = runtimeIdentity(await loadRuntime("scripted"), "scripted");
-  assert.deepEqual({ ...id, sha256: typeof id.sha256 }, { id: "scripted", version: "0.1.0", ai: false, sha256: "string" });
+  const scripted = await loadRuntime("scripted");
+  const id = runtimeIdentity(scripted, "scripted");
+  // The version is the plugin's own, not a number repeated here: a bumped plugin must not have to change a test.
+  assert.deepEqual({ ...id, sha256: typeof id.sha256 }, { id: "scripted", version: scripted.version, ai: false, sha256: "string" });
+  assert.match(scripted.version, /^\d+\.\d+\.\d+$/);
   assert.deepEqual(runtimeIdentity(null, "no-such-runtime"), { id: null, version: null, ai: null, sha256: null });
 });
 

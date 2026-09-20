@@ -3,7 +3,7 @@
 export default {
   id: "null",
   name: "No recording (never a valid run)",
-  version: "0.1.0",
+  version: "0.29.1",
   async preflight() {},
   async start() {
     return { t0: new Date() };

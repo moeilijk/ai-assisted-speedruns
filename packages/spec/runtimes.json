@@ -5,23 +5,23 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.1.0",
+      "version": "0.29.1",
       "ai": true,
-      "sha256": "789ba8307874f03cd1d3edce210223087571862906086bdd57adc2a0b42551d5"
+      "sha256": "1d83a972131ccb4b358b77261aa85828c8aa82b5f9fba3b97f7bbc2c98fb2a46"
     },
     {
       "id": "codex",
       "name": "Codex",
-      "version": "0.1.0",
+      "version": "0.29.1",
       "ai": true,
-      "sha256": "c56e6837bafa13d8fb3b99e67f799a050a0ba2ff03eeb93ca70d0e020bf09d70"
+      "sha256": "54e29db6edcef4e6c70dc21b1d84bc7212152bbd10b094ecf6754d45d5d0996d"
     },
     {
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.1.0",
+      "version": "0.29.1",
       "ai": false,
-      "sha256": "0d95c5c74b7a96ddf5456c187979b828853b9f6481e40885254e537e9d9c92d5"
+      "sha256": "a6b52fce8ceba7c1e765c0a84f921eff6573a5edec53fc4eda167992a5de5f3a"
     }
   ]
 }

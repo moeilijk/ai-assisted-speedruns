@@ -12,6 +12,32 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.1 — 2026-09-20
+
+- **Every plugin's version now says which release it is** (owner, 2026-09-20: the requirement that versions are
+  kept up to date holds for every component that has one). It was honoured nowhere: every runtime, recorder, timer
+  and game plugin still said `0.1.0` while its files had moved on — `games/portal` 21 commits since that number was
+  written, `games/slay-the-spire` 12, `games/balatro` 8, the runtimes 5, 5 and 2, `packages/recorder-obs` 5,
+  `packages/timer-livesplit` 4. A number that never changes says nothing about what ran, which is exactly what an
+  archive reads it for. All eleven plugins that have changed now carry `0.29.1`; the eight game stubs stay `0.0.0`,
+  because they have not been touched since the commit that created them.
+- **`packages/spec/plugins.json`**: every plugin this release ships — runtime, recorder, timer and game — with its
+  version and a sha256 over its own directory (every `.mjs`, `.json` and `.md`, `test/` excluded). Made by
+  `node packages/spec/make-plugins.mjs --write`, never by hand. For the three runtimes the number is the same one
+  `runtimes.json` carries, because it is the same walk.
+- So that this cannot rot again, the rule is enforced from both sides: `--write` **refuses** while a plugin's hash
+  has changed and its version has not, naming each one, and `packages/spec/test/plugins.test.mjs` fails while
+  `plugins.json` is out of date. Changing a plugin without giving it the release's number now breaks the build.
+  Proven by doing it: a stray line in `packages/runtime-codex/index.mjs` made the generator refuse and two tests
+  fail, and reverting it made them pass.
+- The MCP client introduced itself as `aas 0.1.0` in every handshake, including `aas check-connection`; it reports
+  the framework version now (`CLIENT_VERSION` in `packages/core/src/mcp-client.mjs`).
+- `packages/core/test/mock.test.mjs` asserted the scripted runtime's version against a literal `0.1.0`, so bumping a
+  plugin broke a test that had nothing to do with it. It reads the plugin's own version now.
+- **The runtime hashes changed**, because the version lives in the files the hash covers: an archive that holds
+  bundles against `runtimes.json` has to trust `claude-code` and `codex` again. Bundles published before this
+  release name the old hashes, so the archive must keep trusting those rows as well, or it stops reading them.
+
 ## 0.29.0 — 2026-09-19
 
 - **Where Portal 2's published input is, and how to read it** (owner, 2026-09-19: the solution exists, keep

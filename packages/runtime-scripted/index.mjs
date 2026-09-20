@@ -18,7 +18,7 @@ export default {
   /** a script plays, not a model: every run of this runtime is a mock. */
   ai: false,
   name: "Scripted bot",
-  version: "0.1.0",
+  version: "0.29.1",
   interrupt(reason) { interrupted = reason; },
   async configure(runDir, broker, brief) {
     const bot = brief.bot ?? process.env.AAS_BOT ?? null;
