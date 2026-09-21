@@ -87,8 +87,13 @@ export function discardChoice(cards, keep) {
     .sort((a, b) => chipsOf(rankOf(cards[a])) - chipsOf(rankOf(cards[b]))).slice(0, 5).sort((a, b) => a - b);
 }
 
+// The game writes a card's set in capitals ("JOKER", "PLANET"); jackdaw's simulator writes it as "Joker". Both are
+// the same card, so the comparison ignores case — reading it strictly is what made the first run against the real
+// game buy nothing at all and die on the big blind with $9 in hand.
+const isSet = (card, set) => String(card?.set ?? "").toUpperCase() === set;
+
 /** The first Planet card held: a free hand level, so it is used the moment it is there. */
-const planetIndex = (s) => (s.consumables?.cards ?? []).findIndex((c) => c?.set === "Planet");
+const planetIndex = (s) => (s.consumables?.cards ?? []).findIndex((c) => isSet(c, "PLANET"));
 
 /**
  * What to buy in the shop. Early on the money is worth more as a joker than as interest, so while there are fewer
@@ -100,7 +105,7 @@ export function shopChoice(s) {
   const floor = (s.ante_num ?? 1) <= 2 && (s.jokers?.count ?? 0) < 3 ? 0 : 5;
   const spendable = (s.money ?? 0) - floor;
   const jokers = (s.shop?.cards ?? []).map((c, i) => ({ c, i }))
-    .filter(({ c }) => c?.set === "Joker" && (c?.cost?.buy ?? Infinity) <= spendable);
+    .filter(({ c }) => isSet(c, "JOKER") && (c?.cost?.buy ?? Infinity) <= spendable);
   if (!jokers.length) return null;
   // Mult beats chips beats the rest, and the cheapest of the best kind: the same order jackdaw's agent uses.
   const rank = ({ c }) => (/mult/i.test(c?.value?.effect ?? "") ? 0 : /chip/i.test(c?.value?.effect ?? "") ? 1 : 2);

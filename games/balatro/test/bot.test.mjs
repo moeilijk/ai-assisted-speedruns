@@ -75,3 +75,17 @@ test("after the last attempt the bot is done", () => {
   assert.match(bot.next({ state: "GAME_OVER" }).code, /bal\.restart\(\)/, "the first game over is followed by one more attempt");
   assert.equal(bot.next({ state: "GAME_OVER" }), null, "the second one ends it (AAS_BOT_BALATRO_ATTEMPTS defaults to 1)");
 });
+
+test("the set of a card is read whatever case the game writes it in", () => {
+  // The real game says "JOKER" and "PLANET"; jackdaw's simulator says "Joker" and "Planet".
+  const joker = (set) => ({ cards: [{ set, cost: { buy: 4 }, value: { effect: "+4 Mult" } }] });
+  for (const set of ["JOKER", "Joker", "joker"]) {
+    assert.equal(shopChoice({ ante_num: 1, money: 9, jokers: { count: 0, limit: 5 }, shop: joker(set) }), 0, `set ${set} is a joker`);
+  }
+  assert.equal(shopChoice({ ante_num: 1, money: 9, jokers: { count: 0, limit: 5 }, shop: joker("PLANET") }), null, "a planet in the shop is not a joker");
+  for (const set of ["PLANET", "Planet"]) {
+    const bot = createBot();
+    const s = { state: "SELECTING_HAND", consumables: { cards: [{ set }] }, round: { hands_left: 4, discards_left: 4 }, hand: { cards: [{ key: "H_T", value: { rank: "T" } }] } };
+    assert.match(bot.next(s).code, /bal\.use\(0\)/, `set ${set} is used at once`);
+  }
+});

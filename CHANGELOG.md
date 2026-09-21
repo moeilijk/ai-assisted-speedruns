@@ -12,6 +12,22 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.3 — 2026-09-21
+
+- **The Balatro mock clears ante 1 in the real game** (owner, 2026-09-21: "18. akkoord"). Run against Balatro
+  1.0.1o on seed `YLNKMKFJ` at 14:25 CEST: *Victory (Ante 1)* in 19 steps — the small blind in two hands, two
+  jokers bought (Wrathful Joker at $5, Sly Joker at $3), the big blind in one hand, a third joker, then the boss
+  blind with one discard and three hands.
+- What the first run found, at 14:22 on the same seed: **the game writes a card's set in capitals** (`JOKER`,
+  `PLANET`) while jackdaw's simulator writes `Joker`. `shopChoice` compared strictly, so the bot bought nothing at
+  all, sat on $9 and died on the big blind — twice, identically, which at least showed the seed is as deterministic
+  in the game as it is in the simulator. The comparison ignores case now, and a test holds it to that in both
+  spellings.
+- So the simulator's fidelity holds where it was checked: jackdaw said this seed clears ante 1 and the game agrees.
+  That is one seed, not a proof of the engine.
+- The measurement that stands behind the policy is unchanged: 38 of 60 seeds in the simulator. A mock on a seed of
+  its own wins every time; on whatever seed the game hands out it is about two in three.
+
 ## 0.29.2 — 2026-09-21
 
 - **Balatro's mock run gets past the first blind** (owner, 2026-09-21: "regel via de bot(s) een winnend ante 1

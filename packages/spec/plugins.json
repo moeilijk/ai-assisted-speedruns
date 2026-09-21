@@ -66,9 +66,9 @@
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.29.2",
+      "version": "0.29.3",
       "stub": false,
-      "sha256": "7d24d09a9bc412f3ab7fe9fbb990aa2e68118521f6a4e66d304c722d06c90512"
+      "sha256": "584624cc452127e2d2e6dacdb95e3000d759530474b27f31ffc24ac3b4c41ea0"
     },
     {
       "kind": "game",
