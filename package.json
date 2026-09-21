@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.29.4",
+  "version": "0.29.5",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -69,7 +69,7 @@
     "balatro:stop": "node games/balatro/stop-all.mjs",
     "balatro:doctor": "node packages/core/src/cli.mjs doctor --game games/balatro/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "balatro:check": "node packages/core/src/cli.mjs check-connection --game games/balatro/plugin.mjs",
-    "balatro:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/balatro/plugin.mjs --bot games/balatro/bot.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
+    "balatro:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/balatro/plugin.mjs --bot games/balatro/bot.mjs --recorder obs --timer livesplit --overlay-port 8765 --goal ante1 --seed YLNKMKFJ --run-dir",
     "balatro:run": "node packages/core/src/cli.mjs run --runtime claude-code --game games/balatro/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir"
   },
   "bin": {

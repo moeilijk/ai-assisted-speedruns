@@ -12,6 +12,14 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.5 — 2026-09-21
+
+- **`npm run balatro:scripted` plays the seed the mock is measured on**: `--goal ante1 --seed YLNKMKFJ` (owner,
+  2026-09-21: "24. als 23 klaar is"). On that seed the bot wins ante 1 every time — checked against the game at
+  14:25 and again in the full mock at 14:50 — so the chain test has the same outcome on every machine. On a seed
+  the game picks itself it is about two in three (38 of 60 in the simulator). The seed sits in the mock's own
+  script, not in the plugin: a run that is not the mock still gets whatever seed it was given, or none.
+
 ## 0.29.4 — 2026-09-21
 
 - **A bundle said nothing about the build it was played on, depending on which shell published it.** `aas publish`
