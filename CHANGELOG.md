@@ -12,6 +12,24 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.4 — 2026-09-21
+
+- **A bundle said nothing about the build it was played on, depending on which shell published it.** `aas publish`
+  takes no `--game`, so the CLI never loaded the game's own settings for it (`.local/games/<game>.env`), the plugin
+  could not find its game folder, and `summary.game` came out with `version: null` and `mods: []`. Found by
+  publishing the Balatro mock of 0.29.3 from a bare shell: *"reproducible — summary.game has no game version"*, and
+  an empty mod list for a run that had Lovely, Steamodded and balatrobot in it. Publishing now loads the game's
+  settings from the run's own brief, and the same bundle says `Balatro 1.0.1o-FULL; Lovely 0.9.0, Steamodded
+  1.0.0-beta-1814a, balatrobot 1.5.2`.
+- This is the first thing the full mock run found that would have hit a real run: an AI run published the same way
+  would have been not conforming, for a reason that has nothing to do with the run.
+- `packages/core/test/publish-settings.test.mjs` holds it: a plugin whose `build()` can only answer when its own
+  settings file is loaded, published from a shell that knows nothing about the game. Checked against the bug by
+  putting it back: the test fails without the one line that fixes it.
+- `packages/spec/plugins.json` was one release out of date — 0.29.3 regenerated it and then edited the Balatro
+  README, which is part of the plugin's hash. The guard from 0.29.1 refused to write and the test failed, which is
+  what it is for, one release later than would have been ideal.
+
 ## 0.29.3 — 2026-09-21
 
 - **The Balatro mock clears ante 1 in the real game** (owner, 2026-09-21: "18. akkoord"). Run against Balatro

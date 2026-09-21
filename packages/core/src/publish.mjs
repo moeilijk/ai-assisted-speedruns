@@ -19,6 +19,7 @@ import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin, runtimeIdentity } from "./plugins.mjs";
+import { loadSettings } from "./settings.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
 import { CODE_SCHEMA, bindingLine, recordingVideos } from "./videos.mjs";
@@ -125,6 +126,11 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // 2. the other required files
   for (const f of ["tools.json", "AGENTS.md", "documentation.md"]) if (fs.existsSync(path.join(runDir, f))) fs.copyFileSync(path.join(runDir, f), path.join(outDir, f));
   copyTree(path.join(runDir, "runtime-config"), path.join(outDir, "runtime-config"));
+  // The game's own settings before the plugin is asked anything: `aas publish` takes no --game, so the CLI could not
+  // load them, and a plugin that cannot find its game folder reports no build and no mods — a bundle that is then
+  // "not conforming" for a reason that has nothing to do with the run. Measured on Balatro on 2026-09-21: published
+  // from a bare shell it said version null and mods [], while three mods had run.
+  if (brief.gameModule) loadSettings(brief.gameModule);
   const plugin = brief.gameModule ? await loadGamePlugin(brief.gameModule) : null;
   for (const src of plugin?.gameConfig ?? []) {
     if (!fs.existsSync(src)) continue;
