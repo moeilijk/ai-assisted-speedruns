@@ -179,8 +179,10 @@ test("through the sandboxed broker: three tools, the controller works, balatrobo
   assert.equal(t.bot.state.money, 4, "the direct `set` never reached the game");
 });
 
-test("the scripted player plays the largest group of one rank, filled up with the highest cards", async () => {
-  const { pickHand } = await import("../bot.mjs");
-  const cards = ["2", "K", "7", "K", "A", "3", "K", "9"].map((rank) => ({ value: { rank } }));
-  assert.deepEqual(pickHand(cards), [1, 3, 4, 6, 7]);
+test("the scripted player plays the hand that scores most, not the biggest group", async () => {
+  const { bestHand } = await import("../bot.mjs");
+  const cards = ["2", "K", "7", "K", "A", "3", "K", "9"].map((rank, i) => ({ key: `${"HSCDHSCD"[i]}_${rank}`, value: { rank } }));
+  const best = bestHand(cards);
+  assert.equal(best.type, "Three of a Kind");
+  assert.deepEqual(best.indices, [1, 3, 6], "the three kings, and nothing that does not score");
 });

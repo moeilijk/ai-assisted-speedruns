@@ -12,6 +12,28 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.29.2 — 2026-09-21
+
+- **Balatro's mock run gets past the first blind** (owner, 2026-09-21: "regel via de bot(s) een winnend ante 1
+  script voor mock"). The old policy — play the largest group of one rank, buy nothing — lost in ante 1 both times
+  it was tried (`mock-01`, 19-09: game over in round 1, then in round 2), so the chain was never tested beyond the
+  first blind.
+- The new policy in `games/balatro/bot.mjs` is **ported from the `smart_agent` of TylerFlar/jackdaw-balatro** (MIT,
+  recorded in `games/balatro/UPSTREAM.json`), a 1:1 Python reimplementation of Balatro with a PRNG that is bit-exact
+  against LuaJIT 2.1: play the best-scoring set of one to five cards (with the hand's own level out of the state),
+  discard a hopeless hand while hands and discards remain, use a Planet card at once, spend the early money on a
+  joker (mult before chips), skip packs.
+- **Measured before it touches the game.** jackdaw was installed and driven over 30 seeds (Red Deck, White Stake);
+  `bot.mjs` itself was run inside that simulator through a Node bridge, so the numbers are this file's, not a
+  relative's: **ante 1 cleared on 17 of 30 seeds, with zero illegal actions**. jackdaw's own agent manages 22 of 30
+  (it also weighs what a joker does, which the bridge could not show it), and the policy this replaces 0 of 30.
+- Seven tests in `games/balatro/test/bot.test.mjs` hold the policy to what it claims: the hand it reads out of a
+  hand of cards (including the ace counting low in a straight, and a full house beating the three of a kind inside
+  it), what it throws away, what it buys at which interest floor, and the order it walks the phases in.
+- Not yet checked against the game itself: that waits for a run on the owner's machine. `games/balatro/plugin.mjs`
+  already starts a run on a set seed, so the mock can be pinned once the simulator's fidelity has been confirmed
+  against one real ante.
+
 ## 0.29.1 — 2026-09-20
 
 - **Every plugin's version now says which release it is** (owner, 2026-09-20: the requirement that versions are

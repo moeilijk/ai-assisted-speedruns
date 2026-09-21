@@ -59,7 +59,7 @@ const toMenu = async (rpc, log) => {
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.29.1",
+  version: "0.29.2",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",

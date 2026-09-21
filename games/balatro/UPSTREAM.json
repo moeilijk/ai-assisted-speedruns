@@ -27,7 +27,12 @@
     "url": "https://codeload.github.com/coder/balatrobot/zip/refs/tags/v1.5.2",
     "sha256": "7b1352be6b79d3190a3ab7cc0c9a88b3af7d5247a0dc8a8be09252b0ee241d5e",
     "folder": "balatrobot",
-    "files": ["balatrobot.json", "balatrobot.lua", "LICENSE", "src/lua/"],
+    "files": [
+      "balatrobot.json",
+      "balatrobot.lua",
+      "LICENSE",
+      "src/lua/"
+    ],
     "settings": {
       "BALATROBOT_AUDIO": "1",
       "BALATROBOT_FAST": "0",
@@ -37,5 +42,11 @@
       "BALATROBOT_GAMESPEED": "4"
     },
     "license": "MIT"
+  },
+  "jackdaw": {
+    "repo": "https://github.com/TylerFlar/jackdaw-balatro",
+    "license": "MIT, Copyright (c) 2026 Tyler Flar",
+    "used_by": "bot.mjs (the scripted player's policy, ported from jackdaw/cli/smart_agent.py)",
+    "note": "Not shipped and not installed: a 1:1 Python reimplementation of Balatro with a bit-exact PRNG, used to measure the policy over seeds before it touches the game. Its own validation bridge plays against live Balatro through the same balatrobot API this plugin uses."
   }
 }
