@@ -66,17 +66,10 @@ const SEGMENTS = ENDS.map((e) => e.split ?? e.label);
 const upper = (b) => Object.fromEntries(Object.entries(b ?? {}).filter(([, v]) => v).map(([k]) => [k, true]));
 /** Buttons as the agent may give them: ["A", "Right"] or { A: true, Right: true }. */
 /**
- * Buttons reach the game through lua/hold.lua. The tool's press_buttons sets them between frames, and BizHawk clears
- * such overrides when the next frame starts (measured 2026-09-23: Mario at x 58 after 600 frames of TASVideos 3728M,
- * the movie at 916). The script sets them at the start of every frame from the value "aas_held" ("Right+B"), which the
- * plugin sets through the tool before it advances; with it the same 600 frames end at 916.
+ * Buttons go with the frames they are held for: the tool's frame_advance sets them before each of those frames
+ * (bizhawk-mcp-native v0.3.2). A console button (Reset, Power) is given by its own name. Measured 2026-09-23 on
+ * 600 frames of TASVideos 3728M, which presses Reset on frame 0: Mario at x 916, as in the movie.
  */
-const HOLD_LUA = join(here, "lua", "hold.lua");
-const holdLoaded = async () => ((await call("lua_list")).scripts ?? []).some((s) => /[\\/]hold\.lua$/.test(s.path) && s.enabled);
-async function ensureHold() {
-  if (!(await holdLoaded())) await call("lua_load", { path: hostPath(HOLD_LUA) });
-}
-const hold = (buttons) => call("userdata_set", { key: "aas_held", value: buttons.join("+") });
 
 const buttonMap = (buttons) => (Array.isArray(buttons) ? Object.fromEntries(buttons.map((b) => [String(b), true])) : upper(buttons));
 
@@ -85,7 +78,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.33.1",
+  version: "0.33.2",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",
@@ -104,7 +97,7 @@ export default {
       { env: "AAS_BIZHAWK_ROM", label: "ROM of the game", kind: "file", what: "The game's ROM. The profile checks it by its SHA-1, so it has to be the exact dump the profile names." },
     ],
     install: join(here, "install-bizhawk.mjs"),
-    installs: "Download BizHawk 2.11.1 and bizhawk-mcp-native v0.3.0 (both pinned), then let BizHawk ask once whether it may load the tool",
+    installs: "Download BizHawk 2.11.1 and bizhawk-mcp-native v0.3.2 (our fork; both pinned), then let BizHawk ask once whether it may load the tool",
     fixes: { allow: { script: join(here, "allow-tool.mjs"), label: "Let BizHawk ask whether it may load the tool (once per version)" } },
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
@@ -170,16 +163,23 @@ export default {
       const started = Date.now();
       emit("game.playback", { phase: "start", index: i, command: label, frames });
       try {
-        await ensureHold();
+        // All steps go in as few calls as the tool takes (600 frames each): between calls the emulator stands still,
+        // and a call per short step cut the game's sound up (measured 2026-09-23: 15.2 silences a second with calls
+        // of one frame, 2.3 with calls of 600, as many as running freely).
+        let batch = [], inBatch = 0;
+        const flush = async () => { if (batch.length) await call("frame_advance", { steps: batch }); batch = []; inBatch = 0; };
         for (const s of steps) {
           const buttons = buttonMap(s.buttons);
-          const n = Math.max(0, Math.floor(s.frames ?? 1));
-          await hold(Object.keys(buttons));
-          for (let left = n; left > 0; left -= 600) await call("frame_advance", { count: Math.min(600, left) });
+          let left = Math.max(0, Math.floor(s.frames ?? 1));
+          while (left > 0) {
+            const n = Math.min(left, 600 - inBatch);
+            batch.push(Object.keys(buttons).length ? { buttons, frames: n } : { frames: n });
+            inBatch += n; left -= n;
+            if (inBatch === 600) await flush();
+          }
         }
-        await hold([]);
+        await flush();
       } catch (error) {
-        await hold([]).catch(() => {});
         emit("game.playback", { phase: "end", index: i, error: String(error?.message ?? error), wall_ms: Date.now() - started, command: label });
         throw error;
       }
@@ -217,13 +217,8 @@ export default {
     if (resume) return { readyAt: new Date() };
     const info = await call("get_info");
     if (PROFILE && String(info.rom_hash).toUpperCase() !== PROFILE.rom.sha1) throw new Error(`the loaded ROM is not ${PROFILE.name}: SHA-1 ${info.rom_hash}, the profile names ${PROFILE.rom.sha1}`);
-    // A reboot while BizHawk's Lua Console is open makes the console start its own entry for the Lua folder as a script,
-    // which shows an error dialog (LuaConsole.cs, 2.11.1). Every Lua tool of bizhawk-mcp-native opens that console, so
-    // nothing here touches Lua before the reboot: the emulator is rebooted first, the script loaded after.
     await call("pause");
     await call("reboot");
-    await call("userdata_set", { key: "aas_held", value: "" });
-    await ensureHold();
     log(`${info.rom_name} (${info.system_id}) from power-on, paused`);
     return { readyAt: new Date() };
   },
@@ -241,8 +236,6 @@ export default {
     if (!file) throw new Error(`save ${name ?? "(none)"} not found (looked in ${candidates.join(", ")})`);
     await call("pause");
     await call("load_state", { path: hostPath(file) });
-    await ensureHold();
-    await hold([]);
     const info = await call("get_info");
     log(`save ${name} loaded at frame ${info.framecount}`);
     return { readyAt: new Date() };
@@ -272,7 +265,8 @@ export default {
     const dir = bizhawkDir();
     rows.push({ ok: Boolean(dir && existsSync(join(dir, "EmuHawk.exe"))), what: "EmuHawk.exe", detail: dir ? join(dir, "EmuHawk.exe") : "no BizHawk folder" });
     const trust = dir ? trustState(dir) : { trusted: false, detail: "no BizHawk folder" };
-    rows.push({ ok: trust.trusted, what: "BizHawk trusts bizhawk-mcp-native", detail: trust.detail, fix: "allow" });
+    // An older build of the tool is replaced by installing, not allowed: the row then offers the install step.
+    rows.push({ ok: trust.trusted, what: "BizHawk trusts bizhawk-mcp-native", detail: trust.detail, fix: trust.outdated ? null : "allow" });
     const rom = romPath();
     const okRom = Boolean(rom && existsSync(rom));
     rows.push({ ok: okRom, what: `ROM of ${PROFILE?.name ?? "the profile"}`, detail: rom ?? "no ROM set (AAS_BIZHAWK_ROM)" });

@@ -17,12 +17,12 @@ export async function allowTool({ log = console.log } = {}) {
   const pin = JSON.parse(fs.readFileSync(path.join(here, "UPSTREAM.json"), "utf8")).bizhawk_mcp_native;
   const dir = bizhawkDir();
   const before = trustState(dir);
-  if (!before.installed) throw new Error(before.detail);
+  if (!before.installed || before.outdated) throw new Error(before.detail);
   if (before.trusted) { log(before.detail); return before; }
   log([
     "BizHawk opens now, without a game, and asks:",
     '  "Trust this external tool to run on your device?"',
-    `It asks about ${pin.dll}: bizhawk-mcp-native ${pin.version} by StealthC (${pin.license.split(",")[0]}), ${pin.repo},`,
+    `It asks about ${pin.dll}: bizhawk-mcp-native ${pin.version} by StealthC (${pin.license.split(",")[0]}) as built by the fork ${pin.repo},`,
     `downloaded from its release and checked against sha256 ${pin.sha256.slice(0, 16)}…. It lets this tooling pause`,
     "the game, advance frames, press buttons and take screenshots. Choose Yes to allow it; BizHawk then closes again.",
   ].join("\n"));

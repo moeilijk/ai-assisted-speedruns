@@ -18,7 +18,7 @@ One plugin, one profile per game (`profiles/<id>.json`, chosen with `AAS_BIZHAWK
 | | |
 |---|---|
 | id | `bizhawk` |
-| upstream | BizHawk 2.11.1 (MIT for the frontend; each core its own license, most GPL), bizhawk-mcp-native v0.3.0 (MIT); both pinned in [UPSTREAM.json](UPSTREAM.json) and not redistributed |
+| upstream | BizHawk 2.11.1 (MIT for the frontend; each core its own license, most GPL), bizhawk-mcp-native v0.3.2, our fork of StealthC's v0.3.0 (MIT); both pinned in [UPSTREAM.json](UPSTREAM.json) and not redistributed |
 | profiles | `smb`: Super Mario Bros. (NES), your own ROM; ends per world and the game's end (the axe in 8-4), from [periwinkle9's autosplitter](https://github.com/periwinkle9/smb-autosplitter) (Zlib); its mock replays the TAS [#3728](https://tasvideos.org/3728M) by HappyLee & Mars608 (CC BY 2.0, tool-assisted) through World 2 |
 | | `nes15` (test): the Fifteen Puzzle by Mathew Brenaman, BSD-2-Clause, [source](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0); end `solved` (play_state, RAM 0x2F, = 3) |
 | category | `observation: full`, `input: input`, `timing: paused-think` |
@@ -47,15 +47,16 @@ ever appears during a run:
   movie's header. `npm run bizhawk:tas -- <profile>` answers Cancel itself: BizHawk writes the movie without that
   SHA-1, and the ROM is checked by the profile's own SHA-1 before a run starts.
 
-## The Lua Console
+## The tool
 
-The plugin holds buttons through a small Lua script, `lua/hold.lua`, which it loads into EmuHawk after the power-on
-reboot. BizHawk opens its Lua Console window for that, next to the game, and it stays open until EmuHawk closes; OBS
-records only the game window. The tool's own `press_buttons` sets buttons between frames, and BizHawk clears them
-when the next frame starts, so a held button reached the game on hardly any frame (Super Mario Bros., 600 frames of
-the TAS: x 58 instead of 916). The script sets them at the start of every frame, and the same 600 frames end at 916.
-A reboot while the Lua Console is open makes BizHawk show an error about its Lua folder, so nothing touches Lua before
-the reboot.
+The plugin talks to bizhawk-mcp-native through our fork, [moeilijk/bizhawk-mcp-native](https://github.com/moeilijk/bizhawk-mcp-native):
+StealthC's v0.3.0 with two changes, both also offered upstream
+([#1](https://github.com/StealthC/bizhawk-mcp-native/pull/1), [#2](https://github.com/StealthC/bizhawk-mcp-native/pull/2)).
+`press_buttons` put "P1 " in front of every name, so a console button such as Reset could not be pressed; a TAS
+movie that presses Reset on frame 0 then falls out of sync (Super Mario Bros.: Mario at x 58 after 600 frames instead
+of 916). And `frame_advance` can hold buttons on each of its frames, one call for what took one call per frame: 600
+frames in 11.8 s instead of 27.5 s, the same result frame for frame. The launcher refuses another build of the tool,
+since an older one ignores the held buttons and the game would get no input.
 
 ## The mock
 
@@ -82,5 +83,6 @@ sync in BizHawk: the profile's `bot.frames` stops the mock where it still is (Su
 ## Known limits
 
 - The agent's tools read memory and play buttons; memory writes, Lua and state loading are not offered to the agent.
-- bizhawk-mcp-native is a small project that has not changed since v0.3.0 (2026-08-04). It is pinned, and the plugin
-  uses only tools whose answers were measured against it (`test/fake-bizhawk-mcp.mjs` holds them).
+- bizhawk-mcp-native is a small project; its last release is v0.3.0 (2026-08-04), and its author looks in now and then
+  (CONTRIBUTING.md). The fork is pinned to that release plus our two changes, and the plugin uses only tools whose
+  answers were measured against it (`test/fake-bizhawk-mcp.mjs` holds them).

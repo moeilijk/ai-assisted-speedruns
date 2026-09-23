@@ -75,9 +75,9 @@
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.33.1",
+      "version": "0.33.2",
       "stub": false,
-      "sha256": "8f219e7c878dc551451c8c59d7613d601a69f26c0e8ff642526f3f983ae1bbaa"
+      "sha256": "c6adca5926601d2f73ecf1910a1371cf9dc4bde5038adb1487d3698a9cc18afe"
     },
     {
       "kind": "game",

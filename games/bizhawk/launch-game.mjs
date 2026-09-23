@@ -48,9 +48,11 @@ if (quietName && !soundDevice) throw new Error(`the quiet audio device "${quietN
 // only the latest one of the pair counts), and the filter sits on the input the Lua script gives, not on a movie's. A
 // TAS presses both on purpose, so the setting is Allow (2) and the plugin's input reaches the game as a movie's does
 // (measured 2026-09-23: 84 instead of 108 at frame 240 of TASVideos 3728M under Priority).
+// BizHawk's own "sound throttle" paces the emulation by the sound it plays, so the frames a call advances come at the
+// game's own speed and its sound has no gaps (measured 2026-09-23: 61.0 fps for a 600-frame call, 57.4 without it).
 // A profile may name the core its game is played on (a TAS movie belongs to one core); BizHawk's own preference then says so.
 const { PROFILE } = await import("./plugin.mjs");
-setConfig(dir, { SoundDevice: soundDevice, MuteFrameAdvance: false, DispChromeStatusBarWindowed: false, DisplayMessages: false, FirstBoot: false, OpposingDirPolicy: 2 }, { Rewind: { Enabled: false }, ...(PROFILE?.core ? { PreferredCores: { [PROFILE.system]: PROFILE.core } } : {}) });
+setConfig(dir, { SoundDevice: soundDevice, MuteFrameAdvance: false, DispChromeStatusBarWindowed: false, DisplayMessages: false, FirstBoot: false, OpposingDirPolicy: 2, SoundThrottle: true }, { Rewind: { Enabled: false }, ...(PROFILE?.core ? { PreferredCores: { [PROFILE.system]: PROFILE.core } } : {}) });
 const child = spawn(exe, ["--open-ext-tool-dll=BizHawkMcp", "--chromeless", hostPath(rom)], { cwd: dir, detached: true, stdio: "ignore" });
 child.unref();
 console.log(`starting ${exe} with ${path.basename(rom)}${soundDevice ? `, sound on ${soundDevice}` : ""}`);

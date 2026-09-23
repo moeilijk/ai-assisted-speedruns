@@ -159,7 +159,7 @@ The games, and the mods and tools the setup downloads or builds, are not in this
 | Balatro | [balatrobot](https://github.com/coder/balatrobot) | MIT |
 | Balatro | [jackdaw-balatro](https://github.com/TylerFlar/jackdaw-balatro) (the scripted bot's policy is ported from it) | MIT |
 | BizHawk | [BizHawk](https://github.com/TASEmulators/BizHawk) 2.11.1 | MIT (the EmuHawk frontend); each core its own, most GPL |
-| BizHawk | [bizhawk-mcp-native](https://github.com/StealthC/bizhawk-mcp-native) v0.3.0 by StealthC | MIT |
+| BizHawk | [bizhawk-mcp-native](https://github.com/StealthC/bizhawk-mcp-native) by StealthC, through our fork [moeilijk/bizhawk-mcp-native](https://github.com/moeilijk/bizhawk-mcp-native) v0.3.2 | MIT |
 | BizHawk | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
 | BizHawk | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
 | BizHawk | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |

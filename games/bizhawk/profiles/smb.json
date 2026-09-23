@@ -16,13 +16,13 @@
       "domain": "RAM",
       "address": 1887,
       "width": 8,
-      "about": "0 = world 1 \u2026 7 = world 8"
+      "about": "0 = world 1 … 7 = world 8"
     },
     "LevelNumber": {
       "domain": "RAM",
       "address": 1884,
       "width": 8,
-      "about": "0 = level 1 \u2026 3 = level 4"
+      "about": "0 = level 1 … 3 = level 4"
     },
     "OperMode": {
       "domain": "RAM",
@@ -143,11 +143,11 @@
     "sha256": "b099672b65a9305ce6deef16fcf8a1ca106b1a8c7c904d90ed3fab5a081185d3",
     "movie": "happylee_mars608-smb-warpless.fm2",
     "emulator": "FCEUX 2.2.1",
-    "sync": "Imported into BizHawk 2.11.1 (NesHawk) it stays in sync through World 2 and falls out of sync in World 3 (measured twice, 2026-09-23): the mock stops after World 2.",
+    "sync": "Imported into BizHawk 2.11.1 (NesHawk), the movie falls out of sync in 3-1 when BizHawk plays it itself, without any tool: from frame 17460 to 20040 Mario stands at x 496-506 (measured 2026-09-23 19:46-19:53; the movie was made in FCEUX 2.2.1). Through bizhawk-mcp-native v0.3.2 it follows the movie through World 2 and stops at the same place in 3-1. The mock stops after World 2.",
     "core": "NesHawk (BizHawk's importer puts it in the movie's header; the mock refuses another core)"
   },
   "bot": {
-    "about": "The mock replays the TAS's own input, frame by frame, through the same buttons the agent has, from power-on; its goal is World 2.",
+    "about": "The mock replays the TAS's own input, frame by frame, through the same buttons the agent has, from power-on; its goal is World 2, the part of the movie BizHawk plays in sync.",
     "movie": "happylee_mars608-smb-warpless.fm2.bk2",
     "frames": 17500
   },

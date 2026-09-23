@@ -12,6 +12,34 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.2 — 2026-09-23
+
+- **Correction to 0.33.1: BizHawk does not lose the buttons, the Reset was missing.** 0.33.1 said the tool's
+  `press_buttons` was cleared when the next frame starts, and moved the input to a Lua script. Measured frame by
+  frame afterwards (the joypad the game reads, RAM 0x06FC, 400 frames), `press_buttons` delivered the movie's input on
+  399 of them; the one difference was the Reset the movie presses on frame 0, which `press_buttons` could not press:
+  it put "P1 " in front of every name. Without that Reset the Lua script ended at the same x 58.
+- **bizhawk-mcp-native through our fork** [moeilijk/bizhawk-mcp-native](https://github.com/moeilijk/bizhawk-mcp-native)
+  v0.3.2 (owner, 2026-09-23): StealthC's v0.3.0 plus two changes, both offered upstream as pull requests.
+  `press_buttons` presses console buttons such as Reset
+  ([#1](https://github.com/StealthC/bizhawk-mcp-native/pull/1)), and `frame_advance` holds buttons on each of its
+  frames ([#2](https://github.com/StealthC/bizhawk-mcp-native/pull/2)): 600 frames of the TAS in 11.8 s, against
+  27.5 s with a call per frame, both at x 916 as in the movie. Built and released by the fork's own CI, pinned by
+  sha256. `npm run bizhawk:install` installs it, and BizHawk asks once more whether it may load the tool.
+- The Lua script is gone, and with it the Lua Console window next to the game and BizHawk's error on a reboot while
+  that console was open.
+- **The game's sound during playback.** The tool leaves the emulator paused between calls, and the plugin sent a call
+  per input step, often a few frames long: the recordings had 3.6 to 4.7 silences of 20 ms or more a second. The
+  plugin now sends a playback's steps in calls of up to 600 frames (the fork's `frame_advance` `steps`), and the
+  launcher turns on BizHawk's own `SoundThrottle`, which paces the frames by the sound (61.0 fps in a 600-frame call,
+  57.4 without it). Measured on 3-1: 2.3 silences a second with 600-frame calls, 2.4 running freely (the music's own
+  rests), 15.2 with a call per frame. The Super Mario Bros. mock through World 2: 0.5 silences a second (4.7 before),
+  and 00:05:00 real time for 00:04:49.5 of game time (5:56 before).
+- The Super Mario Bros. mock stays at World 2. BizHawk falls out of sync with TASVideos 3728M in 3-1 when it plays the
+  movie itself, without any tool (Mario stands at x 496-506 from frame 17460 on); the movie was made in FCEUX.
+- The launcher refuses another build of the tool, and `aas doctor` reports it: an older one takes the same calls, ignores the held
+  buttons, and the game would get no input without an error.
+
 ## 0.33.1 — 2026-09-23
 
 - **A run's goal milestone reaches the timer, the recorder and the autosave.** When the milestone of the run's goal

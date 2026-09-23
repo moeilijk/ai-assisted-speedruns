@@ -8,14 +8,15 @@
     "license": "MIT (the EmuHawk frontend); every bundled core carries its own license, most of them GPL"
   },
   "bizhawk_mcp_native": {
-    "repo": "https://github.com/StealthC/bizhawk-mcp-native",
-    "version": "v0.3.0",
-    "commit": "e416f1a561e2e0e1abcb75b141c477aa9d8ed3e6",
-    "url": "https://github.com/StealthC/bizhawk-mcp-native/releases/download/v0.3.0/BizHawkMcp-stable-win-2.11.1.zip",
-    "sha256": "3f56352b57a6b69805e6bbc545d095510f20a1a6be1204449d081a9d268a34cd",
+    "repo": "https://github.com/moeilijk/bizhawk-mcp-native",
+    "version": "v0.3.2",
+    "commit": "01f27b6804c0a2e26d372bacbc708004835e955e",
+    "url": "https://github.com/moeilijk/bizhawk-mcp-native/releases/download/v0.3.2/BizHawkMcp-stable-win-2.11.1.zip",
+    "sha256": "730862aebd7f108bf29c489da5bd3569530b066316b22b42e0e3dd4b1b5208b8",
     "dll": "BizHawkMcp.dll",
     "license": "MIT, Copyright (c) StealthC",
-    "endpoint": "http://127.0.0.1:8767/mcp/"
+    "endpoint": "http://127.0.0.1:8767/mcp/",
+    "upstream": "https://github.com/StealthC/bizhawk-mcp-native v0.3.0 (e416f1a); the fork adds console buttons and held buttons (upstream PRs #1 and #2) and steps in one frame_advance call"
   },
   "test_roms": {
     "nes15": {
