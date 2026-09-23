@@ -77,8 +77,13 @@ test("the live archive: a run with proof on its tickets, and the upload", { skip
     assert.equal(a1.proof, "signed", JSON.stringify(a1));
     assert.equal(a1.status, "rejected", "a test upload is refused after the checks");
     assert.equal(a1.test, true);
-    const t1 = await ticketInfo(good.state.tickets[0].ticket);
-    assert.ok(t1.submitted_at, "the ticket is marked submitted");
+    // The archive received every head it signed; a test upload leaves the tickets unsubmitted (nothing is kept).
+    for (const t of good.state.tickets) {
+      const info = await ticketInfo(t.ticket);
+      assert.equal(info.heads, good.state.heads.filter((h) => h.segment === t.segment).length);
+      assert.equal(info.forks, 0);
+      assert.equal(info.submitted_at, null);
+    }
 
     // 2. The public timeline edited after it was made, manifest made again so the bundle is consistent: invalid.
     const edited = await provenRun(dir, "e2e-edited");
@@ -101,6 +106,12 @@ test("the live archive: a run with proof on its tickets, and the upload", { skip
     const a3 = await uploadBundle(forked.zip);
     log(`fork: tickets ${forked.state.tickets.map((x) => x.ticket).join(", ")}; submission ${a3.submission}; proof ${a3.proof}; ${(a3.reasons ?? []).join("; ")}`);
     assert.equal(a3.proof, "review", JSON.stringify(a3));
+    // What this test made at the archive, removed again.
+    for (const r of [good, edited, forked]) for (const t of r.state.tickets) {
+      const d = await archiveFetch(`${proofUrl()}/api/v1/tickets/${t.ticket}`, { method: "DELETE", headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
+      assert.equal(d.status, 200, `deleting ${t.ticket} answered ${d.status}`);
+    }
+    log("the test's tickets are deleted at the archive");
   } finally {
     useArchiveFetch(null);
     await spt.close?.();

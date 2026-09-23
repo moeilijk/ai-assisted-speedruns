@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.6 — 2026-09-23
+
+- The e2e test asserts what the archive does with a test upload: every head received, no fork, the tickets left
+  unsubmitted (nothing is kept), and it deletes its tickets at the archive when it is done. Measured at 14:27 on the
+  archive's e2e account: submissions 57 (proof signed), 58 (invalid) and 59 (review), each refused as a test upload.
+
 ## 0.32.5 — 2026-09-23
 
 - **`aas run` refuses a run that has already started.** It configured only when a directory had no `brief.json`,
