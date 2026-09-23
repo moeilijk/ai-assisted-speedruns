@@ -109,12 +109,18 @@ export default {
   },
   /** The private session log of a run, for `aas publish`. */
   findSession(runDir) { return findClaudeSession(runDir); },
+  /** Every session log Claude Code wrote for this run directory, oldest first: what the run's proof covers. */
+  sessionLogs(runDir) {
+    const dir = claudeProjectDir(runDir);
+    if (!fs.existsSync(dir)) return [];
+    return fs.readdirSync(dir).filter((f) => f.endsWith(".jsonl")).map((f) => path.join(dir, f)).sort((a, b) => fs.statSync(a).birthtimeMs - fs.statSync(b).birthtimeMs || (a < b ? -1 : 1));
+  },
   modelReports(runDir) { return claudeModelReports(runDir); },
   /** Exports the private log into the public timeline and summary (schema 2; publish adds schema 3). */
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
   interrupt(reason) { interruptChild?.(reason); },
-  version: "0.29.1",
+  version: "0.32.0",
   async configure(runDir, broker, brief) {
     const mcp = path.join(runDir, ".mcp.json");
     const settings = path.join(runDir, ".claude", "settings.json");

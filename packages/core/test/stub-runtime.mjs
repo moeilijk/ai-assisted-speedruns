@@ -24,6 +24,8 @@ export default {
   async reconfigure(runDir, broker) {
     fs.writeFileSync(path.join(runDir, ".stub-broker.json"), JSON.stringify({ gameModule: broker.gameModule, readable: broker.readable, endpoints: broker.allowedEndpoints, envNames: broker.envNames ?? [] }));
   },
+  /** The session log this runtime writes into the run directory: what the run's proof covers. */
+  sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
   async start(runDir, brief) {
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".stub-broker.json"), "utf8"));
     const codesFile = path.join(runDir, brief.resume ? "stub-codes-resume.json" : "stub-codes.json");

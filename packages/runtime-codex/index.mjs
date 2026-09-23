@@ -89,8 +89,15 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Codex",
-  version: "0.29.1",
+  version: "0.32.0",
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
+  /** Every rollout Codex wrote with this run directory as its working directory, oldest first: what the proof covers. */
+  sessionLogs(runDir) {
+    const want = path.resolve(runDir);
+    return rolloutFiles().filter((f) => {
+      try { const fd = fs.openSync(f, "r"); const buf = Buffer.alloc(65536); const n = fs.readSync(fd, buf, 0, buf.length, 0); fs.closeSync(fd); const first = buf.subarray(0, n).toString("utf8").split("\n")[0]; return path.resolve(JSON.parse(first)?.payload?.cwd ?? "") === want; } catch { return false; }
+    }).reverse();
+  },
   async budget() { const b = checkCodexBudget(); return { ok: b.ok, percent: b.percent, max: b.max, detail: b.detail, data: { window_minutes: b.usage.windowMinutes, plan_type: b.usage.planType } }; },
   /** Read-only checks for `aas doctor`: codex on the PATH, the run directory trusted (a resume), the plan's stand. */
   async doctor({ runDir = null } = {}) {

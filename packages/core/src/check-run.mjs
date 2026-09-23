@@ -6,6 +6,7 @@
 // timeline or summary is invalid, or with --strict when any requirement is unmet.
 import { createHash } from "node:crypto";
 import { verifyBundle } from "./sign.mjs";
+import { checkProof } from "./proof.mjs";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -34,7 +35,7 @@ const SUMMARY_V2_KEYS = [
  * `core` is accepted and ignored: it used to mean "a bundle without its recording files", which is now every
  * bundle, because a recording is published where video is published and the bundle carries no link to it.
  */
-export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
+export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null } = {}) {
   const results = []; // { requirement, status: "met" | "unmet" | "invalid", detail }
   const add = (requirement, status, detail = "") => results.push({ requirement, status, detail });
   const file = (name) => path.join(runDir, name);
@@ -328,6 +329,14 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   const sig = verifyBundle(runDir);
   if (sig.signed) add("signature", sig.valid ? "met" : "invalid", sig.valid ? `valid for ${sig.fingerprint} (whose key that is, is for an archive to say)` : sig.problem ?? "invalid");
   else add("signature", "met", "not signed (optional: aas publish --sign, for a publisher who wants their bundles tied to one key)");
+  // The logs were not changed after they were written (SPEC §8.11): heads signed by the archive while the run went
+  // on, each recomputed from the private logs when they are here. A run recorded without proof is unsigned: an
+  // archive accepts it and marks it so.
+  {
+    const proof = checkProof(runDir, { privateDir: privateDir ?? (fs.existsSync(file("private")) ? file("private") : null) });
+    const status = { signed: "met", unsigned: "unmet", review: "unmet", invalid: "invalid" }[proof.status];
+    add("proof", status, proof.status === "unsigned" ? `unsigned: ${proof.detail}` : proof.status === "review" ? `for a reviewer: ${proof.detail}` : proof.detail);
+  }
   // Did a model play this run (SPEC §3)? `mock` is one word in a file the publisher signs themselves, so it is
   // not what this answers on: the runtime's own hash and what the timeline actually holds. A bundle that shows
   // none of it is read as a mock, which is the safe way round: a mock that is read
@@ -427,7 +436,8 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
         );
       for (const p of walk(runDir)) {
         // signature.json signs the manifest, so the manifest cannot list it.
-        if (["manifest.json", "run.jsonl", "signature.json"].includes(p) || p.startsWith(".")) continue;
+        // private/ is the upload's private part: bound through proof.json, never listed or published.
+        if (["manifest.json", "run.jsonl", "signature.json"].includes(p) || p.startsWith(".") || p.startsWith("private/")) continue;
         if (!listed.has(p)) problems.push(`${p}: not in manifest`);
       }
     }

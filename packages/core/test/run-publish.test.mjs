@@ -6,7 +6,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import net from "node:net";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,10 @@ import { resume } from "../src/resume.mjs";
 import { publish } from "../src/publish.mjs";
 import { computeTimeline } from "../src/timeline.mjs";
 import { configure } from "../src/configure.mjs";
+import { startFakeSite } from "./fake-site.mjs";
+import { checkProof, readState } from "../src/proof.mjs";
+import { checkUploadProof } from "../src/proof-check.mjs";
+import { readZipEntries } from "../src/zip-read.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 process.env.CODEX_HOME = process.env.CODEX_HOME ?? mkdtempSync(join(tmpdir(), "aas-codex-home-"));
@@ -44,7 +48,7 @@ async function fakeLiveSplit() {
   return { port: server.address().port, commands, close: () => new Promise((r) => server.close(() => r())) };
 }
 
-test("aas run + timeline + publish produce a conforming Portal run directory", { skip: !available && "portal-agent not checked out", timeout: 60000 }, async () => {
+test("aas run + timeline + publish produce a conforming Portal run directory", { skip: !available && "portal-agent not checked out", timeout: 60000 }, async (tc) => {
   const gameRoot = mkdtempSync(join(tmpdir(), "aas-game-"));
   const spt = await startFakeSpt({ gameRoot, readyDelayMs: 300, transitionAfterTicks: 150 });
   const ls = await fakeLiveSplit();
@@ -54,6 +58,13 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   process.env.AAS_PORTAL_GAME_ROOT = gameRoot;
   process.env.AAS_LIVESPLIT_PORT = String(ls.port);
   process.env.AAS_TIME_ZONE = "Europe/Amsterdam";
+  // An archive of its own that signs the proof, anonymous proof as a person who said yes to it, and a config
+  // directory of its own: nothing reaches the real archive and nothing is written into this user's settings.
+  const site = await startFakeSite(dirname(runDir));
+  // An open server keeps the test process alive: it is closed whatever the assertions below say.
+  tc.after(() => site.close());
+  const savedProof = Object.fromEntries(["AAS_PROOF", "AAS_PROOF_URL", "AAS_PROOF_KEYS", "XDG_CONFIG_HOME"].map((k) => [k, process.env[k]]));
+  Object.assign(process.env, { AAS_PROOF: "anonymous", AAS_PROOF_URL: site.url, AAS_PROOF_KEYS: site.keysFile, XDG_CONFIG_HOME: join(dirname(runDir), "config") });
   // A publisher key made here, for the signed bundle below.
   const signKey = join(dirname(runDir), "publisher.pem");
   writeFileSync(signKey, generateKeyPairSync("ed25519").privateKey.export({ type: "pkcs8", format: "pem" }));
@@ -157,6 +168,44 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.equal(p.summary.ai_evidence.human_turns, 0, "nobody typed into this session");
   assert.equal(p.summary.category.human, "restart-only", "it was resumed once, and nothing else was given to it");
   if (savedSignKey === undefined) delete process.env.AAS_SIGN_KEY; else process.env.AAS_SIGN_KEY = savedSignKey;
+
+  // The proof (SPEC §8.11): a ticket per segment, a head at the start and the end of each, chained, every one
+  // signed by the archive; the upload carries the logs under private/, and the archive makes the same timeline.
+  const state = readState(runDir);
+  assert.equal(state.tickets.length, 2, "a ticket for each segment");
+  assert.deepEqual(state.heads.map((h) => `${h.segment} ${h.kind}`), ["1 start", "1 end", "2 start", "2 end"]);
+  assert.equal(state.receipts.length, 4);
+  assert.equal(p.check.results.find((r) => r.requirement === "proof").status, "met");
+  assert.ok(!readFileSync(join(outDir, "proof.json"), "utf8").includes(state.tickets[0].control), "a ticket's control secret never goes in the bundle");
+  const upload = mkdtempSync(join(tmpdir(), "aas-upload-"));
+  for (const e of readZipEntries(p.zip.file)) {
+    const rel = e.name.split("/").slice(1).join("/");
+    if (!rel) continue;
+    mkdirSync(dirname(join(upload, rel)), { recursive: true });
+    writeFileSync(join(upload, rel), e.data);
+  }
+  assert.deepEqual(readdirSync(join(upload, "private")).sort(), ["brief.json", "recording.json", "run.jsonl", "session-1.jsonl"]);
+  assert.ok(!existsSync(join(outDir, "private")), "the bundle directory never holds the private part");
+  const whole = await checkUploadProof(upload, join(upload, "private"));
+  assert.equal(whole.status, "signed", whole.detail);
+  assert.match(whole.detail, /the public timeline is what the private logs make/);
+  // An edit to a log after its head was signed: the archive recomputes the head and it no longer matches.
+  const edited = mkdtempSync(join(tmpdir(), "aas-upload-edited-"));
+  cpSync(upload, edited, { recursive: true });
+  const log = readFileSync(join(edited, "private", "run.jsonl"), "utf8");
+  writeFileSync(join(edited, "private", "run.jsonl"), log.replace('"game.playback"', '"game.playbacq"'));
+  const caught = await checkUploadProof(edited, join(edited, "private"));
+  assert.equal(caught.status, "invalid");
+  assert.match(caught.detail, /run differs from what was hashed/);
+  // A public timeline edited after it was made, with honest logs: made again, it does not come out equal.
+  const retold = mkdtempSync(join(tmpdir(), "aas-upload-retold-"));
+  cpSync(upload, retold, { recursive: true });
+  appendFileSync(join(retold, "session.sanitized.jsonl"), `${JSON.stringify({ sequence: 9999, timestamp: "2026-09-23T12:00:00+02:00", elapsed_seconds: 0, kind: "message", role: "assistant", text: "added" })}\n`);
+  const retoldCheck = await checkUploadProof(retold, join(retold, "private"));
+  assert.equal(retoldCheck.status, "invalid");
+  assert.match(retoldCheck.detail, /session\.sanitized\.jsonl is not what the private logs make/);
+  await site.close();
+  for (const [k, v] of Object.entries(savedProof)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   assert.equal(p.summary.schema_version, 16);
   // This run is played by the stub runtime, which is not a model: the bundle says so in one word, and its runtime
   // agrees. An archive refuses such a bundle as an entry (SPEC §3).

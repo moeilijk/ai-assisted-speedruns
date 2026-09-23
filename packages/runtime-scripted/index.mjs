@@ -18,7 +18,7 @@ export default {
   /** a script plays, not a model: every run of this runtime is a mock. */
   ai: false,
   name: "Scripted bot",
-  version: "0.29.1",
+  version: "0.32.0",
   interrupt(reason) { interrupted = reason; },
   async configure(runDir, broker, brief) {
     const bot = brief.bot ?? process.env.AAS_BOT ?? null;
@@ -32,6 +32,8 @@ export default {
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".scripted-broker.json"), "utf8"));
     fs.writeFileSync(path.join(runDir, ".scripted-broker.json"), JSON.stringify({ ...spec, gameModule: broker.gameModule, readable: broker.readable, endpoints: broker.allowedEndpoints, envNames: broker.envNames ?? [] }));
   },
+  /** The session log this runtime writes into the run directory: what the run's proof covers. */
+  sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
   async start(runDir, brief) {
     interrupted = null;
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".scripted-broker.json"), "utf8"));

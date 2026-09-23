@@ -39,9 +39,33 @@ There are four kinds of plugin: game, runtime (starts the model), recorder and t
 1. `aas run` starts the recorder, the timer and the model against a game you started with its launch script. Everything that happens goes into one log in the run directory, which stays on your machine.
 2. `aas publish` makes a bundle from the run directory: the sanitised log, times, the model's instructions and tools, the configuration, and a hash per file. It stops if the privacy scan finds anything, and packs the bundle into a zip. The video is not included.
 3. Upload the cut, the full recording or both. The files are in `<run-dir>/recording/`, with `UPLOAD.txt` next to them. That file lists each video with its length, its chapters and the verification text its description must contain. That text links the video to the bundle. The title and description in `UPLOAD.txt` are only suggestions.
-4. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). You can check the zip first at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/).
+4. Submit the zip: `aas publish --upload` sends it under the account you signed in with, or submit it at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). You can check the zip first at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/).
 
 After `aas resume`, or after a tooling update that changes the bundle, you publish again as a new revision. See [docs/reference.md](docs/reference.md#a-new-revision).
+
+## Proof that the logs were not changed
+
+A run's logs are on the machine of the person who publishes it, so that person could edit them afterwards and
+sign the result with their own key. A signature from the publisher proves nothing against the publisher. What
+does is a record kept by someone else while the run goes on, so the run can be recorded with proof from the
+archive:
+
+- Before a segment is recorded, the tooling asks the archive for a ticket. At the start of the segment, every hour
+  during it and at its end, it sends the archive one hash of the logs as they stand. The archive signs each hash
+  with its own clock and keeps it. Only the ticket and the hash go over the line: nothing about you, your machine or
+  what happens in the run.
+- The upload carries the logs themselves in a private part. The archive recomputes every hash from them and makes
+  the public timeline again from them. A log or a timeline edited after its hash was signed no longer matches, and
+  the upload is refused.
+- The archive uses the private part for that check only. It never publishes it, never offers it for download and
+  deletes it as soon as the submission is decided, or after 30 days when a reviewer has not decided by then. Keep
+  your run directory as long as you want your run to be defensible: in a dispute the archive asks for the private
+  part again, and it must match the hashes it signed.
+
+Proof is recorded when you are signed in (`aas login`, which opens the archive in your browser, like `claude`
+does) or when you set `AAS_PROOF=anonymous`. An anonymous ticket is not tied to anyone and expires 60 days after its
+last hash when the run is not submitted, an account's after 90. `aas tickets` lists the tickets of your runs and
+extends, revokes or deletes them. Without either, a run is unsigned: the archive accepts it and marks it so.
 
 ## Disclaimer: anti-cheat, bans, your own risk
 

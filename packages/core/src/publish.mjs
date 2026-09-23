@@ -12,6 +12,7 @@ import { CORE_DIR } from "./mcp-client.mjs";
 import { exportClaudeSession } from "./export-claude-session.mjs";
 import { SCAN_RULES } from "./sanitize.mjs";
 import { computeTimeline, writeTimeline } from "./timeline.mjs";
+import { privateEntries, publicProof } from "./proof.mjs";
 import { probeDuration } from "./render.mjs";
 import { SIGNATURE_FILE, signBundle } from "./sign.mjs";
 import { zipBuffer } from "./zip.mjs";
@@ -44,7 +45,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.42";
+export const SPEC_VERSION = "0.43";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -85,6 +86,8 @@ export function scanPublication(dir) {
 export async function publish(runDir, outDir, { session, completionMarker, log = console.log , signKey = null } = {}) {
   runDir = path.resolve(runDir);
   outDir = path.resolve(outDir);
+  // The marker the exporters fall back on, fixed once: proof.json names it, so the archive makes the same timeline.
+  completionMarker = completionMarker || process.env.AAS_COMPLETION_MARKER || null;
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length) throw new Error(`Refusing to write into non-empty ${outDir}`);
   const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
   const recording = fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")) : null;
@@ -103,25 +106,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     else if (fs.existsSync(path.join(runDir, "session.jsonl"))) session = path.join(runDir, "session.jsonl");
   }
   if (!session || !fs.existsSync(session)) throw new Error(`No session log found for runtime ${runtime}; pass --session <file>.`);
-  // Every goal the run had, from its own events: a resume may extend the goal, and a victory reaches only the goal
-  // that held at that moment. An extension is published only once it is reached: until then the bundle keeps the
-  // last goal that was reached, completed at its victory, and what came after is post-completion time on the
-  // timeline. A run that reached no goal publishes the goal it had (the completion marker is the fallback).
-  const history = goalHistory(readRunEvents(runDir), brief.category.goal);
-  const lastReached = history.findLastIndex((g) => g.reached_at);
-  const goals = lastReached >= 0 ? history.slice(0, lastReached + 1) : history;
-  const won = lastReached >= 0 ? { timestamp: history[lastReached].reached_at } : null;
-  const publishedGoal = goals.at(-1)?.id ?? brief.category.goal;
-  // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
-  // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
-  if (rt?.exportSession) await rt.exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
-  else await exportClaudeSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
+  const { history, goals, won, publishedGoal, timeline } = await buildTimeline({ runDir, outDir, brief, rt, session, completionMarker, log });
   log(`exported ${path.basename(session)}`);
-  // The harness's own events (run.started, game.playback, game.milestone, game.over, run.human, recording.*) belong
-  // in the public timeline: the spec reserves them, and without run.human the human axis cannot be verified. They
-  // are merged from run.jsonl on the same clock, sanitised, and the file is renumbered.
-  const merged = mergeHarnessEvents(runDir, path.join(outDir, "session.sanitized.jsonl"));
-  if (merged) log(`${merged.events} harness event(s) merged into the timeline (${merged.records} records)`);
 
   // 2. the other required files
   for (const f of ["tools.json", "AGENTS.md", "documentation.md"]) if (fs.existsSync(path.join(runDir, f))) fs.copyFileSync(path.join(runDir, f), path.join(outDir, f));
@@ -142,19 +128,12 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // Nor is where it is published: a bundle carries no video links.
   // The bundle carries the chapters and the timings that place the timeline in the recording.
 
-  // 3. timeline: timers, sections, chapters, cut list
-  let timeline = null;
-  try {
-    // Completion as the exported summary states it (the published goal's victory, or the completion marker).
-    const exportedCompletion = (() => { try { return JSON.parse(fs.readFileSync(path.join(outDir, "summary.json"), "utf8")).completed_at ?? null; } catch { return null; } })();
-    timeline = computeTimeline(runDir, { completedAt: exportedCompletion });
+  // 3. timeline: chapters and splits next to timeline.json
+  if (timeline) {
     writeTimeline(runDir, timeline);
-    fs.copyFileSync(path.join(runDir, "timeline", "timeline.json"), path.join(outDir, "timeline.json"));
     if (timeline.sections.length > 1) fs.copyFileSync(path.join(runDir, "timeline", "chapters.txt"), path.join(outDir, "chapters.txt"));
     const { writeLss } = await import("../../timer-livesplit/index.mjs");
     fs.copyFileSync(writeLss(runDir, timeline, { game: plugin?.name ?? brief.category.game, category: `AI Assisted Speedrun (${publishedGoal})` }), path.join(outDir, "splits.lss"));
-  } catch (error) {
-    log(`no timeline: ${error.message}`);
   }
 
   // 4. summary schema 6
@@ -331,6 +310,12 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   } catch (e) {
     log(`runtime config not regenerated (${e.message}); the copy from configure time is published`);
   }
+  // The proof that the logs were not changed after they were written (SPEC §8.11): the tickets, the heads and the
+  // archive's receipts. Only a run recorded with proof has it; one without is published as unsigned.
+  const proof = publicProof(runDir, { completionMarker: completionMarker ?? null, session });
+  if (proof) fs.writeFileSync(path.join(outDir, "proof.json"), `${JSON.stringify(proof, null, 2)}\n`);
+  log(proof ? `proof: ${proof.heads.length} head(s), ${proof.receipts.length} signed by the archive` : "unsigned: this run was recorded without proof; an archive accepts it and marks it unsigned");
+
   // 5. manifest, scan, check
   // The run id in the manifest is the bundle's own directory name: that is what an archive uses as the run's identity.
   const files = writeManifest(outDir, { runId: summary.run_id, runUid: brief.run_uid ?? null, revision });
@@ -353,7 +338,9 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     throw new Error(`not published: ${scan.findings.length} private item(s) found (${scan.findings.map((f) => `${f.rule} in ${f.file}`).join("; ")}); the output directory was removed`);
   }
   // The upload file: only a bundle the scan cleared is packed.
-  const zip = packBundle(outDir);
+  // The upload carries the private part next to the bundle: the logs the proof covers, for the archive to check
+  // and never to publish (SPEC §4). The bundle directory itself never holds them.
+  const zip = packBundle(outDir, { privateFiles: privateEntries(runDir) });
   log(`${path.basename(zip.file)}: ${zip.files} files, ${Math.round(zip.bytes / 1024)} kB (the recording is published separately, not packed)`);
   // The videos the runner uploads (the cut, the full recording per segment, or both) and the code each one's description
   // must contain are in one file next to the videos, in the private run directory.
@@ -368,6 +355,55 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   }
   log(formatReport(outDir, check));
   return { outDir, summary, scan, check, timeline, zip, signature, uploadSheet };
+}
+
+/**
+ * The public timeline of a run, made from its own logs alone: session.sanitized.jsonl (the runtime's session log,
+ * sanitised, with the harness's events merged in) and timeline.json. `aas publish` makes a bundle's timeline with it,
+ * and an archive makes it again from the private part of an upload (regenerate below), so the two are the same
+ * function and a timeline that was edited afterwards does not come out equal.
+ * Reads from `runDir` only run.jsonl, recording.json and brief.json.
+ */
+export async function buildTimeline({ runDir, outDir, brief, rt, session, completionMarker = null, log = () => {} }) {
+  const savedMarker = process.env.AAS_COMPLETION_MARKER;
+  // The marker is an argument here, never the environment of whoever runs this: the archive runs it too.
+  if (completionMarker) process.env.AAS_COMPLETION_MARKER = completionMarker; else delete process.env.AAS_COMPLETION_MARKER;
+  try {
+    return await buildTimelineWith({ runDir, outDir, brief, rt, session, completionMarker, log });
+  } finally {
+    if (savedMarker === undefined) delete process.env.AAS_COMPLETION_MARKER; else process.env.AAS_COMPLETION_MARKER = savedMarker;
+  }
+}
+
+async function buildTimelineWith({ runDir, outDir, brief, rt, session, completionMarker, log }) {
+  // Every goal the run had, from its own events: a resume may extend the goal, and a victory reaches only the goal
+  // that held at that moment. An extension is published only once it is reached: until then the bundle keeps the
+  // last goal that was reached, completed at its victory, and what came after is post-completion time on the
+  // timeline. A run that reached no goal publishes the goal it had (the completion marker is the fallback).
+  const history = goalHistory(readRunEvents(runDir), brief.category.goal);
+  const lastReached = history.findLastIndex((g) => g.reached_at);
+  const goals = lastReached >= 0 ? history.slice(0, lastReached + 1) : history;
+  const won = lastReached >= 0 ? { timestamp: history[lastReached].reached_at } : null;
+  const publishedGoal = goals.at(-1)?.id ?? brief.category.goal;
+  // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
+  // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
+  if (rt?.exportSession) await rt.exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
+  else await exportClaudeSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
+  // The harness's own events (run.started, game.playback, game.milestone, game.over, run.human, recording.*) belong
+  // in the public timeline: the spec reserves them, and without run.human the human axis cannot be verified. They
+  // are merged from run.jsonl on the same clock, sanitised, and the file is renumbered.
+  const merged = mergeHarnessEvents(runDir, path.join(outDir, "session.sanitized.jsonl"));
+  if (merged) log(`${merged.events} harness event(s) merged into the timeline (${merged.records} records)`);
+  let timeline = null;
+  try {
+    // Completion as the exported summary states it (the published goal's victory, or the completion marker).
+    const exportedCompletion = (() => { try { return JSON.parse(fs.readFileSync(path.join(outDir, "summary.json"), "utf8")).completed_at ?? null; } catch { return null; } })();
+    timeline = computeTimeline(runDir, { completedAt: exportedCompletion });
+    fs.writeFileSync(path.join(outDir, "timeline.json"), `${JSON.stringify(timeline, null, 2)}\n`);
+  } catch (error) {
+    log(`no timeline: ${error.message}`);
+  }
+  return { history, goals, won, publishedGoal, timeline };
 }
 
 /** Events of run.jsonl that are not published: the operator's plan usage. */
@@ -407,7 +443,7 @@ export function mergeHarnessEvents(runDir, publicLog) {
  * submission form, not carried in the bundle, and its sha256 stays in `manifest.json` so the linked file can
  * still be checked. Returns `{ file, bytes, files }`.
  */
-export function packBundle(outDir, { zipFile = `${outDir}.zip` } = {}) {
+export function packBundle(outDir, { zipFile = `${outDir}.zip`, privateFiles = [] } = {}) {
   const walk = (d, prefix = "") =>
     fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name), `${prefix}${e.name}/`) : [`${prefix}${e.name}`]));
   const name = path.basename(outDir).replace(/-public$/, "");
@@ -415,6 +451,9 @@ export function packBundle(outDir, { zipFile = `${outDir}.zip` } = {}) {
     .filter((p) => !p.startsWith("recording/") && !p.startsWith("."))
     .sort()
     .map((p) => ({ name: `${name}/${p}`, data: fs.readFileSync(path.join(outDir, p)), mtime: fs.statSync(path.join(outDir, p)).mtime }));
+  // Under private/, which manifest.json does not list and the signature does not cover: the archive takes it out
+  // before it keeps the zip, and binds it only through the (length, sha256) pairs in proof.json.
+  for (const f of privateFiles) entries.push({ name: `${name}/private/${f.name}`, data: fs.readFileSync(f.file), mtime: fs.statSync(f.file).mtime });
   const buf = zipBuffer(entries);
   fs.writeFileSync(zipFile, buf);
   return { file: zipFile, bytes: buf.length, files: entries.length };

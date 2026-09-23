@@ -5,6 +5,7 @@
 //   aas start --runtime <id> --run-dir <dir>
 //   aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]
 //   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
+//   aas login | aas logout | aas tickets [extend|revoke|delete <ticket>]
 import fs from "node:fs";
 import path from "node:path";
 import { loadSettings } from "./settings.mjs";
@@ -19,7 +20,7 @@ const gameArg = (() => { const i = process.argv.indexOf("--game"); return i === 
 loadSettings(gameArg);
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
-const BOOLEAN_FLAGS = new Set(["keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
+const BOOLEAN_FLAGS = new Set(["upload", "keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
 function parse(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
@@ -78,6 +79,15 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         const dir = opts._[0];
         if (!dir) throw new Error("Usage: aas check [--strict] <bundle-dir | bundle.zip>");
         const report = checkBundle(path.resolve(dir), { core: Boolean(opts.core) });
+        // An upload zip with its private part: the archive's whole check of the proof, the timeline made again too.
+        if (fs.statSync(path.resolve(dir)).isFile()) {
+          const { checkZipProof } = await import("./proof-check.mjs");
+          const whole = await checkZipProof(path.resolve(dir));
+          if (whole) {
+            const row = report.results.find((r) => r.requirement === "proof");
+            if (row) Object.assign(row, { status: { signed: "met", unsigned: "unmet", review: "unmet", invalid: "invalid" }[whole.status], detail: whole.detail });
+          }
+        }
         console.log(formatReport(dir, report));
         const invalid = report.results.some((r) => r.status === "invalid");
         const unmet = report.results.some((r) => r.status === "unmet");
@@ -156,6 +166,40 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         if (opts["video-url"] !== undefined) throw new Error("--video-url is gone: a bundle carries no video links");
         const r = await publish(src, out, { session: opts.session, completionMarker: opts["completion-marker"], signKey: opts.sign });
         process.exitCode = r.scan.findings.length || r.check.results.some((x) => x.status === "invalid") ? 1 : 0;
+        if (opts.upload && !process.exitCode) {
+          const { uploadBundle } = await import("./upload.mjs");
+          const answer = await uploadBundle(r.zip.file);
+          console.log(`uploaded: ${answer.status ?? "received"}${answer.submission ? ` (${answer.submission})` : ""}${answer.reasons?.length ? `; ${answer.reasons.join("; ")}` : ""}`);
+        }
+        break;
+      }
+      case "login": {
+        const { login } = await import("./auth.mjs");
+        const c = await login();
+        console.log(`signed in to ${c.archive}; runs record their proof under this account from now on`);
+        break;
+      }
+      case "logout": {
+        const { logout } = await import("./auth.mjs");
+        console.log((await logout()) ? "signed out: the archive revoked this machine's token and it is forgotten here" : "not signed in");
+        break;
+      }
+      case "tickets": {
+        // The tickets of this machine's runs: what they are, until when, and extend, revoke or delete one.
+        const { readTicketIndex, proofClient } = await import("./proof.mjs");
+        const { accessToken } = await import("./auth.mjs");
+        const [action, id] = opts._;
+        const list = readTicketIndex();
+        if (!action) {
+          if (!list.length) console.log("no tickets on this machine");
+          for (const t of list) console.log(`${t.ticket}  ${t.account ? "account  " : "anonymous"}  segment ${t.segment}  issued ${t.issued_at}  expires ${t.expires_at ?? "?"}  ${t.run_dir}`);
+          break;
+        }
+        if (!["extend", "revoke", "delete"].includes(action) || !id) throw new Error("Usage: aas tickets [extend|revoke|delete <ticket>]");
+        const t = list.find((x) => x.ticket === id);
+        if (!t) throw new Error(`${id} is not a ticket of this machine (aas tickets lists them)`);
+        const answer = await proofClient({ token: t.account ? () => accessToken() : async () => null }).manage(t, action);
+        console.log(`${action}: ${JSON.stringify(answer)}`);
         break;
       }
       case "timeline": {

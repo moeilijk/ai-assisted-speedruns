@@ -8,6 +8,7 @@ import path from "node:path";
 import { configure } from "./configure.mjs";
 import { createEventLog, followEvents } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
+import { startSegmentProof } from "./proof-run.mjs";
 import { formatDuration } from "./videos.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 
@@ -120,6 +121,9 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
   }
 
+  // Proof, before anything is recorded: a run that wants it and cannot get a ticket does not start.
+  const proof = await startSegmentProof({ runDir, segment: 1, runtime, events, opts, log });
+
   const overlay = opts["overlay-port"] !== undefined ? await startOverlayServer(runDir, { port: Number(opts["overlay-port"]) || 0 }) : null;
   if (overlay) log(`overlay at ${overlay.url} (add it as a browser source; the OBS recorder does this itself)`);
   const ctx = { runDir, game: plugin, overlayUrl: overlay?.url ?? null };
@@ -159,6 +163,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   const goal = resolveGoal(plugin, brief.category?.goal);
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
+  await proof.start();
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.
@@ -221,6 +226,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds });
+  await proof.end();
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify(outcome, null, 2)}\n`);
   log(`run ${outcome.status}; ${files.length} recording file(s); ${formatDuration(info.wall_clock_seconds, { whole: true })} wall clock`);
   // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is

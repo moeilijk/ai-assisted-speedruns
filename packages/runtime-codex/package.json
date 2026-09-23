@@ -1,6 +1,6 @@
 {
   "name": "@aas/runtime-codex",
-  "version": "0.29.1",
+  "version": "0.32.0",
   "description": "AAS runtime plugin: codex",
   "type": "module",
   "engines": { "node": ">=22" },

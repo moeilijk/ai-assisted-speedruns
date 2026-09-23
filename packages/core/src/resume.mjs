@@ -13,6 +13,7 @@ import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity }
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { createAutosave, writeRecordingSegment } from "./run.mjs";
+import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
 export async function resume(opts, { log = (t) => process.stderr.write(`[aas resume] ${t}\n`) } = {}) {
@@ -84,6 +85,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
   }
   const segment = (fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")).segments?.length ?? 1 : 0) + 1;
+  // Proof, before anything is recorded: every segment has its own ticket, and the chain goes on from the last head.
+  const proof = await startSegmentProof({ runDir, segment, runtime, events, opts, log });
   const overlay = opts["overlay-port"] !== undefined ? await startOverlayServer(runDir, { port: Number(opts["overlay-port"]) || 0 }) : null;
   const ctx = { runDir, game: plugin, overlayUrl: overlay?.url ?? null };
   // A failed preflight (OBS already recording, LiveSplit not reachable) stops the run before it starts; the overlay
@@ -124,6 +127,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("game.goal", { from: goalExtended.from, to: goalExtended.to, segment });
   }
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
+  await proof.start();
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   let over = null;
   let deaths = 0;
@@ -178,6 +182,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds, segment });
+  await proof.end();
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify({ ...result, sessionId: result.sessionId ?? sessionId, resumedFrom: save, segment }, null, 2)}\n`);
   log(`resumed run ${result.status}; segment ${segment}; ${files.length} recording file(s)`);
   if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });

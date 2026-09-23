@@ -7,27 +7,27 @@
       "dir": "packages/runtime-claude-code",
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.29.1",
+      "version": "0.32.0",
       "ai": true,
-      "sha256": "1d83a972131ccb4b358b77261aa85828c8aa82b5f9fba3b97f7bbc2c98fb2a46"
+      "sha256": "da3e5fd6a9b6678650c73f0d62b8a347ff99639c4f66f3e9eaf755be6930358c"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.29.1",
+      "version": "0.32.0",
       "ai": true,
-      "sha256": "54e29db6edcef4e6c70dc21b1d84bc7212152bbd10b094ecf6754d45d5d0996d"
+      "sha256": "17100d6cc9b724115caa7e579b4a89c4d178257cf961a10a7a92bd4acd515b17"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-scripted",
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.29.1",
+      "version": "0.32.0",
       "ai": false,
-      "sha256": "a6b52fce8ceba7c1e765c0a84f921eff6573a5edec53fc4eda167992a5de5f3a"
+      "sha256": "e0e2ab2b9d951e157b36fb5cfdd1d097697fc13764ba56262454f6890ea79c8d"
     },
     {
       "kind": "recorder",

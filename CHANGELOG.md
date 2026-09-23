@@ -12,6 +12,27 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.0 — 2026-09-23
+
+- **A run can be recorded with proof that its logs were not changed afterwards (SPEC draft 0.43, §8.11).** Owner,
+  2026-09-23: the witness through the site returns in this form, and the evidence travels in the zip. Before a
+  segment is recorded the tooling fetches a ticket from the archive; at the start of the segment, every hour and at
+  its end it sends one hash of the run log and the runtime's session logs as they stand, and the archive signs it with
+  its own clock. Only the ticket and the hash go over the line. `proof.json` in the bundle carries the tickets, the
+  heads and the receipts; the upload zip carries the logs in `private/`, which the archive uses for the check only
+  and deletes after the decision. The archive recomputes every head and makes the public timeline again with the same
+  function `aas publish` uses (`buildTimeline`), so an edited log or timeline no longer matches.
+- `aas login` / `aas logout`: the archive in the browser, authorization code with PKCE and a loopback redirect, the
+  way `claude` signs in. Signed in, runs record proof under the account; `AAS_PROOF=anonymous` records it without
+  one; otherwise a run is unsigned and says so before it starts. `--proof off` on run and resume.
+- `aas tickets` lists this machine's tickets and extends, revokes or deletes one. `aas publish --upload` sends the
+  zip under the signed-in account. `aas check <upload.zip>` runs the archive's whole check of the proof.
+- `aas check` has a new requirement, `proof`: met when every head is signed by the archive, unmet for an unsigned
+  run or one for a reviewer, invalid when a signature, the chain or a log does not match.
+- The runtimes gain `sessionLogs()`, the logs a head covers; their versions and hashes change (claude-code, codex,
+  scripted 0.32.0).
+- The archive's proof key is pinned in `packages/spec/site-keys.txt`.
+
 ## 0.31.0 — 2026-09-23
 
 - SPEC draft 0.42: point 9 of §8 ("The harness sends nothing to an archive by itself") is gone. Owner: "iets wat NIET
