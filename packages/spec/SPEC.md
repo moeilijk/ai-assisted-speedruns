@@ -1,6 +1,6 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.40
+# AI Assisted Speedruns (AAS) — Specification, draft 0.41
 
-Status: draft 0.40, 2026-09-19. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.41, 2026-09-23. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 
@@ -53,13 +53,13 @@ that moment. The extended goal is published only once it is reached: until then 
 reached, and what came after is post-completion time on the timeline (§6).
 
 **A run no model played is not an entry, and an archive refuses it.** The harness can play a run with a script
-instead of a model, to test a machine without spending tokens (a mock run). Such a bundle may be complete, signed
-and witnessed, and it is still not a run of an AI: an archive does not publish it, rank it or keep it as an entry.
+instead of a model, to test a machine without spending tokens (a mock run). Such a bundle may be complete and
+signed, and it is still not a run of an AI: an archive does not publish it, rank it or keep it as an entry.
 
 **A bundle is a mock unless it shows that a model played it.** `mock` is one word in a file the publisher signs
 with their own key, so a bundle that is trusted on that word is trusted on nothing: changing it is an edit and a
 second signature. The word therefore states what the harness knew, and an archive derives its own answer from
-three things instead, none of which is the publisher's to write afterwards:
+two things instead, none of which is the publisher's to write afterwards:
 
 1. **Which runtime ran.** Whether a model plays is a property of the runtime, not of the run: `scripted` never
    drives one and `claude-code` always does. A bundle names its runtime in `harness.plugins.runtime` with `id`,
@@ -69,11 +69,7 @@ three things instead, none of which is the publisher's to write afterwards:
 2. **What the timeline holds.** `ai_evidence` counts what a model leaves behind and a script does not: messages
    the model wrote, tool calls it made, the models that answered and the output tokens they were billed for.
    All four are countable from `session.sanitized.jsonl` itself, so a reader recounts them.
-3. **What was witnessed before the run.** The start statement of every segment names the runtime and its hash and
-   is counter-signed by the archive before a tick is played (§8.9). A run whose runtime changed between the start
-   and the publication is a run that was rewritten afterwards.
-
-Missing, unreadable or contradictory evidence makes a bundle a mock; only all three together make it a run of an
+Missing, unreadable or contradictory evidence makes a bundle a mock; only both together make it a run of an
 AI. This is the safe way round: a mock that is read as a run is the forgery worth making, and a run that is read
 as a mock costs its publisher one republication. A bundle of schema 15 carries `mock` and `ai` and is read on
 them; one of schema 14 or earlier, which has neither, is read as `false`.
@@ -82,9 +78,8 @@ them; one of schema 14 or earlier, which has neither, is read as `false`.
 from running the model for real and dictating its play, and no flag can: the run would be genuine in every
 countable way. What the standard does instead is fix, before the run, everything that determined it, and publish
 it in full. `AGENTS.md` is the instructions verbatim, `category.goal_prompt` is the first prompt verbatim, and
-the hashes of both are in the start statement the archive counter-signed before the run began (§8.9, §8.10). A
-publisher who writes the route into the prompt publishes that route, in the bundle, for every reader to see, and
-cannot put an innocent prompt in its place afterwards. Dictating is then a visible choice about the run, which an
+the bundle carries the hash of both (§8.10). A publisher who writes the route into the prompt publishes that route,
+in the bundle, for every reader to see. Dictating is then a visible choice about the run, which an
 archive judges like any other, and not a hidden one.
 
 **A run that did not reach its goal is not an entry.** A session that was stopped (a budget, a limit, a
@@ -130,7 +125,7 @@ Per kind:
 - `message`: `role` (`user` or `assistant`), `channel` (string or null), `text`.
 - `tool_call`: `call` (sequential id `call-00001`), `name`, `input` (string or object).
 - `tool_result`: `call`, `output`: an array of content parts `{type: "text", text}` (schema 2 also `input_text`, Codex's name) or `{type: "image_omitted"}`; schema 2 also allows a plain string.
-- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `run.witnessed`, `run.unwitnessed`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.goal`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`.
+- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.goal`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`.
 
 `run.started` carries the `goal` that holds for that segment, and `tooling`: the `version` of the harness that ran the segment, its `commit` (null outside a git clone) and whether its tracked files were `modified` (null when unknown); `allowed_breaking` lists the breaking releases the runner chose to go past on that resume; `overlay` says whether the harness's overlay was in the picture. A resumed run may have segments from different releases: never from an older release than an earlier segment. `game.goal` (`from`, `to`) marks a resume that extended the goal to a later end. `game.over` (`victory`, `label`, `deaths`, plus game-specific fields) marks the end of an attempt inside the game. With `victory: true` the goal is reached: the harness ends the agent session, the timer stops (the milestone before it did the final split) and the run's status is `completed`. With `victory: false` the agent died: that run is over, but not the session (no ironman rule). The game plugin offers a restart from the beginning (a new game with the same seed where the game has one), and the next run begins with `game.attempt` (`phase: start`, `attempt` N, `seed`). Every run is its own attempt: the timer resets and takes its own splits, and `timeline.json` lists the runs under `attempts` (start, end, outcome `death`/`victory`/`stopped`, IGT). The session's RTA keeps running over all runs; `aas render --attempt last` cuts the last run on its own. Deaths are counted in the outcome. A session that ends without a victory is `stopped` and may be resumed.
 
@@ -162,7 +157,7 @@ Where a recording is published is not in the bundle. A run may be published in m
 expires where an upload keeps; the links, their platforms and when each was last confirmed are kept by the archive,
 supplied by whoever submits the run. A bundle is therefore never judged on a missing link.
 
-Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9 adds a suggested `title` and `description` to each of them. Schema version 10 adds what the runtime reported about each model (`context_window`, `max_output_tokens`, `provider`) and `harness.plugins.runtime.cli_versions`. Schema version 11 adds `parts` to each model. Schema version 12 adds `details` to each mod in `game.mods`. Schema version 13 adds `recording.overlay`. Schema version 14 is a video's code `aas<32 hex>`. Schema version 15 adds `mock` and `harness.plugins.runtime.ai`: a run a script played instead of a model, which is never an entry (§3). Schema version 16, what `aas publish` writes, is what makes that answer checkable instead of declared: `harness.plugins.runtime.sha256` (the runtime plugin as it ran), `ai_evidence` (what a model left behind in this timeline), `category.goal_prompt` (the first prompt verbatim) and `brief` (the sha256 of the instructions and of that prompt, both recomputable from this bundle and both counter-signed by the archive before the run began, §8.9). From schema 16 `mock` is `true` unless the runtime says a model plays, so a runtime a reader cannot place is a mock.
+Schema version 2 is portal-agent's format and remains valid. Schema version 3 adds `category`, `recording` and `harness`. Schema version 4 adds the identifiers and versions a reader keys on (`run_uid`, `bundle` with its `revision`, `spec_version`) and the list forms: `recordings`, `game` with its build and mods, `harness` with its plugins. Schema version 5 drops `recordings` and `recording.url`: video links come from the archive, not from the bundle. Schema version 6 adds the goal by name: `ends`, `category.goal_end`, `goals` and `harness.plugins.runtime.name`. Schema version 7 drops `recording.black_intervals`: whether the recording shows the game is checked at the start of the run (§8), and what a published video shows is for the archive to judge. Schema version 8 adds `recording.videos`: the videos a runner may upload. Schema version 9 adds a suggested `title` and `description` to each of them. Schema version 10 adds what the runtime reported about each model (`context_window`, `max_output_tokens`, `provider`) and `harness.plugins.runtime.cli_versions`. Schema version 11 adds `parts` to each model. Schema version 12 adds `details` to each mod in `game.mods`. Schema version 13 adds `recording.overlay`. Schema version 14 is a video's code `aas<32 hex>`. Schema version 15 adds `mock` and `harness.plugins.runtime.ai`: a run a script played instead of a model, which is never an entry (§3). Schema version 16, what `aas publish` writes, is what makes that answer checkable instead of declared: `harness.plugins.runtime.sha256` (the runtime plugin as it ran), `ai_evidence` (what a model left behind in this timeline), `category.goal_prompt` (the first prompt verbatim) and `brief` (the sha256 of the instructions and of that prompt, both recomputable from this bundle, §8.10). From schema 16 `mock` is `true` unless the runtime says a model plays, so a runtime a reader cannot place is a mock.
 
 ```json
 {
@@ -244,7 +239,7 @@ runtime reported them, plus `human_turns`. The harness sends one prompt per segm
 every further message from a user in the timeline is someone typing into a running session, which is help whatever it
 said, so `human_turns` above zero forces `human` to `assisted` (§8.3). `brief.instructions_sha256` is the sha256 of the
 published `AGENTS.md` and `brief.goal_prompt_sha256` the sha256 of `category.goal_prompt` in UTF-8: a reader recomputes
-both from the bundle and finds the same two in the witnessed start of every segment. `harness.plugins.runtime.sha256`
+both from the bundle. `harness.plugins.runtime.sha256`
 is the runtime plugin as it ran, null when the publisher's tooling could not read it, which an archive reads as a
 runtime it cannot place.
 
@@ -347,13 +342,8 @@ A run is verifiable when all of the following hold:
 6. The bundle says what was played: `game.version` and every mod that was loaded, with the pin each was installed from, so the run can be set up again.
 7. The run reached its declared goal: the timeline carries a `game.over` with `victory: true` and `summary.completed_at` names that moment. A stopped session fails this point and is not an entry.
 8. The recording was checked when the run started: the harness confirmed that the recording is being written and that the game capture shows a picture, and a run whose check fails does not start. A failed recording is found while the run can still be stopped, not after a run that has no evidence. What the published video shows is for the archive to judge.
-9. The archive witnessed when each segment ran. Once the game is up, and again when the segment's recording has stopped, the harness sends the archive a statement signed with the publisher's key, and logs the archive's answer as `run.witnessed`: the statement, the archive's `received_at`, the statement's `statement_sha256` and the `receipt`, the archive's ed25519 signature over `aas-witness-receipt v1`, `statement: <sha256>` and `received: <received_at>` on three lines. Which rules apply to a segment follows from the archive's clock, not from the tooling version the statement names. Without a network, a publisher key or an answer, the run goes on and the harness logs `run.unwitnessed` with the reason; a statement is never sent afterwards.
-
-The statement is plain text, one field per line, in this order: `aas-witness v2`, `phase: start|end`, `run_uid: <32 hex>`, `segment: <n>`, `tooling: <version> <commit or -> <clean|modified|unknown>`, `at: <the machine's time>`, then for a start `t0: <recording start>`, `runtime: <id> <version> <ai|no-ai|ai-unknown> <sha256 of the runtime plugin>`, `instructions: <sha256 of AGENTS.md>` and `goal: <id> <sha256 of the goal prompt>`, or for an end `ended_at: <recording end>`, `seconds: <segment length>` and `log: <sha256 of the run log> <its number of records>`, then `key: <the publisher's public key, OpenSSH form>`, and `signature: <base64 ed25519 over the lines before it, joined with newlines>`. A field this machine cannot fill is `-`. The archive's witness keys are published at `/.well-known/aas-witness.txt`; a checker trusts those, never a key in an answer. A statement of the earlier kind `aas-witness v1`, which carries neither the runtime nor the prompt, stays valid in the bundles that hold it.
-
-The two extra fields of a start are what make §3 and §8.10 checkable rather than declared: which runtime drove the segment, and what the model was told, both fixed on the archive's clock before the recording ran. The `log` field of an end fixes what the segment produced. A reader cannot recompute it — the run log is private (§4) and never published — and it is not meant to be recomputed: it says that this log existed, in these bytes, at a time the archive saw. A timeline assembled afterwards has no such moment, so what a bundle publishes either derives from a witnessed log or from one that was never witnessed.
-
-10. The bundle says what the model was told, and it says what was witnessed. `AGENTS.md` is the instructions verbatim and `category.goal_prompt` the first prompt verbatim; `brief.instructions_sha256` and `brief.goal_prompt_sha256` are their sha256 and are recomputed from the bundle; the start statement of every segment carries the same two, and its `runtime` field names the runtime the bundle names, with the same hash. A bundle whose prompt, instructions or runtime differ from what was witnessed was changed after the run and fails this point.
+9. The harness sends nothing to an archive by itself. A machine that runs the tooling may be behind a firewall or have no network at all, and a run does not depend on either: nothing about a run leaves the machine until the publisher uploads the bundle. What an archive knows of a run, it knows from the bundle. A bundle of an earlier draft that holds `run.witnessed` or `run.unwitnessed` records keeps them as they are; they are not checked.
+10. The bundle says what the model was told. `AGENTS.md` is the instructions verbatim and `category.goal_prompt` the first prompt verbatim; `brief.instructions_sha256` and `brief.goal_prompt_sha256` are their sha256 and are recomputed from the bundle. A bundle whose hashes differ from its own `AGENTS.md` or goal prompt fails this point.
 11. Every input the game received came from a tool call. Game time advances only inside `game.playback`, and every playback in the timeline stands between a `tool_call` and its `tool_result`: input that no tool call produced was played by something other than the agent. Where a game records its own inputs (a demo, a replay, the mod's command log), a harness compares the two and the bundle carries the result; where it does not, the timeline's own accounting is what this point checks.
 
 A run that fails any point may still be published but MUST NOT be labelled as conforming.
@@ -404,3 +394,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.38 | 2026-09-17 | §6: in a description a word joiner (U+2060) before each colon of a duration, so a platform does not link it as a place in the video; plain `m:ss` only for places, on their own line and within the video |
 | 0.39 | 2026-09-19 | Schema 15: `mock` and `harness.plugins.runtime.ai`; §3: a run no model played is not an entry and an archive refuses it |
 | 0.40 | 2026-09-19 | §3: a bundle is a mock unless it shows a model played it, and an archive derives that from the runtime's own hash, the timeline's evidence and the witnessed start, not from `mock`; a dictated run publishes its prompt. Schema 16: `harness.plugins.runtime.sha256`, `ai_evidence`, `category.goal_prompt`, `brief`. §8.3: a user message beyond the goal prompt of a segment forces `assisted`. §8.9: `aas-witness v2` carries the runtime and the prompt at a start and the run log at an end. §8.10, §8.11: what was witnessed matches the bundle, and every input came from a tool call |
+| 0.41 | 2026-09-23 | §8.9: the harness sends nothing to an archive by itself; the archive no longer witnesses segments (owner, 2026-09-23). `run.witnessed` and `run.unwitnessed` are no longer reserved and are not checked. §3: whether a model played follows from the runtime's own hash and the timeline's evidence. §8.10: the prompt hashes are checked against the bundle only. Schema 16 unchanged |

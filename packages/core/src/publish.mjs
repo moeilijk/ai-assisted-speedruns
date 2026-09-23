@@ -44,7 +44,7 @@ const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.40";
+export const SPEC_VERSION = "0.41";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -169,7 +169,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // 0.40 it is the other way round: only a runtime that says a model plays makes a bundle not a mock, so a
   // runtime this tooling cannot read (`ai` null) is a mock too. Nothing about a run is easier to change than one
   // word in a file the publisher signs themselves, so the word is not what an archive goes on: `ai_evidence` and
-  // the runtime's own hash below are, and the witnessed start says the same before the run began.
+  // the runtime's own hash below are.
   summary.mock = rt?.ai !== true;
   summary.spec_version = SPEC_VERSION;
   summary.run_id = path.basename(outDir);
@@ -280,8 +280,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     summary.category.human_notes = [summary.category.human_notes, `${humanTurns} message(s) to the agent beyond the goal prompt of each segment`].filter(Boolean).join("; ");
   }
   // The prompt, fixed before the run. AGENTS.md is in the bundle verbatim and the goal prompt is here verbatim, so
-  // a reader recomputes both hashes; the witnessed start of segment 1 carries the same two, signed by the archive
-  // before a tick was played. A run that was told its route therefore publishes that route.
+  // a reader recomputes both hashes. A run that was told its route therefore publishes that route.
   summary.category.goal_prompt = brief.goalPrompt ?? null;
   summary.brief = {
     instructions_sha256: fs.existsSync(path.join(outDir, "AGENTS.md")) ? createHash("sha256").update(fs.readFileSync(path.join(outDir, "AGENTS.md"))).digest("hex") : null,

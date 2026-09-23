@@ -82,13 +82,6 @@ test("a bundle that claims a model played must show what a model leaves behind",
   assert.match(detail(played, "a model played"), /3 message\(s\) from 1 model\(s\), 2 tool call\(s\), 1200 output tokens/);
 });
 
-test("a run nothing witnessed has nothing that fixed what it was told", () => {
-  // The hashes in the bundle are the publisher's own until an archive signed them before the run (SPEC §8.10).
-  const r = checkRun(bundle({}));
-  assert.equal(status(r, "prompt witnessed"), "unmet");
-  assert.match(detail(r, "prompt witnessed"), /no witnessed start: nothing fixed what this run was told before it ran/);
-});
-
 test("the published prompt is the prompt that was hashed", () => {
   // AGENTS.md is in the bundle verbatim, so its hash is recomputed here and a swapped one is caught.
   const swapped = bundle({ summary: { brief: { instructions_sha256: "b".repeat(64), goal_prompt_sha256: sha("Reach test chamber 01.") } } });

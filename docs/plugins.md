@@ -71,8 +71,8 @@ export default {
   version: "0.1.0",
   ai: true,                      // required: does a model play through this runtime? `scripted` says false, and a
                                  // run of a runtime that does not say true is a mock: not an entry (SPEC §3).
-                                 // The bundle and the witnessed start also carry the plugin's own sha256, so an
-                                 // archive reads which runtime this was instead of believing the flag.
+                                 // The bundle also carries the plugin's own sha256, so an archive reads which
+                                 // runtime this was instead of believing the flag.
   async configure(runDir, broker, brief) { /* write the config; refuse to overwrite; return { files, hint } */ },
   async reconfigure(runDir, broker, brief) { /* rewrite machine paths after a move (resume) */ },
   async start(runDir, brief) { /* start the agent, wait; return { status, endedAt, notes, sessionId, privateLog } */ },
@@ -90,7 +90,7 @@ export default {
 
 `start` returns a `RunOutcome`: `completed` (the agent finished), `stopped` (a budget, a limit, or an interrupt; resumable), `failed`. In headless mode (`brief.headless`, with `brief.budget.toolCalls` and `brief.budget.minutes`) the runtime runs the agent non-interactively with `brief.goalPrompt`, or with `brief.resume.prompt` and `brief.resume.sessionId` at a resume. The runtime's private log is what `aas publish` exports: say where it is (`privateLog`), or write it as `session.jsonl` in the run directory, and provide an exporter (`export-claude-session.mjs`, `runtime-codex/export-rollout.mjs` are the two so far) that turns it into the timeline format of the spec.
 
-`ai` is the one thing about a runtime that an archive does not take on trust. It is a property of the runtime, not of a run — a runtime either drives a model or it does not — so the harness writes it into every bundle together with `sha256`, the plugin as it ran (`pluginDigest`: every `.mjs`, `.json` and `.md` of the package directory, `test/` left out). The same two are in the statement the archive counter-signs before the recording runs, so a bundle whose runtime differs from the witnessed one is a bundle that was changed afterwards. A runtime whose hash an archive cannot place is read as a mock.
+`ai` is the one thing about a runtime that an archive does not take on trust. It is a property of the runtime, not of a run — a runtime either drives a model or it does not — so the harness writes it into every bundle together with `sha256`, the plugin as it ran (`pluginDigest`: every `.mjs`, `.json` and `.md` of the package directory, `test/` left out). A runtime whose hash an archive cannot place is read as a mock.
 
 `connectCheck` is the cheap half of that verification: it has the agent's own CLI list and health-check the MCP server of a configured run directory (`claude mcp list`, `codex mcp list`), which asks the model nothing and so costs no tokens. `aas check-agent` and the GUI's mock run use it.
 

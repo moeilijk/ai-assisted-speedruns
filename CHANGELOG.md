@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.30.0 — 2026-09-23
+
+- **The harness sends nothing to the archive by itself any more (SPEC draft 0.41, §8.9).** Owner, 2026-09-23:
+  "tooling kan firewalled zijn of geen internet hebben. ik wil niet dat er ongevraagd data over de lijn gaat. witness
+  is afgekeurd als het via site loopt". `aas run` and `aas resume` no longer send a start or end statement to the
+  archive's `/witness/`, and no longer log `run.witnessed` or `run.unwitnessed`; `aas doctor` no longer asks the
+  archive whether it knows the publisher key. `AAS_WITNESS_URL` and `AAS_WITNESS_KEYS` are gone.
+- `aas check` no longer has the requirements `witnessed` and `prompt witnessed`. Whether a model played (§3) follows
+  from the runtime's own hash and the timeline's evidence; the prompt hashes of §8.10 are checked against the bundle.
+  A bundle of an earlier draft that holds witness records keeps them; they are not checked.
+- Schema 16 is unchanged. `npm test` checks that a run and its resume write no witness record.
+
 ## 0.29.5 — 2026-09-21
 
 - **`npm run balatro:scripted` plays the seed the mock is measured on**: `--goal ante1 --seed YLNKMKFJ` (owner,

@@ -12,8 +12,7 @@ import { createEventLog, followEvents, readRunLog } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
-import { createAutosave, startFields, witnessEnd, writeRecordingSegment } from "./run.mjs";
-import { witnessSegment } from "./witness.mjs";
+import { createAutosave, writeRecordingSegment } from "./run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
 export async function resume(opts, { log = (t) => process.stderr.write(`[aas resume] ${t}\n`) } = {}) {
@@ -124,10 +123,6 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("run.human", { note: `goal extended from ${goalExtended.from} to ${goalExtended.to}`, segment });
     events.append("game.goal", { from: goalExtended.from, to: goalExtended.to, segment });
   }
-  // The archive witnesses the start once the game is up, so a start that fails is never witnessed.
-  const started = await witnessSegment({ phase: "start", runUid: brief.run_uid, segment, tooling, t0: t0.toISOString(), ...startFields({ runtime, runtimeId: opts.runtime ?? brief.runtimeModule ?? brief.runtime, runDir, brief, goal: goalExtended?.to ?? brief.category?.goal }) });
-  events.append(started.event, started.data);
-  if (started.event === "run.unwitnessed") log(`the start of this segment is not witnessed: ${started.data.reason}`);
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
   const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
   let over = null;
@@ -183,7 +178,6 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
   events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds, segment });
-  await witnessEnd(events, { runUid: brief.run_uid, segment, tooling, recorded: info.segments.at(-1), runDir, log });
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify({ ...result, sessionId: result.sessionId ?? sessionId, resumedFrom: save, segment }, null, 2)}\n`);
   log(`resumed run ${result.status}; segment ${segment}; ${files.length} recording file(s)`);
   if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });

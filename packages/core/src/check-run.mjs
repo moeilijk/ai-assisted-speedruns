@@ -12,7 +12,6 @@ import path from "node:path";
 import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
-import { verifyReceipt } from "./witness-receipt.mjs";
 import { CODE_SCHEMA, bindingLine, formatDuration, hasCode, videoCode } from "./videos.mjs";
 
 const TIMESTAMP_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:[+-]\d{2}:\d{2}|Z)$/;
@@ -218,8 +217,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
             } else {
               // Schema 16 turns it around (SPEC §3): only a runtime that says a model plays makes a bundle
               // something other than a mock, so a runtime whose `ai` is unknown is a mock as well. What a reader
-              // goes on is not this word: it is the runtime's own hash, the evidence below, and the witnessed
-              // start, which said the same before the run had begun.
+              // goes on is not this word: it is the runtime's own hash and the evidence below.
               if (typeof summary.mock === "boolean" && summary.mock !== (ai !== true)) problems.push(`mock is ${summary.mock} while harness.plugins.runtime.ai is ${ai}: since schema 16 a bundle is a mock unless its runtime says a model plays`);
               const sha = summary.harness?.plugins?.runtime?.sha256;
               if (!(sha === null || HEX64.test(String(sha)))) problems.push("schema 16 requires harness.plugins.runtime.sha256 (the runtime plugin as it ran) or null");
@@ -330,65 +328,9 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
   const sig = verifyBundle(runDir);
   if (sig.signed) add("signature", sig.valid ? "met" : "invalid", sig.valid ? `valid for ${sig.fingerprint} (whose key that is, is for an archive to say)` : sig.problem ?? "invalid");
   else add("signature", "met", "not signed (optional: aas publish --sign, for a publisher who wants their bundles tied to one key)");
-  // When each segment ran, by the archive's clock (SPEC §8.9): a statement at the start and at the end of every
-  // segment, each with the archive's receipt. A bundle from before the witness has none; a receipt that is there
-  // must be the archive's and belong to this run.
-  {
-    const events = records.filter((r) => r?.kind === "event");
-    const segments = events.filter((r) => r.event === "run.started").length;
-    const runUid = (() => { try { return JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_uid ?? null; } catch { return null; } })();
-    const bad = [], seen = new Set(), keys = new Set();
-    for (const w of events.filter((r) => r.event === "run.witnessed")) {
-      const d = w.data ?? {};
-      const at = `segment ${d.segment} ${d.phase}`;
-      const v = verifyReceipt(d);
-      if (!v.valid) { bad.push(`${at}: ${v.problem}`); continue; }
-      const field = (name) => String(d.statement).split("\n").find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2) ?? null;
-      if (field("phase") !== d.phase || Number(field("segment")) !== d.segment) bad.push(`${at}: the statement says ${field("phase")} of segment ${field("segment")}`);
-      else if (runUid && field("run_uid") !== runUid) bad.push(`${at}: the statement belongs to run ${field("run_uid")}`);
-      else { seen.add(`${d.segment} ${d.phase}`); keys.add(v.fingerprint); }
-    }
-    const missing = Array.from({ length: segments }, (_, i) => ["start", "end"].map((p) => `${i + 1} ${p}`)).flat().filter((k) => !seen.has(k));
-    const why = [...new Set(events.filter((r) => r.event === "run.unwitnessed").map((r) => r.data?.reason).filter(Boolean))];
-    if (bad.length) add("witnessed", "invalid", bad.join("; "));
-    else if (!segments) add("witnessed", "unmet", "no run.started in the timeline");
-    else if (missing.length) add("witnessed", "unmet", `the archive did not witness segment ${missing.join(", ")}${why.length ? ` (${why.join("; ")})` : " (made before the witness existed)"}`);
-    else add("witnessed", "met", `${segments} segment(s), start and end, receipts by ${[...keys].join(", ")}`);
-  }
-  // What was fixed before the run, and by whom (SPEC §8.10). The start statement of every segment names the
-  // runtime with its own hash and the hashes of the instructions and the goal prompt, and the archive signed it
-  // before a tick was played. A bundle whose prompt or runtime differs from what was witnessed is a bundle that
-  // was changed afterwards; one that matches has published exactly what the model was told.
-  {
-    let summary = null;
-    try { summary = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")); } catch { /* reported above */ }
-    const starts = records.filter((r) => r?.kind === "event" && r.event === "run.witnessed" && r.data?.phase === "start" && verifyReceipt(r.data).valid);
-    const field = (statement, name) => String(statement).split("\n").find((l) => l.startsWith(`${name}: `))?.slice(name.length + 2) ?? null;
-    const witnessed = starts.map((r) => ({
-      segment: r.data.segment,
-      runtime: field(r.data.statement, "runtime"),
-      instructions: field(r.data.statement, "instructions"),
-      goal: field(r.data.statement, "goal"),
-    })).filter((w) => w.runtime || w.instructions || w.goal);
-    if (!summary || summary.schema_version < 16) { /* a bundle from before draft 0.40: its statements say nothing about this */ }
-    else if (!witnessed.length) add("prompt witnessed", "unmet", starts.length ? "the witnessed starts are aas-witness v1: they name no runtime and no prompt (made before draft 0.40)" : "no witnessed start: nothing fixed what this run was told before it ran");
-    else {
-      const rt = summary.harness?.plugins?.runtime ?? {};
-      const expected = `${rt.id ?? "-"} ${rt.version ?? "-"} ${rt.ai === true ? "ai" : rt.ai === false ? "no-ai" : "ai-unknown"} ${rt.sha256 ?? "-"}`;
-      const bad = [];
-      for (const w of witnessed) {
-        if (w.runtime && w.runtime !== expected) bad.push(`segment ${w.segment} ran under "${w.runtime}", the bundle says "${expected}"`);
-        if (w.instructions && w.instructions !== "-" && w.instructions !== summary.brief?.instructions_sha256) bad.push(`segment ${w.segment} was witnessed with other instructions than the published AGENTS.md`);
-        const [goalId, promptSha] = String(w.goal ?? "").split(" ");
-        if (goalId && goalId !== "-" && promptSha && promptSha !== "-" && promptSha !== summary.brief?.goal_prompt_sha256) bad.push(`segment ${w.segment} was witnessed with another goal prompt than the published one`);
-      }
-      if (bad.length) add("prompt witnessed", "invalid", bad.join("; "));
-      else add("prompt witnessed", "met", `${witnessed.length} segment(s): the runtime and the prompt were signed by the archive before the run`);
-    }
-  }
   // Did a model play this run (SPEC §3)? `mock` is one word in a file the publisher signs themselves, so it is
-  // not what this answers on: the runtime's own hash, what the timeline actually holds, and the start the archive
-  // witnessed. A bundle that shows none of it is read as a mock, which is the safe way round: a mock that is read
+  // not what this answers on: the runtime's own hash and what the timeline actually holds. A bundle that shows
+  // none of it is read as a mock, which is the safe way round: a mock that is read
   // as a run is the forgery worth making, a run that is read as a mock costs a republication.
   {
     let summary = null;
