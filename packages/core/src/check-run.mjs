@@ -349,7 +349,7 @@ export function checkRun(runDir, { core: _ignoredCore = false } = {}) {
       else add("a model played", "met", `${ev.assistant_records} message(s) from ${ev.models} model(s), ${ev.tool_calls} tool call(s), ${ev.output_tokens} output tokens, runtime ${rt.id} ${rt.sha256.slice(0, 12)}`);
     }
   }
-  // Every input came from a tool call (SPEC §8.11). Game time advances only inside a playback, and a playback the
+  // Every input came from a tool call (SPEC §8.10). Game time advances only inside a playback, and a playback the
   // agent did not ask for was played by something else: a second hand on the controls, or a timeline assembled
   // from parts. The timeline answers this on its own, so a reader checks it without the run directory.
   {

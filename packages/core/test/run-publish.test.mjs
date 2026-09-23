@@ -102,8 +102,6 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
       assert.equal(typeof t.modified, "boolean");
     }
     assert.equal(resumed.outcome.status, "completed");
-    // The harness sends nothing to the archive by itself (SPEC §8.9): no witness, before, during or after a segment.
-    assert.doesNotMatch(readFileSync(join(runDir, "run.jsonl"), "utf8"), /"run\.(un)?witnessed"/);
     const stops = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"recording.stopped"'));
     assert.equal(stops.length, 2, "each segment's recording is logged as stopped, the resumed one too");
     assert.ok(spt.seen.some((m) => m.type === "cmd" && /^load aas_/.test(m.cmd)), "load sent");
@@ -151,7 +149,7 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.match(played.detail, /^mock: the runtime stub does not say a model plays/);
   assert.ok(p.check.results.filter((r) => r.requirement !== "a model played").every((r) => r.status === "met"), JSON.stringify(p.check.results.filter((r) => r.status !== "met" && r.requirement !== "a model played")));
   // What the model was told, published after the run: the runtime with its own hash and both prompt hashes, each
-  // recomputable from this bundle (SPEC §8.10).
+  // recomputable from this bundle (SPEC §8.9).
   assert.match(p.check.results.find((r) => r.requirement === "input from tool calls").detail, /playback\(s\), each inside the tool call that asked for it/);
   assert.match(p.summary.harness.plugins.runtime.sha256, /^[0-9a-f]{64}$/, "which runtime drove this run, as a number an archive can place");
   assert.equal(p.summary.brief.instructions_sha256, createHash("sha256").update(readFileSync(join(outDir, "AGENTS.md"))).digest("hex"));

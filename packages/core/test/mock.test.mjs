@@ -1,4 +1,4 @@
-// Is this bundle a run of an AI, and can a reader tell without believing the publisher (SPEC §3, §8.10, §8.11)?
+// Is this bundle a run of an AI, and can a reader tell without believing the publisher (SPEC §3, §8.9, §8.10)?
 // What is checked here is the way round that matters: a mock that is read as a run is the forgery worth making.
 import { test } from "node:test";
 import assert from "node:assert/strict";

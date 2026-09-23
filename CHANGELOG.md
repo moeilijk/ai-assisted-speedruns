@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.31.0 — 2026-09-23
+
+- SPEC draft 0.42: point 9 of §8 ("The harness sends nothing to an archive by itself") is gone. Owner: "iets wat NIET
+  gebeurt hoef je niet te documenteren". Points 10 and 11 become 9 (the prompt in the bundle) and 10 (every input
+  came from a tool call). Nothing else in the text, the schema or the checks changed.
+
 ## 0.30.0 — 2026-09-23
 
 - **The harness sends nothing to the archive by itself any more (SPEC draft 0.41, §8.9).** Owner, 2026-09-23:
