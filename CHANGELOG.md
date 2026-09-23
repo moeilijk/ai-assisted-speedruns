@@ -12,6 +12,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.2 — 2026-09-23
+
+- The GUI shows the archive on the Run tab: whether this machine is signed in and how runs record their proof, with
+  Sign in and Sign out; at the first start without an account it asks once whether runs record their proof
+  anonymously (the answer goes into `.env` as `AAS_PROOF`); before an unsigned run it warns that the archive accepts
+  the run and marks it unsigned; it lists the tickets of this machine's runs with extend, revoke and delete; and after
+  a session, when signed in, it offers to upload the bundle. Each action runs the CLI's own command, shown in the log.
+- `aas upload <bundle.zip>` sends a zip under the signed-in account (what `aas publish --upload` does after publishing).
+- Measured on the live archive at 13:44–13:46: a scripted Balatro mock with anonymous proof got its ticket, both
+  heads were signed, and `aas check` on its zip recomputed every head from the private part and made the same
+  timeline.
+
 ## 0.32.1 — 2026-09-23
 
 - The archive's check of an upload's proof can be taken over as a flat set of files: `proof.mjs` imports only

@@ -5,7 +5,7 @@
 //   aas start --runtime <id> --run-dir <dir>
 //   aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]
 //   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
-//   aas login | aas logout | aas tickets [extend|revoke|delete <ticket>]
+//   aas login | aas logout | aas tickets [extend|revoke|delete <ticket>] | aas upload <bundle.zip>
 import fs from "node:fs";
 import path from "node:path";
 import { loadSettings } from "./settings.mjs";
@@ -171,6 +171,14 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
           const answer = await uploadBundle(r.zip.file);
           console.log(`uploaded: ${answer.status ?? "received"}${answer.submission ? ` (${answer.submission})` : ""}${answer.reasons?.length ? `; ${answer.reasons.join("; ")}` : ""}`);
         }
+        break;
+      }
+      case "upload": {
+        const { uploadBundle } = await import("./upload.mjs");
+        const zip = opts._[0];
+        if (!zip) throw new Error("Usage: aas upload <bundle.zip>");
+        const answer = await uploadBundle(path.resolve(zip));
+        console.log(`uploaded: ${answer.status ?? "received"}${answer.submission ? ` (${answer.submission})` : ""}${answer.proof ? `; proof ${answer.proof}` : ""}${answer.reasons?.length ? `; ${answer.reasons.join("; ")}` : ""}`);
         break;
       }
       case "login": {

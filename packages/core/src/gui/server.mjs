@@ -194,6 +194,22 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, { state: await session.start(await body(req)) });
       } else if (req.method === "POST" && url.pathname === "/api/stop") {
         send(res, 200, { state: await session.stop((await body(req)).game) });
+      } else if (req.method === "GET" && url.pathname === "/api/proof") {
+        // How runs record their proof here, and the tickets of this machine's runs (without their control secret).
+        const { readCredentials } = await import("../auth.mjs");
+        const { proofUrl, readTicketIndex } = await import("../proof.mjs");
+        const c = readCredentials();
+        const answer = readEnv().AAS_PROOF ?? process.env.AAS_PROOF ?? null;
+        const mode = answer === "off" ? "off" : c?.access_token ? "account" : answer === "anonymous" ? "anonymous" : "off";
+        send(res, 200, { signedIn: Boolean(c?.access_token), archive: c?.archive ?? proofUrl(), mode, answered: Boolean(answer), tickets: readTicketIndex().map(({ control, ...t }) => ({ ...t, run_dir: toWindows(t.run_dir) })) });
+      } else if (req.method === "POST" && url.pathname === "/api/proof-answer") {
+        // The one question: record proof anonymously, or not. The answer is kept in .env, where the CLI reads it too.
+        writeEnv({ AAS_PROOF: (await body(req)).anonymous ? "anonymous" : "off" });
+        send(res, 200, { ok: true });
+      } else if (req.method === "POST" && url.pathname === "/api/archive") {
+        const b = await body(req);
+        await session.archive(b.action, b.arg ?? null);
+        send(res, 200, { ok: true });
       } else if (req.method === "POST" && url.pathname === "/api/fix") {
         const fixId = (await body(req)).id;
         await session.fix(fixId);

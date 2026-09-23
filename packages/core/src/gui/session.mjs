@@ -206,6 +206,32 @@ export function createSession() {
     return state;
   }
 
+  /**
+   * The archive from the page: sign in or out, extend, revoke or delete a ticket, upload a bundle. Each is the CLI's
+   * own command, shown in the log as a person would type it.
+   */
+  async function archive(action, arg = null) {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    const cmds = {
+      login: [["login"], "login"],
+      logout: [["logout"], "logout"],
+      extend: [["tickets", "extend", arg], `tickets extend ${arg}`],
+      revoke: [["tickets", "revoke", arg], `tickets revoke ${arg}`],
+      delete: [["tickets", "delete", arg], `tickets delete ${arg}`],
+      upload: [["upload", toLocal(arg ?? "")], `upload ${q(toLocal(arg ?? ""))}`],
+    };
+    const c = cmds[action];
+    if (!c || (action !== "login" && action !== "logout" && !arg)) throw new Error(`Unknown action: ${action}`);
+    if (!/^[0-9a-f]{32}$/.test(String(arg)) && ["extend", "revoke", "delete"].includes(action)) throw new Error("Not a ticket.");
+    set({ phase: "working", step: action });
+    try {
+      const code = await node([CLI, ...c[0]], `${CLI_SHOWN} ${c[1]}`);
+      if (code !== 0) throw new Error(`${action} did not succeed; see the log.`);
+    } finally {
+      set({ phase: "idle", step: null });
+    }
+  }
+
   /** One-click fixes named by the set-up checks. */
   async function fix(id) {
     if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
@@ -256,6 +282,6 @@ export function createSession() {
     get state() { return state; },
     get lines() { return lines; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    plan, start, stop, fix, nextRunName, log,
+    plan, start, stop, fix, archive, nextRunName, log,
   };
 }

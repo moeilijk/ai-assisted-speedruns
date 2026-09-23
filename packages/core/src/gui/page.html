@@ -77,7 +77,10 @@
   .dlg-list div { padding: 7px 16px; cursor: pointer; display: flex; gap: 8px; }
   .dlg-list div:hover { background: var(--code); }
   .dlg-foot { padding: 12px 16px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; }
-  .result a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  .result a, #proof a { color: var(--accent); cursor: pointer; text-decoration: underline; }
+  #tickets { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+  #tickets th { text-align: left; font-weight: 600; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line, #ccc); }
+  #tickets td { padding: 4px 8px 4px 0; vertical-align: top; }
   /* The GUI is gone: the page says so over everything else, because nothing on it works any more. */
   .tests { grid-column: 1 / -1; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12.5px; line-height: 1.7; }
   .tests li { color: var(--muted); }
@@ -138,7 +141,13 @@
       <span class="status" id="phase"><span class="dot"></span><span class="phase">idle</span></span>
       <span class="muted" id="step"></span>
     </div>
+    <p class="muted" id="proofnow" style="margin:10px 0 0"></p>
     <div class="result muted" id="result" style="margin-top:10px"></div>
+  </div>
+  <div class="panel" id="proof">
+    <h2>The archive</h2>
+    <p class="muted" id="account" style="margin:0"></p>
+    <table id="tickets"></table>
   </div>
   <div class="panel">
     <h2>What this runs, as commands</h2>
@@ -270,6 +279,13 @@ for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed"
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();
+  // The one question, the first time: without an account, may the proof be recorded anonymously?
+  if (!proof.signedIn && !proof.answered) {
+    const yes = confirm("Record proof of your runs with the archive, anonymously?\n\nBefore each part of a run the tool fetches a ticket from ai-assisted-speedruns.org, and every hour it sends one hash of the run's logs. Nothing about you or the run goes with it.\n\nOK: yes, anonymously. Cancel: no, runs are unsigned. You can sign in instead at any time.");
+    await api("/api/proof-answer", { anonymous: yes }).catch(() => {});
+    await loadProof();
+  }
+  if (proof.mode === "off" && !confirm("This run is unsigned: the archive accepts it and marks it unsigned. Start?")) return;
   if (c.runtime !== "scripted" && !confirm("This starts an AI run: it uses your plan's budget. Start?")) return;
   try { await api("/api/start", c); nameTouched = false; } catch (e) { alert(e.message); }
 };
@@ -324,11 +340,44 @@ function showState(s) {
   if (s.result && s.phase === "idle") {
     const r = s.result;
     const link = (p, t) => (p ? `<a data-open="${esc(p)}">${esc(t)}</a>` : "");
-    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "run folder"), link(r.recording, "recording"), link(r.bundle, "bundle (zip)")].filter(Boolean).join(" · ")}`;
+    const upload = r.bundle && proof.signedIn ? `<a data-upload="${esc(r.bundle)}">upload to the archive</a>` : "";
+    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "run folder"), link(r.recording, "recording"), link(r.bundle, "bundle (zip)"), upload].filter(Boolean).join(" · ")}`;
   }
-  if (s.phase === "idle") loadGames();
+  if (s.phase === "idle") { loadGames(); loadProof(); }
 }
-$("result").onclick = (e) => { const p = e.target.dataset?.open; if (p) api("/api/open", { path: p }).catch((x) => alert(x.message)); };
+$("result").onclick = (e) => {
+  const p = e.target.dataset?.open;
+  if (p) api("/api/open", { path: p }).catch((x) => alert(x.message));
+  const z = e.target.dataset?.upload;
+  if (z && confirm("Upload this bundle to the archive under your account? The zip carries the run's logs in a private part, which the archive uses to check the proof and deletes after its decision.")) api("/api/archive", { action: "upload", arg: z }).catch((x) => alert(x.message));
+};
+// The archive: signed in or not, how runs record their proof, and the tickets of this machine's runs.
+let proof = { signedIn: false, answered: true, mode: "off", tickets: [] };
+const MODES = { account: "Runs record their proof under your account.", anonymous: "Runs record their proof anonymously.", off: "Runs are unsigned: the archive accepts them and marks them unsigned." };
+async function loadProof() {
+  try { proof = await api("/api/proof"); } catch { return; }
+  const host = esc(new URL(proof.archive).host);
+  $("account").innerHTML = proof.signedIn
+    ? `Signed in to ${host}. ${MODES[proof.mode]} <a data-act="logout">Sign out</a>`
+    : `Not signed in to ${host}. ${proof.answered ? MODES[proof.mode] : "You are asked once, at the first start, whether runs record their proof anonymously."} <a data-act="login">Sign in</a>${proof.answered ? ` · <a data-act="${proof.mode === "anonymous" ? "proof-off" : "proof-anonymous"}">${proof.mode === "anonymous" ? "stop recording anonymous proof" : "record anonymous proof"}</a>` : ""}`;
+  $("proofnow").textContent = MODES[proof.mode];
+  const t = proof.tickets.slice().reverse();
+  $("tickets").innerHTML = t.length ? `<tr><th>Ticket</th><th>Run</th><th>Part</th><th></th><th>Expires</th><th></th></tr>${t.map((x) => `<tr><td class="path">${esc(x.ticket.slice(0, 8))}…</td><td class="path">${esc(x.run_dir)}</td><td>${esc(x.segment)}</td><td>${x.account ? "account" : "anonymous"}</td><td>${esc((x.expires_at ?? "").slice(0, 10))}</td><td><a data-ticket="${esc(x.ticket)}" data-act="extend">extend</a> · <a data-ticket="${esc(x.ticket)}" data-act="revoke">revoke</a> · <a data-ticket="${esc(x.ticket)}" data-act="delete">delete</a></td></tr>`).join("")}` : "";
+}
+$("proof").onclick = async (e) => {
+  const act = e.target.dataset?.act;
+  if (!act) return;
+  try {
+    if (act === "proof-off" || act === "proof-anonymous") await api("/api/proof-answer", { anonymous: act === "proof-anonymous" });
+    else if (act === "login" || act === "logout") await api("/api/archive", { action: act });
+    else {
+      const what = { extend: "Extend this ticket?", revoke: "Revoke this ticket? Its run can then no longer be submitted with proof.", delete: "Delete this ticket at the archive? Its run can then no longer be submitted with proof." }[act];
+      if (!confirm(what)) return;
+      await api("/api/archive", { action: act, arg: e.target.dataset.ticket });
+    }
+  } catch (x) { alert(x.message); }
+  loadProof();
+};
 function addLine(l) {
   logLines.push(`${l.at} ${l.text}`);
   while (logLines.length > 200) logLines.shift();
@@ -473,6 +522,7 @@ function browse(start, kind, expect) {
   const j = await api("/api/state");
   for (const l of j.lines) addLine(l);
   await loadGames();
+  await loadProof();
   // ?static: no live connection (page screenshots in tests); the page shows the state it loaded.
   const isStatic = new URLSearchParams(location.search).has("static");
   live = true;
