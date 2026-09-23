@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.3 — 2026-09-23
+
+- **A run no longer goes on without its timer.** In one Super Mario Bros. mock LiveSplit never started its timer: 8
+  minutes of recording showed 0.00 and no split, and no log said so. The LiveSplit timer now asks LiveSplit whether
+  its timer runs after the start; if not, it connects again and starts again, and if LiveSplit still does not take it,
+  the run does not start. After every split it checks that LiveSplit moved on. What LiveSplit did not do is kept with
+  the timer in `recording.json`, with LiveSplit's own windows at that moment (a dialog in front of it would show
+  there). Why LiveSplit did not start that once is not known yet; a run where it happens again now records it.
+
 ## 0.33.2 — 2026-09-23
 
 - **Correction to 0.33.1: BizHawk does not lose the buttons, the Reset was missing.** 0.33.1 said the tool's

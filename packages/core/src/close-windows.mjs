@@ -64,3 +64,22 @@ for ($i = 0; $i -lt ${Number(seconds) || 60}; $i++) {
   const out = execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", cwd: "/mnt/c" });
   return /answered/.test(out);
 }
+
+/** The titles of the visible windows of a program (a dialog shows up as its own window); [] where there is none. */
+export function windowTitles(processName) {
+  const ps = `Add-Type @'
+using System; using System.Text; using System.Collections.Generic; using System.Runtime.InteropServices;
+public class WT { public delegate bool P(IntPtr h, IntPtr l);
+[DllImport("user32.dll")] public static extern bool EnumWindows(P f, IntPtr l);
+[DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h, out uint p);
+[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+[DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+public static List<string> For(uint pid) { var r = new List<string>(); EnumWindows((h, l) => { uint p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) { var s = new StringBuilder(512); GetWindowText(h, s, 512); r.Add(s.ToString()); } return true; }, IntPtr.Zero); return r; } }
+'@
+foreach ($p in Get-Process ${q(processName)} -ErrorAction SilentlyContinue) { [WT]::For([uint32]$p.Id) }`;
+  try {
+    return execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", cwd: "/mnt/c", timeout: 20000 }).split("\n").map((l) => l.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}

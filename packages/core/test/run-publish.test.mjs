@@ -29,6 +29,7 @@ const available = existsSync(join(portalAgentDir, "controller", "index.mjs"));
 
 async function fakeLiveSplit() {
   const commands = [];
+  const state = { phase: "NotRunning", index: -1 };
   const server = net.createServer((s) => {
     s.setEncoding("utf8");
     let buf = "";
@@ -39,6 +40,12 @@ async function fakeLiveSplit() {
         const c = buf.slice(0, at).replace(/\r$/, "");
         buf = buf.slice(at + 1);
         commands.push(c);
+        // The phase and split index as LiveSplit keeps them, which the timer checks after its start and every split.
+        if (c === "reset") { state.phase = "NotRunning"; state.index = -1; }
+        if (c === "starttimer") { state.phase = "Running"; state.index = 0; }
+        if (c === "split" && state.phase === "Running") state.index += 1;
+        if (c === "getcurrenttimerphase") s.write(`${state.phase}\r\n`);
+        if (c === "getsplitindex") s.write(`${state.index}\r\n`);
         if (c === "getcurrenttime") s.write("0:01:02.34\r\n");
         if (c === "getcurrentgametime") s.write("0:00:03.00\r\n");
       }

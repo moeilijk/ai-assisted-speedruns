@@ -80,10 +80,18 @@ export function createLiveSplitTimer(options = {}) {
   let igt = 0;
   let over = false;
   const sent = [];
+  // What LiveSplit did not do as asked (its timer not running after the start, a split that did not move on): kept
+  // with the timer's result in recording.json. Measured 2026-09-23: a run whose LiveSplit never started its timer
+  // went on for 8 minutes with nothing on screen and nothing in any log.
+  const problems = [];
+  // LiveSplit's own windows when a start fails: a dialog in front of it is the first thing to rule out.
+  const windows = options.windows ?? (async () => (await import("../core/src/close-windows.mjs")).windowTitles("LiveSplit"));
   const send = (c) => {
     sent.push(c);
     ls?.send(c);
   };
+  const phase = async () => { try { return await ls.query("getcurrenttimerphase"); } catch { return null; } };
+  const startCommands = (from) => { send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send(`setgametime ${from.toFixed(3)}`); };
   return {
     processName: "LiveSplit",
     /** Read-only check for `aas doctor`: the LiveSplit Server reachable. */
@@ -97,7 +105,7 @@ export function createLiveSplitTimer(options = {}) {
       return closeWindows([{ name: "LiveSplit", title: "LiveSplit", seconds: 15, dialogTitle: "Save Splits?", dialogButton: "&No" }], { report: ["LiveSplit"] });
     },
     id: "livesplit",
-    version: "0.29.1",
+    version: "0.33.3",
     sent,
     async preflight() {
       const probe = await connectLiveSplit({ host, port });
@@ -108,11 +116,17 @@ export function createLiveSplitTimer(options = {}) {
       ls = await connectLiveSplit({ host, port });
       igt = Number(startIgt) || 0;
       over = false;
-      send("reset");
-      send("initgametime");
-      send("starttimer");
-      send("pausegametime");
-      send(`setgametime ${igt.toFixed(3)}`);
+      startCommands(igt);
+      // LiveSplit answers on its server when it runs; the timer's phase says whether it took the start.
+      let got = await phase();
+      if (got !== "Running") {
+        problems.push({ at: new Date().toISOString(), what: `after the start LiveSplit's timer was ${got ?? "not answering"}; connected again and started again`, windows: await windows() });
+        ls.close();
+        ls = await connectLiveSplit({ host, port });
+        startCommands(igt);
+        got = await phase();
+      }
+      if (got !== "Running") { ls.close(); ls = null; throw new Error(`LiveSplit did not start its timer (phase ${got ?? "no answer"}; LiveSplit's windows: ${(await windows()).join(", ") || "none"}): the run does not start without its timer on screen`); }
     },
     async onEvent(event) {
       switch (event.event) {
@@ -126,7 +140,12 @@ export function createLiveSplitTimer(options = {}) {
           }
           break;
         case "game.milestone":
-          if (event.data?.chapter) send("split");
+          if (event.data?.chapter) {
+            const before = Number(await ls?.query("getsplitindex").catch(() => NaN));
+            send("split");
+            const after = Number(await ls?.query("getsplitindex").catch(() => NaN));
+            if (!(after === before + 1 || (after === -1 && before >= 0))) problems.push({ at: new Date().toISOString(), what: `split for ${event.data?.label ?? "a milestone"}: LiveSplit's split index went from ${before} to ${after}` });
+          }
           break;
         case "game.over":
           if (event.data?.victory) { over = true; send("pause"); }
@@ -151,7 +170,7 @@ export function createLiveSplitTimer(options = {}) {
         ls.close();
         ls = null;
       }
-      return { igt, times };
+      return { igt, times, problems };
     },
   };
 }

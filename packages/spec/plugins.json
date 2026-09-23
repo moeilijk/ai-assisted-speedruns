@@ -58,8 +58,8 @@
       "dir": "packages/timer-livesplit",
       "id": "livesplit",
       "name": null,
-      "version": "0.29.1",
-      "sha256": "72e6c89e4fe75a5092ec51e95c67ab92a5710a99ccfae46ca02e57d44fc7e999"
+      "version": "0.33.3",
+      "sha256": "1863654bb319b1e30873232010367139280d881e7129a62c85ec4909697768e6"
     },
     {
       "kind": "game",
