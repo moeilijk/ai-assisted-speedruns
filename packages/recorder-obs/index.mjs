@@ -193,7 +193,11 @@ export function createObsRecorder(options = {}) {
         // A game with more than one window (an emulator with a tool window) names its game window by a title pattern.
         const titled = game.windowTitlePattern ? new RegExp(game.windowTitlePattern) : null;
         const ofExe = items.map((i) => i.itemValue).filter((v) => v.endsWith(`:${exe}`) && !v.startsWith("::"));
-        const full = titled ? ofExe.find((v) => titled.test(v.split(":")[0])) : ofExe[0];
+        // OBS lists the window the input was last set to even when that window is gone; with a title pattern, a window
+        // other than that stored one is the live one (an earlier game's title matched the pattern too).
+        const stored = (await o.tryCall("GetInputSettings", { inputName }))?.inputSettings?.window ?? null;
+        const matching = titled ? ofExe.filter((v) => titled.test(v.split(":")[0])) : ofExe;
+        const full = matching.find((v) => v !== stored) ?? matching[0];
         return full ?? `::${exe}`;
       };
       const name = `${n.prefix} Game Window`;
@@ -227,7 +231,7 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.33.0",
+    version: "0.33.1",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
     async doctor() {

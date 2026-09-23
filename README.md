@@ -161,5 +161,8 @@ The games, and the mods and tools the setup downloads or builds, are not in this
 | BizHawk | [BizHawk](https://github.com/TASEmulators/BizHawk) 2.11.1 | MIT (the EmuHawk frontend); each core its own, most GPL |
 | BizHawk | [bizhawk-mcp-native](https://github.com/StealthC/bizhawk-mcp-native) v0.3.0 by StealthC | MIT |
 | BizHawk | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
+| BizHawk | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
+| BizHawk | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |
+| BizHawk | [TASVideos movie 3728M](https://tasvideos.org/3728M), "warpless" by HappyLee & Mars608, which `bizhawk:tas` downloads for the `smb` mock | CC BY 2.0 |
 | every game | [LiveSplit](https://github.com/LiveSplit/LiveSplit) (the timer, installed from the GUI) | MIT |
 | every game | [SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html) by NirSoft (optional quiet audio routing) | freeware |

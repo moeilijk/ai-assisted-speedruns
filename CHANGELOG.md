@@ -12,6 +12,36 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.1 — 2026-09-23
+
+- **A run's goal milestone reaches the timer, the recorder and the autosave.** When the milestone of the run's goal
+  went by, the harness declared the victory and passed the milestone itself on to nothing: LiveSplit never took the
+  last split of a run whose goal is an end before the game's last one (Super Mario Bros. to World 2: World 2 kept
+  "-"), and no autosave was made there. This held for every game. Measured by replaying the commands on LiveSplit
+  itself: its last split ends the timer.
+- **Super Mario Bros. is a BizHawk profile** (`AAS_BIZHAWK_PROFILE=smb`), on the core NesHawk: the ROM by SHA-1
+  ("Super Mario Bros. (World)", taken from its zip), ends World 1 to World 7 and the credits as memory
+  conditions (world number at RAM 0x75F and the game mode at 0x770, from periwinkle9's smb-autosplitter, Zlib), and a
+  splits file per end. The mock replays TASVideos movie 3728M, the warpless run by HappyLee and Mars608 (CC BY 2.0),
+  imported by `npm run bizhawk:tas -- smb`; it stays in sync through World 2, where the mock stops. It refuses to
+  start on another core than the movie's. A zipped ROM is extracted into BizHawk's `aas-roms` folder, since
+  bizhawk-mcp-native cannot open a zip.
+- **Buttons reach the game on every frame.** The tool's `press_buttons` sets buttons between frames, and BizHawk clears
+  them when the next frame starts: 600 frames of the TAS ended with Mario at x 58 instead of 916. The plugin now holds
+  buttons through `lua/hold.lua`, which sets them at the start of every frame; the same 600 frames end at 916. BizHawk
+  opens its Lua Console for that, next to the game (the recording shows only the game). A reboot while that console is
+  open shows a BizHawk error, so the plugin reboots first and loads the script after.
+- The launcher sets BizHawk's `OpposingDirPolicy` to Allow: by default BizHawk passes only the latest of Left+Right
+  held together, a filter a movie's input does not go through and the plugin's does.
+- After the run's goal the BizHawk plugin takes no more input: the harness declares the victory up to half a second
+  later, and the mock had played 100 more frames by then, counted in the game time. The mock stops there too.
+- **What a run plays is recorded in the run.** A plugin names the variables that choose its game in `runEnv`
+  (BizHawk: `AAS_BIZHAWK_PROFILE`); `brief.json` keeps their values, and `aas publish` and `aas resume` set them again
+  before they load the plugin. Published from a shell without the profile, the bundle said nes15 and lacked the goal.
+- `aas stop --run-dir <dir>` stops a running session as Ctrl-C does, by the pid the run writes into its own directory.
+- EmuHawk is closed through its game window: Windows may name the Lua Console its main window, and closing that one
+  left EmuHawk running. The OBS recorder no longer takes the window OBS still lists from an earlier game.
+
 ## 0.33.0 — 2026-09-23
 
 - **BizHawk is a game plugin, not a stub.** Games on the BizHawk emulator through bizhawk-mcp-native (StealthC, MIT),

@@ -19,9 +19,12 @@ if (!exe || !fs.existsSync(exe)) throw new Error(`EmuHawk.exe not found in ${dir
 // A run never shows BizHawk's trust question: without the stored answer it does not start.
 const trust = trustState(dir);
 if (!trust.trusted) throw new Error(`${trust.detail}. Not starting: that question belongs to the set-up step, not to a run.`);
-const { romPath } = await import("./plugin.mjs");
-const rom = romPath();
-if (!rom || !fs.existsSync(rom)) throw new Error(`the ROM is not there: ${rom ?? "(none)"} (put it in .local/roms, or set AAS_BIZHAWK_ROM)`);
+const { romPath, playableRom } = await import("./plugin.mjs");
+const given = romPath();
+if (!given || !fs.existsSync(given)) throw new Error(`the ROM is not there: ${given ?? "(none)"} (put it in .local/roms, or set AAS_BIZHAWK_ROM)`);
+// A ROM in a zip is taken out of it (checked by the profile's SHA-1) into BizHawk's own folder: bizhawk-mcp-native
+// cannot read the "archive|member" path BizHawk gives a ROM opened inside an archive (measured 2026-09-23).
+const rom = playableRom(given, dir);
 
 if (await ping()) {
   console.log("EmuHawk is already running with bizhawk-mcp-native.");
@@ -41,9 +44,13 @@ if (quietName && !soundDevice) throw new Error(`the quiet audio device "${quietN
 // BizHawk writes its own messages over the game (the first-boot invitation for 30 s, "Rewind started", saves): the
 // recording shows the game and nothing the tools made, so its own "Display Messages" is off, and so is rewind, which a
 // run does not use (its savestates are the harness's).
+// BizHawk filters Left+Right and Up+Down pressed together (its own "Opposing directions" setting, Priority by default:
+// only the latest one of the pair counts), and the filter sits on the input the Lua script gives, not on a movie's. A
+// TAS presses both on purpose, so the setting is Allow (2) and the plugin's input reaches the game as a movie's does
+// (measured 2026-09-23: 84 instead of 108 at frame 240 of TASVideos 3728M under Priority).
 // A profile may name the core its game is played on (a TAS movie belongs to one core); BizHawk's own preference then says so.
 const { PROFILE } = await import("./plugin.mjs");
-setConfig(dir, { SoundDevice: soundDevice, MuteFrameAdvance: false, DispChromeStatusBarWindowed: false, DisplayMessages: false, FirstBoot: false }, { Rewind: { Enabled: false }, ...(PROFILE?.core ? { PreferredCores: { [PROFILE.system]: PROFILE.core } } : {}) });
+setConfig(dir, { SoundDevice: soundDevice, MuteFrameAdvance: false, DispChromeStatusBarWindowed: false, DisplayMessages: false, FirstBoot: false, OpposingDirPolicy: 2 }, { Rewind: { Enabled: false }, ...(PROFILE?.core ? { PreferredCores: { [PROFILE.system]: PROFILE.core } } : {}) });
 const child = spawn(exe, ["--open-ext-tool-dll=BizHawkMcp", "--chromeless", hostPath(rom)], { cwd: dir, detached: true, stdio: "ignore" });
 child.unref();
 console.log(`starting ${exe} with ${path.basename(rom)}${soundDevice ? `, sound on ${soundDevice}` : ""}`);

@@ -22,7 +22,7 @@ import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
 import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin, runtimeIdentity } from "./plugins.mjs";
-import { loadSettings } from "./settings.mjs";
+import { applyRunEnv, loadSettings } from "./settings.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
 import { CODE_SCHEMA, bindingLine, recordingVideos } from "./videos.mjs";
@@ -118,6 +118,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // load them, and a plugin that cannot find its game folder reports no build and no mods — a bundle that is then
   // "not conforming" for a reason that has nothing to do with the run. Measured on Balatro on 2026-09-21: published
   // from a bare shell it said version null and mods [], while three mods had run.
+  // What the run played (the BizHawk profile) comes from its brief, before the settings files and the plugin.
+  applyRunEnv(brief);
   if (brief.gameModule) loadSettings(brief.gameModule);
   const plugin = brief.gameModule ? await loadGamePlugin(brief.gameModule) : null;
   for (const src of plugin?.gameConfig ?? []) {

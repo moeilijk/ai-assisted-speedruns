@@ -47,3 +47,20 @@ export function closeWindows(steps, { steam = false, steamExe = process.env.AAS_
   const ps = `${PS_TYPES}\n${body}\n${steamStep}\nStart-Sleep 2\n'still running: ' + ((Get-Process ${report.join(",")} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName) -join ',')`;
   return execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8" }).replace(/\r/g, "").trim();
 }
+
+/**
+ * Waits up to `seconds` for a known question of a program (a dialog of `processName` titled `title`) and answers it
+ * with `button`, the way a user would; returns true when it was answered. For questions a tool asks the same way every
+ * time, which this harness has documented and answers itself (BizHawk's movie import: "ROM required to populate hash").
+ */
+export function answerDialog({ processName, title, button, seconds = 60 }) {
+  const ps = `${PS_TYPES}
+for ($i = 0; $i -lt ${Number(seconds) || 60}; $i++) {
+  $p = Get-Process ${q(processName)} -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($p) { $d = [WC]::DialogOf([uint32]$p.Id, ${q(title)}); if ($d -ne 0) { if ([WC]::PressButton($d, ${q(button)})) { 'answered'; exit } } }
+  Start-Sleep 1
+}
+'not asked'`;
+  const out = execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", cwd: "/mnt/c" });
+  return /answered/.test(out);
+}

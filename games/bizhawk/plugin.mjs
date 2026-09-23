@@ -6,7 +6,8 @@
 // with its maker, license and source, the game's ends as memory conditions (from a published RAM map, a disassembly or
 // the game's own source, and measured in BizHawk), what the agent is told, and the mock run's inputs.
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { call, rpc } from "./mcp.mjs";
@@ -25,6 +26,30 @@ export const romsDir = () => resolve(process.env.AAS_BIZHAWK_ROMS || join(REPO, 
 /** The ROM of the run: AAS_BIZHAWK_ROM, else the profile's file in the ROMs folder. */
 export const romPath = (profile = PROFILE) => (process.env.AAS_BIZHAWK_ROM ? resolve(process.env.AAS_BIZHAWK_ROM) : profile ? join(romsDir(), profile.rom.file) : null);
 const sha1 = (file) => createHash("sha1").update(readFileSync(file)).digest("hex").toUpperCase();
+const sha1Of = (buf) => createHash("sha1").update(buf).digest("hex").toUpperCase();
+
+/**
+ * The ROM as a file BizHawk can open: the file itself, or for a zip the member the profile names (by file name, or the
+ * one whose SHA-1 is the profile's), written once into <BizHawk>/aas-roms/. Returns the path to open.
+ */
+export function playableRom(given, dir = bizhawkDir(), profile = PROFILE) {
+  if (!/\.zip$/i.test(given)) return given;
+  const entries = readZipEntries(given);
+  if (!entries) throw new Error(`${given} is not a zip BizHawk's ROM can be taken from`);
+  const want = profile?.rom?.file_sha1 ?? profile?.rom?.sha1;
+  const entry = entries.find((e) => sha1Of(e.data) === want) ?? entries.find((e) => profile?.rom?.member && e.name === profile.rom.member) ?? (entries.length === 1 ? entries[0] : null);
+  if (!entry) throw new Error(`no ROM in ${given} matches the profile ${profile?.id ?? ""}`);
+  const out = join(dir, "aas-roms", entry.name.split("/").pop());
+  if (!existsSync(out) || sha1(out) !== sha1Of(entry.data)) { mkdirSync(dirname(out), { recursive: true }); writeFileSync(out, entry.data); }
+  return out;
+}
+/** The SHA-1 of the ROM file itself, also inside a zip: what the profile's `file_sha1` names. */
+export function romFileSha1(given, profile = PROFILE) {
+  if (!/\.zip$/i.test(given)) return sha1(given);
+  const entries = readZipEntries(given) ?? [];
+  const want = profile?.rom?.file_sha1 ?? profile?.rom?.sha1;
+  return (entries.find((e) => sha1Of(e.data) === want) ?? entries[0]) ? sha1Of((entries.find((e) => sha1Of(e.data) === want) ?? entries[0]).data) : null;
+}
 
 /**
  * Frames per second of each system, as BizHawk itself counts them (src/BizHawk.Client.Common/movie/PlatformFrameRates.cs,
@@ -40,6 +65,19 @@ const ENDS = PROFILE?.ends ?? [{ id: "end", label: "End", final: true }];
 const SEGMENTS = ENDS.map((e) => e.split ?? e.label);
 const upper = (b) => Object.fromEntries(Object.entries(b ?? {}).filter(([, v]) => v).map(([k]) => [k, true]));
 /** Buttons as the agent may give them: ["A", "Right"] or { A: true, Right: true }. */
+/**
+ * Buttons reach the game through lua/hold.lua. The tool's press_buttons sets them between frames, and BizHawk clears
+ * such overrides when the next frame starts (measured 2026-09-23: Mario at x 58 after 600 frames of TASVideos 3728M,
+ * the movie at 916). The script sets them at the start of every frame from the value "aas_held" ("Right+B"), which the
+ * plugin sets through the tool before it advances; with it the same 600 frames end at 916.
+ */
+const HOLD_LUA = join(here, "lua", "hold.lua");
+const holdLoaded = async () => ((await call("lua_list")).scripts ?? []).some((s) => /[\\/]hold\.lua$/.test(s.path) && s.enabled);
+async function ensureHold() {
+  if (!(await holdLoaded())) await call("lua_load", { path: hostPath(HOLD_LUA) });
+}
+const hold = (buttons) => call("userdata_set", { key: "aas_held", value: buttons.join("+") });
+
 const buttonMap = (buttons) => (Array.isArray(buttons) ? Object.fromEntries(buttons.map((b) => [String(b), true])) : upper(buttons));
 
 const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf8")}\n## This game\n\n${PROFILE ? `${PROFILE.name} (${PROFILE.system}).\n\nControls: ${PROFILE.controls}\n\nGoal: ${PROFILE.goal}\n` : "No profile chosen (AAS_BIZHAWK_PROFILE).\n"}`;
@@ -47,7 +85,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.33.0",
+  version: "0.33.1",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",
@@ -56,6 +94,7 @@ export default {
   windowTitlePattern: " - BizHawk$",
   endpoints: [{ host: "127.0.0.1", port: 8767 }],
   env: ["AAS_BIZHAWK_PROFILE", "AAS_BIZHAWK_MCP_URL"],
+  runEnv: ["AAS_BIZHAWK_PROFILE"],
   ends: ENDS,
   profile: PROFILE,
   setup: {
@@ -70,6 +109,7 @@ export default {
     launch: join(here, "launch-game.mjs"),
     stop: join(here, "stop-all.mjs"),
     bot: join(here, "bot.mjs"),
+    splits: PROFILE ? Object.fromEntries(ENDS.map((e) => [e.id, join(here, "splits", `${PROFILE.id}-${e.id}.lss`)])) : {},
   },
   readable: [here],
   segments: SEGMENTS,
@@ -98,16 +138,27 @@ export default {
     const reached = new Set();
     let index = 0;
     let over = false;
+    // The run's goal, from its brief: the harness declares the victory when that end goes by, but it reads the event
+    // log up to half a second later, and the next input may come before that (measured 2026-09-23: 100 frames after
+    // World 2, counted in the game time). So after the goal's end the plugin takes no more input itself.
+    const goal = (() => { try { return JSON.parse(readFileSync(join(process.env.AAS_RUN_DIR, "brief.json"), "utf8")).category?.goal ?? null; } catch { return null; } })();
     // After every playback: has the game reached one of its ends? The harness declares the victory for the goal.
+    // A condition of the profile: one value (`equals` or `atLeast`), or `all` / `any` of such conditions.
+    const holds = async (w) => {
+      if (w.all) { for (const c of w.all) if (!(await holds(c))) return false; return true; }
+      if (w.any) { for (const c of w.any) if (await holds(c)) return true; return false; }
+      const v = await call("read_memory", { address: w.address, domain: w.domain, width: w.width ?? 8 });
+      const value = Number(typeof v === "object" ? v.value : v);
+      return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
+    };
     const checkEnds = async () => {
       for (const end of ENDS) {
         if (!end.when || reached.has(end.id)) continue;
-        const v = await call("read_memory", { address: end.when.address, domain: end.when.domain, width: end.when.width ?? 8 });
-        const value = typeof v === "object" ? v.value ?? v.values?.[0] : Number(v);
-        if (Number(value) === end.when.equals) {
+        if (await holds(end.when)) {
           reached.add(end.id);
           emit("game.milestone", { label: end.label, split: end.split ?? end.label, end: end.id, chapter: true });
           if (end.final) { over = true; emit("game.over", { victory: true, label: end.label }); }
+          else if (end.id === goal) over = true;
         }
       }
     };
@@ -119,16 +170,16 @@ export default {
       const started = Date.now();
       emit("game.playback", { phase: "start", index: i, command: label, frames });
       try {
+        await ensureHold();
         for (const s of steps) {
           const buttons = buttonMap(s.buttons);
           const n = Math.max(0, Math.floor(s.frames ?? 1));
-          if (Object.keys(buttons).length) {
-            for (let f = 0; f < n; f += 1) { await call("press_buttons", { buttons }); await call("frame_advance", { count: 1 }); }
-          } else {
-            for (let left = n; left > 0; left -= 600) await call("frame_advance", { count: Math.min(600, left) });
-          }
+          await hold(Object.keys(buttons));
+          for (let left = n; left > 0; left -= 600) await call("frame_advance", { count: Math.min(600, left) });
         }
+        await hold([]);
       } catch (error) {
+        await hold([]).catch(() => {});
         emit("game.playback", { phase: "end", index: i, error: String(error?.message ?? error), wall_ms: Date.now() - started, command: label });
         throw error;
       }
@@ -166,8 +217,13 @@ export default {
     if (resume) return { readyAt: new Date() };
     const info = await call("get_info");
     if (PROFILE && String(info.rom_hash).toUpperCase() !== PROFILE.rom.sha1) throw new Error(`the loaded ROM is not ${PROFILE.name}: SHA-1 ${info.rom_hash}, the profile names ${PROFILE.rom.sha1}`);
+    // A reboot while BizHawk's Lua Console is open makes the console start its own entry for the Lua folder as a script,
+    // which shows an error dialog (LuaConsole.cs, 2.11.1). Every Lua tool of bizhawk-mcp-native opens that console, so
+    // nothing here touches Lua before the reboot: the emulator is rebooted first, the script loaded after.
     await call("pause");
     await call("reboot");
+    await call("userdata_set", { key: "aas_held", value: "" });
+    await ensureHold();
     log(`${info.rom_name} (${info.system_id}) from power-on, paused`);
     return { readyAt: new Date() };
   },
@@ -185,6 +241,8 @@ export default {
     if (!file) throw new Error(`save ${name ?? "(none)"} not found (looked in ${candidates.join(", ")})`);
     await call("pause");
     await call("load_state", { path: hostPath(file) });
+    await ensureHold();
+    await hold([]);
     const info = await call("get_info");
     log(`save ${name} loaded at frame ${info.framecount}`);
     return { readyAt: new Date() };
@@ -218,7 +276,7 @@ export default {
     const rom = romPath();
     const okRom = Boolean(rom && existsSync(rom));
     rows.push({ ok: okRom, what: `ROM of ${PROFILE?.name ?? "the profile"}`, detail: rom ?? "no ROM set (AAS_BIZHAWK_ROM)" });
-    if (okRom && PROFILE) rows.push({ ok: sha1(rom) === PROFILE.rom.sha1, what: "the ROM is the dump the profile names", detail: `SHA-1 ${sha1(rom)}; the profile names ${PROFILE.rom.sha1}` });
+    if (okRom && PROFILE) { const got = romFileSha1(rom); rows.push({ ok: got === PROFILE.rom.sha1, what: "the ROM is the dump the profile names", detail: `SHA-1 ${got}; the profile names ${PROFILE.rom.sha1}` }); }
     return rows;
   },
   exercise: [

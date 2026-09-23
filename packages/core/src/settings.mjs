@@ -56,3 +56,17 @@ export function loadSettings(game = null) {
   }
   return loaded;
 }
+
+/**
+ * The variables that decide what a run plays (a plugin's `runEnv`, such as the BizHawk profile), as the run recorded
+ * them in its brief, set again before the plugin is loaded: publish and resume play or describe the run's own game,
+ * whatever the shell holds. Returns the names whose shell value it replaced.
+ */
+export function applyRunEnv(brief) {
+  const replaced = [];
+  for (const [k, v] of Object.entries(brief?.gameEnv ?? {})) {
+    if (process.env[k] !== undefined && process.env[k] !== v) replaced.push(k);
+    process.env[k] = v;
+  }
+  return replaced;
+}

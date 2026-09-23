@@ -49,7 +49,7 @@ export async function configure(opts) {
   if (opts.build) category.build = opts.build;
   // The first prompt names the run's own goal: a plugin may give it per end.
   const goalPrompt = opts.prompt ?? (typeof plugin.goalPrompt === "function" ? plugin.goalPrompt(goal.end) : plugin.goalPrompt) ?? null;
-  const brief = { id: opts.id ?? path.basename(runDir), run_uid: randomBytes(16).toString("hex"), instructions, goalPrompt, category, model: opts.model, reasoningEffort: opts.effort ?? null, runtime: runtime.id, runtimeVersion: runtime.version, runtimeModule: /\.m?js$/.test(opts.runtime) ? path.resolve(opts.runtime) : null, game: { id: plugin.id, version: plugin.version }, gameModule: spec.gameModule };
+  const brief = { id: opts.id ?? path.basename(runDir), run_uid: randomBytes(16).toString("hex"), instructions, goalPrompt, category, model: opts.model, reasoningEffort: opts.effort ?? null, runtime: runtime.id, runtimeVersion: runtime.version, runtimeModule: /\.m?js$/.test(opts.runtime) ? path.resolve(opts.runtime) : null, game: { id: plugin.id, version: plugin.version }, gameModule: spec.gameModule, gameEnv: Object.fromEntries((plugin.runEnv ?? []).filter((k) => process.env[k] !== undefined).map((k) => [k, process.env[k]])) };
   if (opts.headless) brief.headless = true;
   // The seed, for games that have one: configuration of the run, handed to the plugin's prepareRun.
   if (opts.seed) brief.seed = String(opts.seed);

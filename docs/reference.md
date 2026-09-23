@@ -185,7 +185,7 @@ Created by `aas run` (or `aas configure`), private; only `aas publish` makes the
 
 | Path | Written by | Content |
 |---|---|---|
-| `brief.json` | configure, resume | run id, category, model, effort, instructions, goal prompt, runtime and game plugin, budgets, resume info |
+| `brief.json` | configure, resume | run id, category, model, effort, instructions, goal prompt, runtime and game plugin, the plugin's `runEnv` values (what the run plays), budgets, resume info |
 | `AGENTS.md`, `CLAUDE.md`, `.mcp.json`, `.claude/settings.json`, `.codex/config.toml` | runtime configure | the agent's instructions and hardened configuration (which files depends on the runtime) |
 | `runtime-config/` | runtime configure | the same configuration with machine paths replaced (`__RUN_DIR__`, `__REPO__`, `__HOME__`), published |
 | `run.jsonl` | broker, harness, plugins | the private, complete log: tool calls and results, agent messages, events (`game.playback`, `game.milestone`, `game.over`, `game.saved`, `run.started`, `run.ended`, `recording.*`, ...), all on one clock |

@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.33.0",
+  "version": "0.33.1",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -77,7 +77,8 @@
     "bizhawk:launch": "node games/bizhawk/launch-game.mjs",
     "bizhawk:stop": "node games/bizhawk/stop-all.mjs",
     "bizhawk:doctor": "node packages/core/src/cli.mjs doctor --game games/bizhawk/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
-    "bizhawk:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/bizhawk/plugin.mjs --bot games/bizhawk/bot.mjs --recorder obs --overlay-port 8765 --run-dir"
+    "bizhawk:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/bizhawk/plugin.mjs --bot games/bizhawk/bot.mjs --recorder obs --overlay-port 8765 --run-dir",
+    "bizhawk:tas": "node games/bizhawk/tas.mjs"
   },
   "bin": {
     "aas": "./packages/core/src/cli.mjs"

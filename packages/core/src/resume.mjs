@@ -7,6 +7,7 @@ import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
+import { applyRunEnv } from "./settings.mjs";
 import path from "node:path";
 import { createEventLog, followEvents, readRunLog } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
@@ -23,6 +24,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   if (opts["ignore-budget"]) brief.ignoreBudget = true;
   const outcome = fs.existsSync(path.join(runDir, "outcome.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8")) : {};
   const gameModule = opts.game ?? brief.gameModule;
+  for (const k of applyRunEnv(brief)) log(`${k}: the run's own value (${brief.gameEnv[k]}), not the shell's`);
   const plugin = await loadGamePlugin(gameModule);
   // A resume may extend the goal to a later end of the game (act 1 to the game's own end); never shorten it.
   // A run that reached its goal is over unless the goal is extended.
@@ -134,8 +136,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   const goal = resolveGoal(plugin, brief.category?.goal);
   const follower = followEvents(runDir, async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
+      // As in run.mjs: the goal's milestone still goes on to the recorder, the timer and the autosave.
       events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
-      return;
     }
     if (ev.event === "game.over") {
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
@@ -151,6 +153,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
   process.once("SIGINT", stopRequested);
   process.once("SIGTERM", stopRequested);
+  // `aas stop --run-dir` finds this process by this file, never by a process search.
+  fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
   try {
     result = await runtime.start(runDir, brief);
   } catch (error) {
@@ -159,6 +163,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);
+  fs.rmSync(path.join(runDir, "run.pid"), { force: true });
   autosave?.stop();
   // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
   await follower.flush();

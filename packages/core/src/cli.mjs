@@ -5,7 +5,7 @@
 //   aas start --runtime <id> --run-dir <dir>
 //   aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]
 //   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
-//   aas login | aas logout | aas tickets [extend|revoke|delete <ticket>] | aas upload <bundle.zip>
+//   aas stop --run-dir <dir> | aas login | aas logout | aas tickets [extend|revoke|delete <ticket>] | aas upload <bundle.zip>
 import fs from "node:fs";
 import path from "node:path";
 import { loadSettings } from "./settings.mjs";
@@ -179,6 +179,22 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         if (!zip) throw new Error("Usage: aas upload <bundle.zip>");
         const answer = await uploadBundle(path.resolve(zip));
         console.log(`uploaded: ${answer.status ?? "received"}${answer.submission ? ` (${answer.submission})` : ""}${answer.proof ? `; proof ${answer.proof}` : ""}${answer.reasons?.length ? `; ${answer.reasons.join("; ")}` : ""}`);
+        break;
+      }
+      case "stop": {
+        // Stops a running session the way Ctrl-C does (saved, recording kept, everything closed), found by the pid the
+        // run wrote into its own directory: never a process search, which can find the shell around it instead.
+        const runDir = opts["run-dir"];
+        if (!runDir) throw new Error("Usage: aas stop --run-dir <dir>");
+        const file = path.join(path.resolve(runDir), "run.pid");
+        if (!fs.existsSync(file)) { console.log("no session is running in this run directory"); break; }
+        const { pid } = JSON.parse(fs.readFileSync(file, "utf8"));
+        const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
+        if (!alive()) { fs.rmSync(file, { force: true }); console.log(`the session (pid ${pid}) is no longer running`); break; }
+        process.kill(pid, "SIGINT");
+        console.log(`stop sent to the session (pid ${pid}); it saves, keeps its recording and closes everything`);
+        for (let i = 0; i < 240 && alive(); i += 1) await new Promise((r) => setTimeout(r, 500));
+        console.log(alive() ? `the session (pid ${pid}) is still closing after 2 minutes` : "the session has ended");
         break;
       }
       case "login": {

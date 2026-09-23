@@ -1,6 +1,6 @@
 {
   "name": "@aas/core",
-  "version": "0.33.0",
+  "version": "0.33.1",
   "description": "AAS core: hardened MCP broker, run log, export",
   "type": "module",
   "engines": {

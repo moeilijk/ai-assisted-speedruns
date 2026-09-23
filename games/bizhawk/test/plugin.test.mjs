@@ -21,10 +21,11 @@ test("buttons are held frame by frame, and game time is frames at the system's o
   const emu = await plugin.connect();
   const r = await emu.press(["A", "Right"], 5);
   assert.equal(r.frames, 5);
-  assert.equal(fake.pressed.slice(-5).length, 5, "the buttons are set before each of the five frames");
+  assert.equal(fake.pressed.slice(-5).length, 5, "the buttons are held in each of the five frames");
   assert.deepEqual(fake.pressed.at(-1).buttons, { A: true, Right: true });
   const end = events.find((e) => e.event === "game.playback" && e.data.phase === "end");
   assert.equal(end.data.frames, 5);
+  assert.equal(fake.userdata.aas_held, "", "nothing is held after the playback");
   assert.equal(end.data.seconds, 5 / FPS.NES, "IGT from BizHawk's own NES frame rate");
   const w = await emu.wait(1200);
   assert.equal(w.frames, 1200);
@@ -48,10 +49,14 @@ test("the profile's end is read from memory after a playback: the milestone, the
 });
 
 test("a run starts only on the ROM the profile names, from power-on and paused", async () => {
+  fake.scripts.length = 0; // a freshly started EmuHawk: the playbacks above loaded the input script
   const lines = [];
   await plugin.prepareRun({ log: (l) => lines.push(l) });
   assert.equal(fake.framecount, 0, "rebooted");
   assert.equal(fake.paused, true);
+  assert.equal(fake.luaDialog, false, "rebooted before anything opened the Lua Console");
+  assert.ok(fake.scripts.some((p) => p.endsWith("hold.lua")), "the input script is loaded after the reboot");
+  fake.scripts.length = 0;
   // Another dump of the game, or another game: the run does not start.
   fake.romHash = "0".repeat(40);
   await assert.rejects(plugin.prepareRun({}), /is not nes15 .*SHA-1 0{40}, the profile names 8FCC5798/);

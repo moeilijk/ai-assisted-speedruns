@@ -175,10 +175,12 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   let deaths = 0; // deaths so far in this session (game.over without victory); a death is not the end of the run
   // The goal: one of the game's ends. The plugin marks its ends with milestones; when the milestone of the goal's
   // end goes by, the harness declares the victory (game.over), which ends the session like the game's own victory.
+  // The goal's milestone itself goes on to the recorder, the timer (its final split) and the autosave like any other
+  // (measured 2026-09-23: without it LiveSplit never took the last split); the appended game.over comes back through
+  // the follower and ends the session below.
   const forward = async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
       events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
-      return; // the appended game.over comes back through the follower and ends the session below
     }
     if (ev.event === "game.over") {
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
@@ -196,6 +198,8 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
   process.once("SIGINT", stopRequested);
   process.once("SIGTERM", stopRequested);
+  // `aas stop --run-dir` finds this process by this file, never by a process search.
+  fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
   try {
     outcome = await runtime.start(runDir, brief);
   } catch (error) {
@@ -204,6 +208,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   }
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);
+  fs.rmSync(path.join(runDir, "run.pid"), { force: true });
   autosave?.stop();
   // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
   await follower.flush();

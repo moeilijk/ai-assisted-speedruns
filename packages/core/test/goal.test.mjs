@@ -79,8 +79,9 @@ test("an earlier end as the goal: the harness declares the victory; a resume may
   await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": runDir, goal: "half" }, { log() {} });
   assert.equal(JSON.parse(readFileSync(join(runDir, "brief.json"), "utf8")).category.goal, "half");
   writeFileSync(join(runDir, "stub-codes.json"), JSON.stringify(["return await game.observe()", "return await game.half()", ...slow]));
-  const r = await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: "null", "run-dir": runDir, "keep-open": true }, { log() {} });
+  const r = await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: "null", timer: join(here, "recording-timer.mjs"), "run-dir": runDir, "keep-open": true }, { log() {} });
   assert.equal(r.outcome.status, "completed");
+  assert.ok(globalThis.aasTimerEvents.some((e) => e.event === "game.milestone" && e.data.label === "Halfway"), "the goal's milestone reaches the timer, for its final split");
   const over = events(runDir).find((e) => e.event === "game.over");
   assert.equal(over.data.victory, true);
   assert.equal(over.data.goal, "half");
