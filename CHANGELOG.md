@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.3 — 2026-09-23
+
+- `npm run e2e:archive`: the whole chain against the live archive while it is in test, with no person involved.
+  An account of its own (signed up once, then kept in `.local/e2e-account.json`), signed in through the archive's own
+  pages, a two-segment run with proof on that account's tickets (the Portal chain against the fake SPT: no game, no
+  model, no tokens), and the upload. It asserts three answers: a clean run has proof `signed` (and is refused as a mock),
+  an edited public timeline has proof `invalid`, and a fork has proof `review`. Measured at 14:04: submissions 53, 54
+  and 55. Not part of `npm test`, because it needs the network; after launch it needs an account the archive allows to
+  submit.
+- `aas upload` reads a refusal that carries a decision (HTTP 422 with `submission`, `status`, `proof`, `reasons`) as
+  the archive's answer, not as a failed upload; other 4xx mean the upload was not taken in.
+- `aas login` opens `/auth/oauth/authorize/` with its trailing slash, the address the archive serves, without a redirect.
+
 ## 0.32.2 — 2026-09-23
 
 - The GUI shows the archive on the Run tab: whether this machine is signed in and how runs record their proof, with

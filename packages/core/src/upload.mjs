@@ -10,6 +10,8 @@ export async function uploadBundle(zipFile, { fetchImpl = fetch, baseUrl = proof
   if (!token) throw new Error("uploading needs an account: sign in with `aas login` first");
   const res = await fetchImpl(`${baseUrl}/api/v1/bundles`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/zip", "X-Filename": path.basename(zipFile), Accept: "application/json" }, body: fs.readFileSync(zipFile), signal: AbortSignal.timeout(timeoutMs) });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`the archive refused the upload (${res.status}${json.error ? `: ${json.error}` : ""})`);
+  // A refusal with a decision (a mock, a proof that does not match) is the archive's answer, not a failed upload.
+  if (!res.ok && json.status && json.submission) return json;
+  if (!res.ok) throw new Error(`the archive refused the upload (${res.status}${json.error ? `: ${json.error}` : ""}${json.reasons?.length ? `: ${json.reasons.join("; ")}` : ""})`);
   return json;
 }

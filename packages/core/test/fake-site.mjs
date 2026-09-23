@@ -60,7 +60,7 @@ export async function startFakeSite(dir, { down = false } = {}) {
         if (m[2] === "revoke") { t.state = "revoked"; return reply(200, { ticket: t.ticket, revoked: true }); }
         if (!m[2] && req.method === "DELETE") { tickets.delete(t.ticket); return reply(200, { ticket: t.ticket, deleted: true }); }
       }
-      if (url.pathname === "/auth/oauth/authorize") {
+      if (url.pathname === "/auth/oauth/authorize/") {
         // The person signs in and allows the tooling: here that is always yes, for account "tester".
         if (url.searchParams.get("code_challenge_method") !== "S256") return reply(400, { error: "S256 required" });
         const code = hex(16);

@@ -55,7 +55,7 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
   const server = http.createServer();
   await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
   const redirect = `http://127.0.0.1:${server.address().port}/callback`;
-  const url = `${baseUrl}/auth/oauth/authorize?${new URLSearchParams({ client_id: CLIENT_ID, response_type: "code", redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state })}`;
+  const url = `${baseUrl}/auth/oauth/authorize/?${new URLSearchParams({ client_id: CLIENT_ID, response_type: "code", redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state })}`;
   const code = new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("no answer from the browser within 5 minutes")), timeoutMs);
     server.on("request", (req, res) => {
