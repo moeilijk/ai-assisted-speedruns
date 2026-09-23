@@ -27,7 +27,8 @@ games/
   portal/               Portal through the controller from portal-agent
   balatro/              Balatro through balatrobot
   portal-2/             Portal 2 through SourceAutoRecord's TAS protocol
-  half-life-2/ slay-the-spire-2/ celeste/ openrct2/ kerbal-space-program/ bizhawk/ unity-bepinex/ unreal-ue4ss/
+  bizhawk/              games on the BizHawk emulator through bizhawk-mcp-native, one profile per game
+  half-life-2/ slay-the-spire-2/ celeste/ openrct2/ kerbal-space-program/ unity-bepinex/ unreal-ue4ss/
                         planned, not implemented; each README has the route, license and risks
 docs/                   install, command reference, plugins, design
 ```
@@ -139,13 +140,26 @@ MIT, see [LICENSE](LICENSE). Code from others keeps its own license:
 - [portal-agent](https://github.com/cozyblaze/portal-agent) by cozyblaze (MIT): see [packages/core/NOTICE](packages/core/NOTICE) and [packages/core/vendor/portal-agent/LICENSE](packages/core/vendor/portal-agent/LICENSE). A bundle that contains portal-agent material (Portal game configuration, instructions and documentation, or the Codex configuration template) includes that license.
 - [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) by gamerpuppy (MIT): see [games/slay-the-spire/NOTICE](games/slay-the-spire/NOTICE) and [games/slay-the-spire/lightspeed/LICENSE](games/slay-the-spire/lightspeed/LICENSE).
 
-Games, mods and tools that the setup downloads or builds are not in this repository. Each is pinned in the game's `UPSTREAM.json` and has its own license:
+The games, and the mods and tools the setup downloads or builds, are not in this repository. You bring the game; every mod and tool is pinned in the `UPSTREAM.json` next to the plugin that uses it, and each has its own license:
 
-| Game | Downloaded or built | License |
+| Game | Game, or what the setup downloads or builds | License |
 |---|---|---|
-| Slay the Spire | Communication Mod, BaseMod, ModTheSpire | MIT |
-| Slay the Spire | sts_lightspeed (built for the scripted bot) | MIT |
-| Portal | SourcePauseTool | MIT |
+| Slay the Spire | [Slay the Spire](https://store.steampowered.com/app/646570/) (your own copy) | the game's own |
+| Slay the Spire | [Communication Mod](https://github.com/ForgottenArbiter/CommunicationMod) | MIT |
+| Slay the Spire | [ModTheSpire](https://steamcommunity.com/sharedfiles/filedetails/?id=1605060445) ([source](https://github.com/kiooeht/ModTheSpire)) | MIT |
+| Slay the Spire | [BaseMod](https://steamcommunity.com/sharedfiles/filedetails/?id=1605833019) ([source](https://github.com/daviscook477/BaseMod)) | MIT |
+| Slay the Spire | [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) (built for the scripted bot) | MIT |
+| Portal | [Portal](https://store.steampowered.com/app/400/) (your own copy), run from [Source Unpack](https://sourceunpack.gameabusefastcomplete.com/) | the game's own |
+| Portal | [SourcePauseTool](https://github.com/OutOfBoundsOffice/SourcePauseTool) | MIT |
+| Portal 2 | [Portal 2](https://store.steampowered.com/app/620/) (your own copy) | the game's own |
+| Portal 2 | [SourceAutoRecord](https://github.com/p2sr/SourceAutoRecord) | MIT |
+| Balatro | [Balatro](https://store.steampowered.com/app/2379780/) (your own copy) | the game's own |
 | Balatro | [Lovely](https://github.com/ethangreen-dev/lovely-injector) | MIT |
 | Balatro | [Steamodded](https://github.com/Steamodded/smods) | GPL-3.0 |
 | Balatro | [balatrobot](https://github.com/coder/balatrobot) | MIT |
+| Balatro | [jackdaw-balatro](https://github.com/TylerFlar/jackdaw-balatro) (the scripted bot's policy is ported from it) | MIT |
+| BizHawk | [BizHawk](https://github.com/TASEmulators/BizHawk) 2.11.1 | MIT (the EmuHawk frontend); each core its own, most GPL |
+| BizHawk | [bizhawk-mcp-native](https://github.com/StealthC/bizhawk-mcp-native) v0.3.0 by StealthC | MIT |
+| BizHawk | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
+| every game | [LiveSplit](https://github.com/LiveSplit/LiveSplit) (the timer, installed from the GUI) | MIT |
+| every game | [SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html) by NirSoft (optional quiet audio routing) | freeware |

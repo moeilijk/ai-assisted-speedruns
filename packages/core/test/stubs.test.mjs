@@ -14,7 +14,7 @@ const stubs = readdirSync(games).map((d) => join(games, d, "plugin.mjs")).filter
 
 // The games still waiting for a plugin, by their folder. Naming them rather than counting them means finishing one
 // is a change this test points at, instead of a number that silently drifts.
-const EXPECTED = ["bizhawk", "celeste", "half-life-2", "kerbal-space-program", "openrct2", "slay-the-spire-2", "unity-bepinex", "unreal-ue4ss"];
+const EXPECTED = ["celeste", "half-life-2", "kerbal-space-program", "openrct2", "slay-the-spire-2", "unity-bepinex", "unreal-ue4ss"];
 
 test("every stub game plugin loads, declares its ends, and refuses to run", async () => {
   assert.deepEqual(stubs.map((f) => f.split("/").at(-2)).sort(), [...EXPECTED].sort(), "the stubs are the games still waiting for a plugin; finishing one means taking it out of this list");

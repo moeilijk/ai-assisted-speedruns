@@ -160,6 +160,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);
   autosave?.stop();
+  // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
+  await follower.flush();
   if (result.status !== "failed") result = { ...result, deaths: (outcome.deaths ?? 0) + deaths, ...(over ? { status: "completed", over, notes: [result.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
   if (plugin.saveState && result.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });
   events.append("run.ended", { status: result.status, notes: result.notes ?? null, sessionId: result.sessionId ?? sessionId, segment });

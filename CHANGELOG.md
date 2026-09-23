@@ -12,6 +12,33 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.0 — 2026-09-23
+
+- **BizHawk is a game plugin, not a stub.** Games on the BizHawk emulator through bizhawk-mcp-native (StealthC, MIT),
+  an external tool inside EmuHawk that serves the emulator over HTTP. Chosen by the owner (2026-09-23) after a
+  measurement: paused, the emulator stands still; `frame_advance` plays exactly N frames and pauses again; buttons,
+  screenshots and savestates work (15:02–15:06). mcp-bizhawk was not taken: its Lua loop runs on `emu.frameadvance`,
+  which BizHawk's own documentation says waits for a frame, so it stands still when the game is paused.
+- One plugin, one profile per game (`games/bizhawk/profiles/`): the ROM by SHA-1 with maker, license and source, the
+  ends as memory conditions, controls and goal, the mock's inputs, optionally the core. The first profile is a test:
+  nes15, the Fifteen Puzzle by Mathew Brenaman (BSD-2-Clause). Its end `solved` is `play_state` = 3 (from the game's
+  source), at RAM 0x2F as measured in BizHawk; the mock uses the game's own auto-solver. In-game time is frames divided
+  by the system's frame rate as BizHawk counts it.
+- `npm run bizhawk:install` downloads BizHawk 2.11.1, bizhawk-mcp-native v0.3.0 and the test ROM, each pinned, and then
+  lets BizHawk ask its own "Trust this external tool" question, announced beforehand (owner, 2026-09-23). A run never
+  shows it: the launcher reads BizHawk's stored answer (per DLL SHA512) and refuses to start without it. The GUI's
+  Setup tab has the row and the button (`bizhawk:allow`); a game plugin's check may now name a fix of its own.
+- The launcher sets BizHawk's own settings for a clean recording with sound: `--chromeless`, no status bar, no messages
+  over the game, `MuteFrameAdvance` off (BizHawk mutes frame advance by default: the first mock had -91 dB), rewind
+  off, and the quiet output device through BizHawk's `SoundDevice` (EmuHawk follows the Windows default when it
+  changes, so switching that does not keep it quiet). Measured on the mock at 16:09: the game only, -24.8 dB.
+- The OBS recorder takes the game window by a title pattern when a game plugin names one (`windowTitlePattern`):
+  EmuHawk has a second window, the tool's own form, and the first mock recorded that one.
+- A run's outcome waits for the last events of the session: a victory in the last frames came in after the outcome
+  was decided, and the run said `stopped` instead of `completed`.
+- README: every game, mod and tool in the license table now links to its source or store page, and Portal 2 with
+  SourceAutoRecord, jackdaw-balatro, LiveSplit and SoundVolumeView are in it.
+
 ## 0.32.6 — 2026-09-23
 
 - The e2e test asserts what the archive does with a test upload: every head received, no fork, the tickets left

@@ -1,0 +1,30 @@
+{
+  "bizhawk": {
+    "repo": "https://github.com/TASEmulators/BizHawk",
+    "version": "2.11.1",
+    "commit": "bdddf4a58aa1a022afb11dc73294a81a5aa7bbd5",
+    "url": "https://github.com/TASEmulators/BizHawk/releases/download/2.11.1/BizHawk-2.11.1-win-x64.zip",
+    "sha256": "dd7cbd5e205b09c5bce6afabc4f8aa525acc0bbeb9753b198a8db3fe6a5e5717",
+    "license": "MIT (the EmuHawk frontend); every bundled core carries its own license, most of them GPL"
+  },
+  "bizhawk_mcp_native": {
+    "repo": "https://github.com/StealthC/bizhawk-mcp-native",
+    "version": "v0.3.0",
+    "commit": "e416f1a561e2e0e1abcb75b141c477aa9d8ed3e6",
+    "url": "https://github.com/StealthC/bizhawk-mcp-native/releases/download/v0.3.0/BizHawkMcp-stable-win-2.11.1.zip",
+    "sha256": "3f56352b57a6b69805e6bbc545d095510f20a1a6be1204449d081a9d268a34cd",
+    "dll": "BizHawkMcp.dll",
+    "license": "MIT, Copyright (c) StealthC",
+    "endpoint": "http://127.0.0.1:8767/mcp/"
+  },
+  "test_roms": {
+    "nes15": {
+      "repo": "https://github.com/christopherpow/nes-test-roms",
+      "commit": "95d8f621ae55cee0d09b91519a8989ae0e64753b",
+      "url": "https://raw.githubusercontent.com/christopherpow/nes-test-roms/95d8f621ae55cee0d09b91519a8989ae0e64753b/nes15-1.0.0/nes15-NTSC.nes",
+      "sha1": "8FCC5798252370C63A98E7421131ABF3EB22BFCF",
+      "file": "nes15-NTSC.nes",
+      "license": "BSD-2-Clause, Copyright (c) 2011 Mathew Brenaman (nes15-1.0.0/LICENSE)"
+    }
+  }
+}

@@ -310,6 +310,13 @@ export function createSession() {
         const { enableServerStartup } = await import("../../../timer-livesplit/install-livesplit.mjs");
         log(enableServerStartup(path.join(path.dirname(toLocal(readEnv().AAS_LIVESPLIT_EXE)), "settings.cfg")), "note");
         log("LiveSplit reads this when it starts; close it first if it is open.", "note");
+      } else if (id.startsWith("fix:")) {
+        const [, gameId, fixId] = id.split(":");
+        const g = (await guiGames()).find((x) => x.plugin.id === gameId);
+        const f = g?.plugin.setup.fixes?.[fixId];
+        if (!f) throw new Error(`Unknown fix: ${id}`);
+        const code = await node([f.script], shownScript(f.script));
+        if (code !== 0) throw new Error(`${f.label} did not succeed; see the log.`);
       } else if (id.startsWith("install:")) {
         const g = (await guiGames()).find((x) => x.plugin.id === id.slice(8));
         if (!g?.plugin.setup.install) throw new Error("Nothing to install for this game.");

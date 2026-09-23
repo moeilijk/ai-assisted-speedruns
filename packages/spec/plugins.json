@@ -42,8 +42,8 @@
       "dir": "packages/recorder-obs",
       "id": "obs",
       "name": "OBS Studio (video)",
-      "version": "0.29.1",
-      "sha256": "a72fbd84f80c1df076db9318f74f5c6f308b679d1048b81094bbf2e90b036d6a"
+      "version": "0.33.0",
+      "sha256": "9c492a4bb687f730412c31a9f79d7543d7964a9a97e3197d2f662f4dd1851cd3"
     },
     {
       "kind": "recorder",
@@ -74,10 +74,10 @@
       "kind": "game",
       "dir": "games/bizhawk",
       "id": "bizhawk",
-      "name": "BizHawk emulator (generic, with game profiles)",
-      "version": "0.0.0",
-      "stub": true,
-      "sha256": "28919b507c872b2f1573c681aab6999dd182214078e9e166d148af67627f83e0"
+      "name": "BizHawk",
+      "version": "0.33.0",
+      "stub": false,
+      "sha256": "3378f0b831a3ab4f597c17e6fc97a3321bf71d7b5f6d20e6f6c6121d7fa45039"
     },
     {
       "kind": "game",

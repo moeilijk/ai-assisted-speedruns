@@ -51,6 +51,13 @@ export function followEvents(runDir, onEvent, { intervalMs = 500, onRecord = nul
   };
   const timer = setInterval(tick, intervalMs);
   return {
+    /**
+     * Reads what is in the file now and waits for the handlers, twice: a handler may append an event of its own (the
+     * harness declares a victory as a game.over), and that one has to be read too before an outcome is decided.
+     */
+    async flush() {
+      for (let i = 0; i < 2; i += 1) { tick(); await Promise.all([...inflight]); }
+    },
     /** Stop polling; reads the remainder of the file and waits for the handlers. */
     async stop() {
       clearInterval(timer);

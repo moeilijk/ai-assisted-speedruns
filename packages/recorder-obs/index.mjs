@@ -190,7 +190,10 @@ export function createObsRecorder(options = {}) {
       // own window list; while the game is not running yet, keep the short form and try again at start.
       const resolveWindow = async (inputName) => {
         const items = (await o.tryCall("GetInputPropertiesListPropertyItems", { inputName, propertyName: "window" }))?.propertyItems ?? [];
-        const full = items.map((i) => i.itemValue).find((v) => v.endsWith(`:${exe}`) && !v.startsWith("::"));
+        // A game with more than one window (an emulator with a tool window) names its game window by a title pattern.
+        const titled = game.windowTitlePattern ? new RegExp(game.windowTitlePattern) : null;
+        const ofExe = items.map((i) => i.itemValue).filter((v) => v.endsWith(`:${exe}`) && !v.startsWith("::"));
+        const full = titled ? ofExe.find((v) => titled.test(v.split(":")[0])) : ofExe[0];
         return full ?? `::${exe}`;
       };
       const name = `${n.prefix} Game Window`;
@@ -224,7 +227,7 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.29.1",
+    version: "0.33.0",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
     async doctor() {

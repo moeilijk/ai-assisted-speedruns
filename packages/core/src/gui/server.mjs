@@ -215,7 +215,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
       } else if (req.method === "POST" && url.pathname === "/api/fix") {
         const fixId = (await body(req)).id;
         await session.fix(fixId);
-        const fixed = { "obs-password": ["obs"], "install-livesplit": ["livesplit"], "livesplit-server": ["livesplit"], "livesplit-windows": ["livesplit"], "install-svv": ["svv", "quiet"] }[fixId] ?? (fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : []);
+        const fixed = { "obs-password": ["obs"], "install-livesplit": ["livesplit"], "livesplit-server": ["livesplit"], "livesplit-windows": ["livesplit"], "install-svv": ["svv", "quiet"] }[fixId] ?? (fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : fixId.startsWith("fix:") ? [`game-${fixId.split(":")[1]}`] : []);
         await startChecks(fixed);
         send(res, 200, { ok: true });
       } else if (req.method === "POST" && url.pathname === "/api/open") {

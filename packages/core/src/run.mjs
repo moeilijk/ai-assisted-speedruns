@@ -205,6 +205,8 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);
   autosave?.stop();
+  // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
+  await follower.flush();
   if (outcome.status !== "failed") outcome = { ...outcome, deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
   // A final save state, so a stopped run can be resumed from exactly here.
   if (plugin.saveState && outcome.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });

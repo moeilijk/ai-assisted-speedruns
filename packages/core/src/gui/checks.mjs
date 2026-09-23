@@ -292,7 +292,9 @@ export async function checkItem(id) {
     if (st.expect && !t(`${st.expect} is in the ${folder}`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
     const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "game-doctor.mjs"), g.file], { encoding: "utf8", timeout: 60000, env: process.env });
     let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "its own checks answered", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
-    for (const row of rows) t(row.what, row.ok, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: install });
+    // A check may name a fix of its own (setup.fixes): a step of the game's set-up other than the install.
+    const ownFix = (id) => { const f = g.plugin.setup.fixes?.[id]; return f ? { id: `fix:${g.plugin.id}:${id}`, label: f.label, command: shownScript(f.script) } : null; };
+    for (const row of rows) t(row.what, row.ok, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: (row.fix && ownFix(row.fix)) || install });
     // Everything passed, so the same action is offered again rather than needed: the sentence stays, "again" says why.
     return done({ ...extra, fix: tests.every((x) => x.ok) && install ? { ...install, label: `${install.label} (again)` } : undefined });
   }
