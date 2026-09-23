@@ -12,6 +12,12 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.4 — 2026-09-23
+
+- 0.32.3 was released with one failing test: the login test still looked for `/auth/oauth/authorize` without its
+  trailing slash, which 0.32.3 had added to `aas login`. The tooling itself was right; the test is fixed and
+  `npm test` passes again (173/173). The release step now stops when a test fails.
+
 ## 0.32.3 — 2026-09-23
 
 - `npm run e2e:archive`: the whole chain against the live archive while it is in test, with no person involved.

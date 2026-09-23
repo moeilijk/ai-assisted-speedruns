@@ -34,7 +34,7 @@ test("signing in is the authorization code with PKCE, and the refresh token rota
   const c = await login({ open: browser, log: () => {} });
   assert.equal(c.archive, site.url);
   assert.equal((fs.statSync(credentialsFile()).mode & 0o777).toString(8), "600", "only this user can read the tokens");
-  const authorize = site.requests.find((r) => r.path === "/auth/oauth/authorize");
+  const authorize = site.requests.find((r) => r.path === "/auth/oauth/authorize/");
   assert.ok(authorize, "the browser went to the archive's own page");
   assert.ok(!site.requests.some((r) => /password/i.test(r.body)), "no password passes through the tooling");
   // An access token about to expire is refreshed, and the new refresh token replaces the old one.
