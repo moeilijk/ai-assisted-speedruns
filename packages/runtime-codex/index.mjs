@@ -89,7 +89,7 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Codex",
-  version: "0.32.0",
+  version: "0.32.1",
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
   /** Every rollout Codex wrote with this run directory as its working directory, oldest first: what the proof covers. */
   sessionLogs(runDir) {

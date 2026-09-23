@@ -12,6 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.1 — 2026-09-23
+
+- The archive's check of an upload's proof can be taken over as a flat set of files: `proof.mjs` imports only
+  `sign.mjs` and `versions.mjs` (where `ARCHIVE_URL` now lives), `buildTimeline` moved to `timeline-build.mjs`, which
+  picks the session exporter from a fixed table by runtime id, and the checks take the archive's keys as an argument
+  (`checkRun(dir, { proofKeys })`, `checkUploadProof(dir, privateDir, { proofKeys })`).
+- `export-rollout.mjs` exports `exportRollout()`; run as a script it does what it did. Checked on a real rollout of
+  1276 records: the old and the new export are byte for byte the same. Codex runtime 0.32.1.
+- `aas publish --upload` names the zip in `X-Filename`, as the archive asks.
+
 ## 0.32.0 — 2026-09-23
 
 - **A run can be recorded with proof that its logs were not changed afterwards (SPEC draft 0.43, §8.11).** Owner,

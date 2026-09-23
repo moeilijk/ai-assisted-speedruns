@@ -16,9 +16,9 @@
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.32.0",
+      "version": "0.32.1",
       "ai": true,
-      "sha256": "17100d6cc9b724115caa7e579b4a89c4d178257cf961a10a7a92bd4acd515b17"
+      "sha256": "5cb63357baa1835dc81d41d50ac52db12d27344dd5c7863961db310fa97267b3"
     },
     {
       "kind": "runtime",

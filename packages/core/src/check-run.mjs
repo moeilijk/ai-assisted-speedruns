@@ -35,7 +35,7 @@ const SUMMARY_V2_KEYS = [
  * `core` is accepted and ignored: it used to mean "a bundle without its recording files", which is now every
  * bundle, because a recording is published where video is published and the bundle carries no link to it.
  */
-export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null } = {}) {
+export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null, proofKeys = null } = {}) {
   const results = []; // { requirement, status: "met" | "unmet" | "invalid", detail }
   const add = (requirement, status, detail = "") => results.push({ requirement, status, detail });
   const file = (name) => path.join(runDir, name);
@@ -333,7 +333,7 @@ export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null
   // on, each recomputed from the private logs when they are here. A run recorded without proof is unsigned: an
   // archive accepts it and marks it so.
   {
-    const proof = checkProof(runDir, { privateDir: privateDir ?? (fs.existsSync(file("private")) ? file("private") : null) });
+    const proof = checkProof(runDir, { privateDir: privateDir ?? (fs.existsSync(file("private")) ? file("private") : null), keys: proofKeys });
     const status = { signed: "met", unsigned: "unmet", review: "unmet", invalid: "invalid" }[proof.status];
     add("proof", status, proof.status === "unsigned" ? `unsigned: ${proof.detail}` : proof.status === "review" ? `for a reviewer: ${proof.detail}` : proof.detail);
   }

@@ -11,3 +11,5 @@ export const BREAKING_RELEASES = [];
 export const SUMMARY_SCHEMA = SUMMARY_SCHEMAS.at(-1);
 /** The bundle's packaging this tooling writes: which files it holds and how they are named. */
 export const BUNDLE_VERSION = BUNDLE_VERSIONS.at(-1);
+/** The AAS Archive: where bundles are submitted and whose proof keys this tooling knows. */
+export const ARCHIVE_URL = "https://ai-assisted-speedruns.org";

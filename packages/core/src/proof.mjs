@@ -14,7 +14,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { ARCHIVE_URL } from "./plugins.mjs";
+import { ARCHIVE_URL } from "./versions.mjs";
 import { publicInfo, publicKeyFromLine } from "./sign.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -22,14 +22,21 @@ const sha256 = (data) => crypto.createHash("sha256").update(data).digest("hex");
 
 /** The archive's API. AAS_PROOF_URL points the tooling at another archive (the tests use a local one). */
 export const proofUrl = () => (process.env.AAS_PROOF_URL || ARCHIVE_URL).replace(/\/+$/, "");
+/**
+ * Proof keys from the archive's own format (/.well-known/aas-proof.txt): its `key: ssh-ed25519 …` lines; other lines,
+ * such as `fingerprint:`, say what the key is. A bare `ssh-ed25519 …` line is read too.
+ */
+export function parseProofKeys(text) {
+  return String(text).split("\n").map((l) => l.trim()).filter((l) => /^(key: )?ssh-ed25519 /.test(l)).map((l) => l.replace(/^key: /, ""))
+    .map((line) => { try { const key = publicKeyFromLine(line); return { key, fingerprint: publicInfo(key).fingerprint }; } catch { return null; } })
+    .filter(Boolean);
+}
+/** The keys a check uses: the ones given (an archive passes its own), else those pinned in this repository. */
+const keysOf = (given) => (given === undefined || given === null ? trustedProofKeys() : typeof given === "string" ? parseProofKeys(given) : Array.isArray(given) && typeof given[0] === "string" ? parseProofKeys(given.join("\n")) : given);
 /** The archive's proof keys, pinned in this repository; AAS_PROOF_KEYS names a file with others (the tests). */
 export const SITE_KEYS_FILE = path.resolve(here, "../../spec/site-keys.txt");
 export function trustedProofKeys() {
-  const files = [SITE_KEYS_FILE, process.env.AAS_PROOF_KEYS].filter((f) => f && fs.existsSync(f));
-  // The archive's format: `key: ssh-ed25519 …` lines (other lines, such as `fingerprint:`, say what the key is).
-  return files.flatMap((f) => fs.readFileSync(f, "utf8").split("\n").map((l) => l.trim()).filter((l) => /^key: /.test(l)).map((l) => l.slice(5)))
-    .map((line) => { try { const key = publicKeyFromLine(line); return { key, fingerprint: publicInfo(key).fingerprint }; } catch { return null; } })
-    .filter(Boolean);
+  return [SITE_KEYS_FILE, process.env.AAS_PROOF_KEYS].filter((f) => f && fs.existsSync(f)).flatMap((f) => parseProofKeys(fs.readFileSync(f, "utf8")));
 }
 
 /** Where the harness keeps a run's tickets and receipts. Never published: it holds each ticket's control secret. */
@@ -104,7 +111,8 @@ export function proofClient({ baseUrl = proofUrl(), token = async () => null, fe
 }
 
 /** Is this signature the archive's? `{ valid, fingerprint, problem }`. */
-export function verifySigned(message, signature, keys = trustedProofKeys()) {
+export function verifySigned(message, signature, given = null) {
+  const keys = keysOf(given);
   if (!keys.length) return { valid: false, fingerprint: null, problem: "no archive proof key is known to this tooling" };
   for (const k of keys) {
     try { if (crypto.verify(null, Buffer.from(message, "utf8"), k.key, Buffer.from(String(signature), "base64"))) return { valid: true, fingerprint: k.fingerprint, problem: null }; } catch { /* next key */ }
@@ -214,7 +222,8 @@ export function privateEntries(runDir) {
  * (`privateDir`), every head is recomputed from them as well.
  * Returns `{ status: "signed" | "unsigned" | "invalid" | "review", detail, problems, review }`.
  */
-export function checkProof(bundleDir, { privateDir = null, keys = trustedProofKeys() } = {}) {
+export function checkProof(bundleDir, { privateDir = null, keys = null } = {}) {
+  keys = keysOf(keys);
   const file = path.join(bundleDir, "proof.json");
   if (!fs.existsSync(file)) return { status: "unsigned", detail: "no proof.json: the run was recorded without proof", problems: [], review: [] };
   let proof;

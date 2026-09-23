@@ -5,8 +5,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { buildTimeline } from "./publish.mjs";
-import { loadRuntime } from "./plugins.mjs";
+import { buildTimeline } from "./timeline-build.mjs";
 import { checkProof } from "./proof.mjs";
 import { readZipEntries } from "./zip-read.mjs";
 
@@ -29,11 +28,9 @@ export async function regenerate(bundleDir, privateDir) {
   const savedZone = process.env.AAS_TIME_ZONE;
   try {
     const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
-    let rt = null;
-    try { rt = await loadRuntime(summary.harness?.plugins?.runtime?.id); } catch { /* a runtime this tooling does not know: the harness's own export */ }
     // The timestamps are written in the run's own time zone, whatever zone the archive runs in.
     if (summary.time_zone) process.env.AAS_TIME_ZONE = summary.time_zone;
-    await buildTimeline({ runDir, outDir, brief, rt, session, completionMarker: proof.export?.completion_marker ?? null });
+    await buildTimeline({ runDir, outDir, brief, runtimeId: summary.harness?.plugins?.runtime?.id ?? null, session, completionMarker: proof.export?.completion_marker ?? null });
     const differences = [];
     for (const f of ["session.sanitized.jsonl", "timeline.json"]) {
       const mine = path.join(outDir, f), theirs = path.join(bundleDir, f);
@@ -48,8 +45,8 @@ export async function regenerate(bundleDir, privateDir) {
 }
 
 /** Everything the archive checks about an upload's proof: `{ status, detail }`, status signed|unsigned|review|invalid. */
-export async function checkUploadProof(bundleDir, privateDir) {
-  const p = checkProof(bundleDir, { privateDir: privateDir && fs.existsSync(privateDir) ? privateDir : null });
+export async function checkUploadProof(bundleDir, privateDir, { proofKeys = null } = {}) {
+  const p = checkProof(bundleDir, { privateDir: privateDir && fs.existsSync(privateDir) ? privateDir : null, keys: proofKeys });
   if (p.status === "unsigned" || p.status === "invalid") return p;
   if (!privateDir || !fs.existsSync(privateDir)) return { ...p, status: "invalid", detail: "the upload has proof but no private part to check it against" };
   const r = await regenerate(bundleDir, privateDir);
@@ -58,7 +55,7 @@ export async function checkUploadProof(bundleDir, privateDir) {
 }
 
 /** checkUploadProof on an upload zip as it is sent; null for a zip without proof.json. */
-export async function checkZipProof(zipFile) {
+export async function checkZipProof(zipFile, { proofKeys = null } = {}) {
   const entries = readZipEntries(zipFile);
   if (!entries?.some((e) => e.name.endsWith("/proof.json"))) return null;
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aas-proof-"));
@@ -70,7 +67,7 @@ export async function checkZipProof(zipFile) {
       fs.writeFileSync(dest, data);
     }
     const top = path.join(tmp, entries[0].name.split("/")[0]);
-    return await checkUploadProof(top, path.join(top, "private"));
+    return await checkUploadProof(top, path.join(top, "private"), { proofKeys });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
