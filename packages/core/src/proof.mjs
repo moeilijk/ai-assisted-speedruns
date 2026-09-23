@@ -91,8 +91,16 @@ async function call(method, url, { headers = {}, body = null, timeoutMs = 15000,
   return json;
 }
 
+/**
+ * How the tooling reaches the archive: `fetch`, unless a caller sets another (a test that authenticates its requests
+ * in its own way). Every call to the archive's API goes through it.
+ */
+let archiveFetch = null;
+export const useArchiveFetch = (f) => { archiveFetch = f; };
+export const currentArchiveFetch = () => archiveFetch ?? fetch;
+
 /** The archive's ticket API. `token()` gives the account's access token, or null for an anonymous ticket. */
-export function proofClient({ baseUrl = proofUrl(), token = async () => null, fetchImpl = fetch, timeoutMs = 15000 } = {}) {
+export function proofClient({ baseUrl = proofUrl(), token = async () => null, fetchImpl = currentArchiveFetch(), timeoutMs = 15000 } = {}) {
   const api = `${baseUrl}/api/v1/tickets`;
   const auth = async (control) => { const t = await token(); return t ? { Authorization: `Bearer ${t}` } : control ? { Authorization: `Ticket ${control}` } : {}; };
   return {

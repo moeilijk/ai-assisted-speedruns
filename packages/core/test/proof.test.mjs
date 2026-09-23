@@ -120,3 +120,11 @@ test("a head the archive does not receive is logged, the run goes on, and a revi
   assert.equal(c.status, "review");
   assert.match(c.detail, /never reached the archive/);
 });
+
+test("a run that has started is continued, never started again", async () => {
+  const { run } = await import("../src/run.mjs");
+  const dir = fs.mkdtempSync(join(tmpdir(), "aas-started-"));
+  fs.writeFileSync(join(dir, "run.jsonl"), '{"kind":"event","event":"run.started"}\n');
+  await assert.rejects(run({ runtime: "scripted", game: "games/balatro/plugin.mjs", "run-dir": dir }, { log: () => {} }), /this run has already started .*aas resume --run-dir/);
+  assert.equal(fs.readFileSync(join(dir, "run.jsonl"), "utf8"), '{"kind":"event","event":"run.started"}\n', "the log is left as it was");
+});

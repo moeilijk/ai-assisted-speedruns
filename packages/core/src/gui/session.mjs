@@ -137,17 +137,9 @@ export function createSession() {
     return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
 
-  async function start(opts) {
-    if (state.phase !== "idle") throw new Error("A session is already running.");
-    const p = await plan(opts);
-    const { game: g, setup, runtime, run, runDir, pub, output } = p;
-    if (!output || !fs.existsSync(output)) throw new Error("Choose an output location first (Setup).");
-    if (runtime.id === "scripted" && !setup.bot) throw new Error(`${g.plugin.name} has no scripted player for a mock run.`);
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(run)) throw new Error("A run name may only have letters, digits, - and _.");
-    if (fs.existsSync(runDir)) throw new Error(`${toWindows(runDir)} already exists; choose another run name.`);
-    cancelled = false;
-    set({ phase: "starting", step: "game", game: g.plugin.id, run, runDir: toWindows(runDir), runtime: runtime.id, startedAt: new Date().toISOString(), result: null });
-    log(`Session: ${g.plugin.name}, ${runtime.label}, run ${run} → ${toWindows(runDir)}`, "head");
+  /** Runs a session's steps in order: the checks, the game, the recorder, LiveSplit, the run, the timeline, the bundle. */
+  function execute(p, { runDir, pub }) {
+    const { runtime } = p;
     const byId = Object.fromEntries(p.steps.map((st) => [st.id, st]));
     (async () => {
       try {
@@ -188,6 +180,60 @@ export function createSession() {
         set({ phase: "idle", step: null, result: { status: cancelled ? "stopped" : "failed", notes: String(error.message ?? error), runDir: toWindows(runDir) } });
       }
     })();
+  }
+
+  async function start(opts) {
+    if (state.phase !== "idle") throw new Error("A session is already running.");
+    const p = await plan(opts);
+    const { game: g, setup, runtime, run, runDir, pub, output } = p;
+    if (!output || !fs.existsSync(output)) throw new Error("Choose an output location first (Setup).");
+    if (runtime.id === "scripted" && !setup.bot) throw new Error(`${g.plugin.name} has no scripted player for a mock run.`);
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(run)) throw new Error("A run name may only have letters, digits, - and _.");
+    if (fs.existsSync(runDir)) throw new Error(`${toWindows(runDir)} already exists; choose another run name.`);
+    cancelled = false;
+    set({ phase: "starting", step: "game", game: g.plugin.id, run, runDir: toWindows(runDir), runtime: runtime.id, startedAt: new Date().toISOString(), result: null });
+    log(`Session: ${g.plugin.name}, ${runtime.label}, run ${run} → ${toWindows(runDir)}`, "head");
+    execute(p, { runDir, pub });
+    return state;
+  }
+
+  /**
+   * Continue: a run that stopped (a budget, a limit, a Stop) goes on as its next segment with `aas resume`, with the
+   * recorder and timer it had, the game and its tools started first like at Start, and a new revision of its bundle.
+   */
+  async function resume(runDirShown) {
+    if (state.phase !== "idle") throw new Error("A session is already running.");
+    const runDir = toLocal(runDirShown ?? "");
+    if (!runDir || !fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run that has started.");
+    const outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8"));
+    if (outcome.status === "completed") throw new Error("This run reached its goal; there is nothing to continue.");
+    const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
+    const started = fs.readFileSync(path.join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data).at(-1) ?? {};
+    const games = await guiGames();
+    const g = games.find((x) => x.plugin.id === (started.game ?? brief.category?.game));
+    if (!g) throw new Error("The game of this run is not in this tooling.");
+    const setup = g.plugin.setup;
+    const runtime = RUNTIMES.find((r) => r.id === brief.runtime) ?? { id: brief.runtime, label: brief.runtime };
+    const recorderId = started.recorder ?? "obs";
+    const recorder = await loadRecorder(recorderId);
+    const livesplit = started.timer === "livesplit";
+    const revision = (() => { try { return Number(JSON.parse(fs.readFileSync(path.join(runDir, "publish-revision.json"), "utf8")).revision) + 1 || 2; } catch { return 1; } })();
+    const run = path.basename(runDir);
+    const pub = path.join(path.dirname(runDir), "public", revision > 1 ? `${run}-r${revision}` : run);
+    const args = ["resume", "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless"];
+    const steps = [
+      { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
+      ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
+      ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs")], shown: "npm run livesplit:launch" }] : []),
+      { id: "run", title: "The run goes on as its next segment", args: [CLI, ...args], shown: `${CLI_SHOWN} ${args.map((a) => (a === runDir ? q(runDir) : a)).join(" ")}` },
+      { id: "timeline", title: "Times, sections and the cut list", args: [CLI, "timeline", runDir], shown: `${CLI_SHOWN} timeline ${q(runDir)}` },
+      { id: "publish", title: "The bundle again, as a new revision", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+    ];
+    const p = { game: g, setup, runtime, run, runDir, pub, steps, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
+    cancelled = false;
+    set({ phase: "starting", step: "game", game: g.plugin.id, run, runDir: toWindows(runDir), runtime: runtime.id, startedAt: new Date().toISOString(), result: null });
+    log(`Continue: ${g.plugin.name}, run ${run} → ${toWindows(runDir)}`, "head");
+    execute(p, { runDir, pub });
     return state;
   }
 
@@ -282,6 +328,6 @@ export function createSession() {
     get state() { return state; },
     get lines() { return lines; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    plan, start, stop, fix, archive, nextRunName, log,
+    plan, start, resume, stop, fix, archive, nextRunName, log,
   };
 }

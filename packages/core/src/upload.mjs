@@ -3,12 +3,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { accessToken } from "./auth.mjs";
-import { proofUrl } from "./proof.mjs";
+import { currentArchiveFetch, proofUrl } from "./proof.mjs";
 
-export async function uploadBundle(zipFile, { fetchImpl = fetch, baseUrl = proofUrl(), timeoutMs = 300000 } = {}) {
-  const token = await accessToken({ fetchImpl });
-  if (!token) throw new Error("uploading needs an account: sign in with `aas login` first");
-  const res = await fetchImpl(`${baseUrl}/api/v1/bundles`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/zip", "X-Filename": path.basename(zipFile), Accept: "application/json" }, body: fs.readFileSync(zipFile), signal: AbortSignal.timeout(timeoutMs) });
+export async function uploadBundle(zipFile, { fetchImpl = currentArchiveFetch(), baseUrl = proofUrl(), timeoutMs = 300000 } = {}) {
+  const token = await accessToken();
+  // Without an account only a caller that authenticates its own requests can upload (useArchiveFetch).
+  if (!token && fetchImpl === fetch) throw new Error("uploading needs an account: sign in with `aas login` first");
+  const res = await fetchImpl(`${baseUrl}/api/v1/bundles`, { method: "POST", headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), "Content-Type": "application/zip", "X-Filename": path.basename(zipFile), Accept: "application/json" }, body: fs.readFileSync(zipFile), signal: AbortSignal.timeout(timeoutMs) });
   const json = await res.json().catch(() => ({}));
   // A refusal with a decision (a mock, a proof that does not match) is the archive's answer, not a failed upload.
   if (!res.ok && json.status && json.submission) return json;

@@ -99,6 +99,10 @@ export function writeRecordingSegment(runDir, segment, { recorder, timer }) {
 export async function run(opts, { log = (t) => process.stderr.write(`[aas run] ${t}\n`) } = {}) {
   for (const k of ["runtime", "game", "run-dir"]) if (!opts[k]) throw new Error(`--${k} is required`);
   const runDir = path.resolve(opts["run-dir"]);
+  // A run that has started is continued, never started again: a second segment 1 in the same log would be two runs
+  // in one timeline, and its proof two chains on one ticket list.
+  const started = path.join(runDir, "run.jsonl");
+  if (fs.existsSync(started) && fs.statSync(started).size > 0) throw new Error(`this run has already started (${started}); continue it with \`aas resume --run-dir ${runDir}\`, or choose another run directory`);
   const briefFile = path.join(runDir, "brief.json");
   if (!fs.existsSync(briefFile)) {
     await configure(opts);

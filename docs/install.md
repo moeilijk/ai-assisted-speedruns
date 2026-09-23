@@ -304,7 +304,7 @@ No file has to be edited by hand beyond `.env`.
 | `doctor`: `game endpoint 127.0.0.1:<port> ECONNREFUSED` | the game is not running, or its mod/IPC is not enabled. Launch it with the game's own launch script. |
 | `doctor`: OBS reachable but not authenticated | `AAS_OBS_PASSWORD` does not match OBS's WebSocket settings. |
 | The run aborts with a black capture | OBS's game capture bound to a window that is gone. The recorder rebinds once and then stops the run: start the game before the run, and do not restart it during one. |
-| `aas run` refuses: the run directory already exists | `configure` never overwrites. Use a new id, or continue with `aas resume --run-dir <dir>`. |
+| `aas run` refuses: the run has already started | A run directory with a run log is continued, never started again. Continue it with `aas resume --run-dir <dir>` (in the GUI: Continue), or use a new run name. |
 | `aas budget` says STOP | your plan is at or above the configured share. Wait for the window to reset, raise `AAS_BUDGET_WEEKLY_MAX` / `AAS_CODEX_BUDGET_MAX`, or use `--ignore-budget` deliberately. |
 | `aas render`: `ffmpeg failed` / no duration in the bundle | ffmpeg or ffprobe is not on the PATH. |
 | `aas publish` deleted the output directory | the privacy scan found something (a home path, a mount path, an e-mail address, a credential). The findings are printed; fix the source, then publish again. |

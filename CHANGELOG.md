@@ -12,6 +12,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.32.5 — 2026-09-23
+
+- **`aas run` refuses a run that has already started.** It configured only when a directory had no `brief.json`,
+  and otherwise began a second segment 1 in the same run log: two runs in one timeline, and the docs said it refused.
+  Now a directory with a run log is refused with the command that continues it (`aas resume --run-dir …`). Owner,
+  2026-09-23: akkoord.
+- **Continue in the GUI.** After a session that stopped (a budget, a limit, Stop), the result offers "continue this
+  run": the game, the recorder and LiveSplit as at Start, then `aas resume` with the recorder and timer the run had,
+  the timeline, and the bundle again as a new revision. Before an unsigned part it warns like Start does.
+- The e2e test reaches the archive through a local module that authenticates as an account the archive lets submit
+  test uploads (owner, 2026-09-23: only his own machine may run it); without that module it is skipped. The tooling
+  gained the hook for it: `useArchiveFetch()`, used by every call to the archive's API.
+
 ## 0.32.4 — 2026-09-23
 
 - 0.32.3 was released with one failing test: the login test still looked for `/auth/oauth/authorize` without its

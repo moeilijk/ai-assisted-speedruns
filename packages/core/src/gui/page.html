@@ -341,13 +341,19 @@ function showState(s) {
     const r = s.result;
     const link = (p, t) => (p ? `<a data-open="${esc(p)}">${esc(t)}</a>` : "");
     const upload = r.bundle && proof.signedIn ? `<a data-upload="${esc(r.bundle)}">upload to the archive</a>` : "";
-    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "run folder"), link(r.recording, "recording"), link(r.bundle, "bundle (zip)"), upload].filter(Boolean).join(" · ")}`;
+    const cont = r.status === "stopped" && r.runDir ? `<a data-continue="${esc(r.runDir)}">continue this run</a>` : "";
+    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "run folder"), link(r.recording, "recording"), link(r.bundle, "bundle (zip)"), upload, cont].filter(Boolean).join(" · ")}`;
   }
   if (s.phase === "idle") { loadGames(); loadProof(); }
 }
 $("result").onclick = (e) => {
   const p = e.target.dataset?.open;
   if (p) api("/api/open", { path: p }).catch((x) => alert(x.message));
+  const cr = e.target.dataset?.continue;
+  if (cr) {
+    if (proof.mode === "off" && !confirm("This part of the run is unsigned: the archive accepts it and marks it unsigned. Continue?")) return;
+    api("/api/continue", { runDir: cr }).catch((x) => alert(x.message));
+  }
   const z = e.target.dataset?.upload;
   if (z && confirm("Upload this bundle to the archive under your account? The zip carries the run's logs in a private part, which the archive uses to check the proof and deletes after its decision.")) api("/api/archive", { action: "upload", arg: z }).catch((x) => alert(x.message));
 };

@@ -192,6 +192,8 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         req.on("close", () => clients.delete(res));
       } else if (req.method === "POST" && url.pathname === "/api/start") {
         send(res, 200, { state: await session.start(await body(req)) });
+      } else if (req.method === "POST" && url.pathname === "/api/continue") {
+        send(res, 200, { state: await session.resume((await body(req)).runDir) });
       } else if (req.method === "POST" && url.pathname === "/api/stop") {
         send(res, 200, { state: await session.stop((await body(req)).game) });
       } else if (req.method === "GET" && url.pathname === "/api/proof") {
