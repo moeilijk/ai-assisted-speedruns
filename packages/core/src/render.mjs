@@ -81,6 +81,25 @@ export function render(runDir, { video, out, burn = [], cut = true, crf, marginB
   return { out, kept, timeline, uploadSheet };
 }
 
+/**
+ * The cut after a run or a resume, so a run directory holds its whole package: the recording and the video without
+ * the thinking pauses (with the timeline it is made from). Until 2026-09-25 only a hand-run `aas render` made it, and
+ * after the GUI (0.18.4) left that step out no run had one. Without a video there is nothing to cut; a failure is
+ * logged with the command that makes the cut, and the run's own result stands.
+ */
+export function renderAfterRun(runDir, { log = console.log } = {}) {
+  if (!findRecording(runDir)) {
+    log("no video recording, so no cut");
+    return null;
+  }
+  try {
+    return render(runDir, { log });
+  } catch (e) {
+    log(`the cut could not be made: ${e.message}; \`aas render ${runDir}\` makes it`);
+    return null;
+  }
+}
+
 export function probeDuration(file) {
   try {
     return Number(execFileSync("ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", file], { encoding: "utf8" }).trim());

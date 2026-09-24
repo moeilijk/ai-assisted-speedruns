@@ -130,8 +130,7 @@ export function createSession() {
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
-      { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
-      { id: "timeline", title: "Times, sections and the cut list", args: [CLI, "timeline", runDir], shown: `${CLI_SHOWN} timeline ${q(runDir)}` },
+      { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end, then makes the timeline and the cut (the video without the thinking pauses)`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
       { id: "publish", title: "The bundle for the archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
     ];
     return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
@@ -225,8 +224,7 @@ export function createSession() {
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs")], shown: "npm run livesplit:launch" }] : []),
-      { id: "run", title: "The run goes on as its next segment", args: [CLI, ...args], shown: `${CLI_SHOWN} ${args.map((a) => (a === runDir ? q(runDir) : a)).join(" ")}` },
-      { id: "timeline", title: "Times, sections and the cut list", args: [CLI, "timeline", runDir], shown: `${CLI_SHOWN} timeline ${q(runDir)}` },
+      { id: "run", title: "The run goes on as its next segment, then the timeline and the cut are made again", args: [CLI, ...args], shown: `${CLI_SHOWN} ${args.map((a) => (a === runDir ? q(runDir) : a)).join(" ")}` },
       { id: "publish", title: "The bundle again, as a new revision", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
     ];
     const p = { game: g, setup, runtime, run, runDir, pub, steps, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };

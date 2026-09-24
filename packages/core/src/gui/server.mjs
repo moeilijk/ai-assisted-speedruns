@@ -54,6 +54,23 @@ function listDir(p) {
   };
 }
 
+
+/**
+ * A game is set up when its first setting has a value in .env, or when the folder its plugin uses without one (the
+ * setting's `default`, a function) is there with the file the setting expects: BizHawk and FCEUX run from the folder
+ * their install puts them in, with nothing written to .env.
+ */
+export function settingReady(setting, env) {
+  if (!setting) return false;
+  if (env[setting.env]) return true;
+  if (typeof setting.default !== "function") return false;
+  try {
+    const dir = setting.default();
+    return Boolean(dir) && fs.existsSync(setting.expect ? path.join(dir, setting.expect) : dir);
+  } catch {
+    return false;
+  }
+}
 export async function startGui({ port = 8770, open = true, log = console.log } = {}) {
   let note = null;
   try { note = JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")); } catch { /* no GUI has run yet, or the note is gone */ }
@@ -175,7 +192,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           seed: plugin.setup.seed ? { placeholder: plugin.setup.seed.placeholder ?? "" } : null,
           ends: plugin.ends.map((e) => ({ id: e.id, label: e.label, final: Boolean(e.final) })),
           mock: Boolean(plugin.setup.bot),
-          ready: Boolean(env[plugin.setup.settings[0]?.env]),
+          ready: settingReady(plugin.setup.settings[0], env),
           next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
         })));
         send(res, 200, { games, runtimes: RUNTIMES, agents: agentsPresent().map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });

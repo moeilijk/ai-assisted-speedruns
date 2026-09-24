@@ -210,8 +210,8 @@ itself. `--keep-open` leaves them open. A stopped run continues with `aas resume
 ## 9. After the run: timeline, video, bundle
 
 ```bash
-aas timeline <run-dir>                      # RTA, IGT, sections, attempts, cut list, subtitles
-aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thinking pauses
+# aas run and aas resume make the timeline and the cut at their end; again by hand, for example with burned-in timers:
+aas render <run-dir> --burn timers,inputs   # ffmpeg: the video without the thinking pauses (and the timeline)
 aas publish <run-dir> <public-dir>          # the bundle + the upload zip + recording/UPLOAD.txt
 cat <run-dir>/recording/UPLOAD.txt          # the videos you can upload, each with its code and chapters
 ```

@@ -10,6 +10,7 @@ import { createEventLog, followEvents, inOrder } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { formatDuration } from "./videos.mjs";
+import { renderAfterRun } from "./render.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 
 /**
@@ -253,5 +254,6 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is
   // still running. Nothing stays open on the machine after a run unless --keep-open asks for it.
   if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
+  renderAfterRun(runDir, { log });
   return { runDir, outcome, recording: info };
 }

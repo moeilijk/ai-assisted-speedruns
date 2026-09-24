@@ -65,7 +65,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "fceux",
   name: "FCEUX",
-  version: "0.33.4",
+  version: "0.33.5",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "fceux64.exe",
@@ -82,7 +82,7 @@ export default {
   setup: {
     folder: "FCEUX",
     settings: [
-      { env: "AAS_FCEUX_DIR", label: "FCEUX folder", kind: "dir", expect: "fceux64.exe", what: "Where FCEUX is: the folder with fceux64.exe in it. The install puts it in %LOCALAPPDATA%\\aas\\FCEUX." },
+      { env: "AAS_FCEUX_DIR", label: "FCEUX folder", kind: "dir", expect: "fceux64.exe", default: fceuxDir, what: "Where FCEUX is: the folder with fceux64.exe in it. The install puts it in %LOCALAPPDATA%\\aas\\FCEUX." },
       { env: "AAS_FCEUX_ROM", label: "ROM of the game", kind: "file", what: "The game's ROM (a .nes file, or a zip with one in it). The profile checks it by its SHA-1, so it has to be the exact dump the profile names." },
     ],
     install: join(here, "install-fceux.mjs"),

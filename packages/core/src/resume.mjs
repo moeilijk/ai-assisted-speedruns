@@ -4,6 +4,7 @@
 // session (Claude Code --resume), then ends like `aas run`. The resume is a
 // `run.human` record, so the category becomes `restart-only`.
 import fs from "node:fs";
+import { renderAfterRun } from "./render.mjs";
 import { spawnSync } from "node:child_process";
 import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
@@ -197,5 +198,6 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify({ ...result, sessionId: result.sessionId ?? sessionId, resumedFrom: save, segment }, null, 2)}\n`);
   log(`resumed run ${result.status}; segment ${segment}; ${files.length} recording file(s)`);
   if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
+  renderAfterRun(runDir, { log });
   return { runDir, outcome: result, recording: info, segment };
 }

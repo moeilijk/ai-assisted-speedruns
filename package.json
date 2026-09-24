@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.33.4",
+  "version": "0.33.5",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -35,7 +35,7 @@
     "packages/timer-livesplit"
   ],
   "scripts": {
-    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/core/src/gui/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/portal/*.mjs games/portal-2/*.mjs games/balatro/*.mjs games/slay-the-spire/*.mjs; do node --check \"$f\" || exit 1; done",
+    "check": "for f in packages/core/src/*.mjs packages/core/src/windows/*.mjs packages/core/src/gui/*.mjs packages/runtime-*/*.mjs packages/recorder-*/*.mjs packages/timer-*/*.mjs games/*/*.mjs; do node --check \"$f\" || exit 1; done",
     "test": "node --test \"packages/*/test/*.test.mjs\" \"games/*/test/*.test.mjs\"",
     "gui": "node packages/core/src/cli.mjs gui",
     "portal:fetch": "node games/portal/fetch-portal-agent.mjs",

@@ -12,6 +12,23 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.5 — 2026-09-25
+
+- **A run makes its own cut.** `aas run` and `aas resume` make the timeline and the cut (the video without the
+  thinking pauses) at their end, after everything is closed. Only a hand-run `aas render` made the cut before, and
+  since the GUI (0.18.4), whose steps left it out, runs had none; the GUI's separate timeline step is gone. Without a
+  video there is no cut; when ffmpeg fails the run keeps its result and the log names `aas render <run-dir>`.
+- **The YouTube description links to the archive and to the run's page.** YouTube makes a link only of an address
+  with its scheme, so the domain as plain text was no link. The description now ends with `The AAS Archive:
+  https://ai-assisted-speedruns.org/` and `This run in the archive: https://ai-assisted-speedruns.org/runs/<run_id>/`
+  (owner, 2026-09-25); `youtube-text.mjs`, which the archive carries, builds both from the archive's address.
+- **`npm run check` checks every game plugin.** It listed five games by name, so the files of FCEUX, BizHawk,
+  Portal 2 and the stubs were never checked; it now takes `games/*/*.mjs`.
+- **The GUI sees BizHawk and FCEUX as set up.** It called a game set up only when its first setting had a value in
+  `.env`; the emulators run from the folder their install puts them in (`%LOCALAPPDATA%\aas\<emulator>`) with
+  nothing in `.env`, so they showed as "not set up". A setting can now name that folder (`default`), and the GUI
+  counts the game as set up when the folder holds the file the setting expects.
+
 ## 0.33.4 — 2026-09-24
 
 - **FCEUX: NES games on the emulator most NES TAS movies were made on** (`games/fceux`), through the bridge of

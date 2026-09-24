@@ -110,7 +110,7 @@ test("a video's text tells what that video shows, and nothing it does not", () =
   assert.match(cutAfter, /\n11:15 The run reaches the Act 1 boss\.\n/);
   assert.doesNotMatch(cutAfter, /resumed|extended/);
   assert.doesNotMatch(two, /person/, "how the run was restarted is the archive's to show");
-  assert.doesNotMatch(two + one, /Claude Code|https?:|Moments/);
+  assert.doesNotMatch(two + one, /Claude Code|Moments/);
   assert.equal(one.split("\n").at(-1), "AAS sts-x · fingerprint f · 1368 s");
   assert.equal(videoTitle({ ...summary, completed_at: null, category: { goal_end: { id: "credits", label: "End credits" } } }, { kind: "cut" }), "Claude Sonnet 5 plays Slay the Spire (cut): stopped before the end credits");
   // YouTube links every m:ss / h:mm:ss within the video: a plain one is only a place, on its own line, inside the video.

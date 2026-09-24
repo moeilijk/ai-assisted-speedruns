@@ -150,3 +150,17 @@ test("a button in the Setup tab says what it does and which command it runs", as
     assert.match(shownScript(g.plugin.setup.install), /^(npm run [a-z0-9:_-]+|node .+\.mjs)$/, g.plugin.id);
   }
 });
+
+test("a game is set up by its first setting in .env, or by the folder its plugin uses without one", async () => {
+  const { settingReady } = await import("../src/gui/server.mjs");
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const dir = mkdtempSync(join(tmpdir(), "aas-ready-"));
+  const setting = { env: "AAS_X_DIR", kind: "dir", expect: "x.exe", default: () => dir };
+  assert.equal(settingReady(setting, { AAS_X_DIR: "C:\\X" }), true);
+  assert.equal(settingReady(setting, {}), false, "the default folder without the expected file");
+  writeFileSync(join(dir, "x.exe"), "");
+  assert.equal(settingReady(setting, {}), true, "the default folder with the expected file");
+  assert.equal(settingReady({ env: "AAS_Y_ROOT", kind: "dir" }, {}), false, "no value and no default");
+});

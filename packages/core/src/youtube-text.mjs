@@ -5,8 +5,8 @@
 // Written for a viewer, in plain sentences: who plays what and how it ended first (YouTube shows only the first
 // lines before "more"), then which video this is, what the picture shows, and what happens in this video as
 // "m:ss what happens". How a person restarted the run is the archive's to show, not the description's (owner
-// 16-09). No links: the archive's domain and the run id are plain text. The code that binds the video to the bundle
-// is the last line.
+// 16-09). Two links with https://, to the archive and to the run's page there (owner 2026-09-25: YouTube only makes
+// a link of an address with its scheme). The code that binds the video to the bundle is the last line.
 import { formatDuration, youtubeTime } from "./videos.mjs";
 import { modelDisplayName } from "./models.mjs";
 
@@ -124,14 +124,14 @@ function momentText(labels, summary, f) {
 }
 
 /**
- * The suggested description, in plain sentences, about this video only. `archiveUrl` is the archive's address (only
- * its domain is shown); `note` is the publisher's own sentence, or null. The wording is the one the owner approved
+ * The suggested description, in plain sentences, about this video only. `archiveUrl` is the archive's address (its
+ * origin is linked, and the run's page under it, /runs/<run_id>/); `note` is the publisher's own sentence, or null. The wording is the one the owner approved
  * on 2026-09-16 for the cut of portal-02.
  */
 export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const s = summary;
   const f = facts(s);
-  const domain = String(archiveUrl).replace(/^https?:\/\//, "").replace(/\/.*$/, "");
+  const origin = new URL(String(archiveUrl)).origin;
   const goal = goalPhrase(f.goal);
   const igt = durationText(f.igt);
   const real = durationText(f.real);
@@ -171,7 +171,11 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
     .map((m) => ({ at: m.at, text: momentText(m.raw, s, f) ?? (chapters && youtubeTime(m.at) === "0:00" ? "Start" : null) }))
     .filter((m) => m.text)
     .map((m) => `${youtubeTime(m.at)} ${m.text}`);
-  const about = `An AI Assisted Speedrun (AAS): a language model plays a game by itself, timed in game time and in real time. Run ${s.run_id} in the AAS Archive: ${domain}`;
+  const about = [
+    "An AI Assisted Speedrun (AAS): a language model plays a game by itself, timed in game time and in real time.",
+    `The AAS Archive: ${origin}/`,
+    `This run in the archive: ${origin}/runs/${encodeURIComponent(s.run_id)}/`,
+  ].join("\n");
   const code = /^aas[0-9a-f]+$/.test(String(video.line));
   return [
     intro,

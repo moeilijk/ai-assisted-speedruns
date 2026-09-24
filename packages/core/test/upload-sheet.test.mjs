@@ -58,8 +58,7 @@ test("the sheet offers the cut and the full recording per segment, each with its
   assert.ok(cut.trim().split("\n").at(-2).startsWith(`${fp} · 769 s`), "the description ends on the cut's line");
   const cutText = cut.split("-".repeat(78))[1].trim().split("\n");
   assert.equal(cutText[0], "Claude Sonnet 5, a language model, plays Slay the Spire by itself. Goal: the Act 1 boss. The run reached the Act 1 boss after 00\u2060:02\u2060:57.4 of game time and 00\u2060:22\u2060:42 of real time.", "the result first");
-  assert.ok(cut.includes("Run sts-claude-code-01 in the AAS Archive: ai-assisted-speedruns.org"), "the domain and the run id as text, no link YouTube would shorten");
-  assert.ok(!cut.includes("https://"), "no links: a viewer has no bundle to check, and a link is shortened in view");
+  assert.ok(cut.includes("The AAS Archive: https://ai-assisted-speedruns.org/\nThis run in the archive: https://ai-assisted-speedruns.org/runs/sts-claude-code-01/"), "both links with https://, the run page by its run_id");
   assert.equal(cutText.at(-2), "Verification line for the AAS Archive:");
   assert.equal(cutText.at(-1), `${fp} · 769 s`, "the line is the last line");
   assert.match(sheet, /exists once the archive has accepted the run/);

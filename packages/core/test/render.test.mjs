@@ -38,3 +38,13 @@ test("the cut carries no data stream: OBS's chapter track would give it the reco
   assert.equal(args[args.indexOf("-map_chapters") + 1], "-1");
   assert.ok(args.indexOf("-dn") < args.indexOf("-c:v"));
 });
+
+test("after a run without a video there is no cut, and the run is not failed for it", async () => {
+  const { renderAfterRun } = await import("../src/render.mjs");
+  const { mkdtempSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const lines = [];
+  assert.equal(renderAfterRun(mkdtempSync(join(tmpdir(), "aas-norec-")), { log: (l) => lines.push(l) }), null);
+  assert.deepEqual(lines, ["no video recording, so no cut"]);
+});
