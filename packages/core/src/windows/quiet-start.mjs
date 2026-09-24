@@ -19,10 +19,22 @@ function tool(name, args, { processName, log }) {
   if (r.status !== 0) throw new Error(`${name} ${args[0] ?? ""} failed${out ? `: ${out.split("\n").at(-1)}` : ""}`);
 }
 
-export async function beforeGameStart({ processName, snapshotFile, log = console.log } = {}) {
+// `route: "app"` is for a game that follows the Windows default when it changes and has no output setting of its own
+// (FCEUX): the quiet device is set as the program's own output in Windows' per-app setting instead, once it runs
+// (started()); clearAppRoute() undoes that when it has closed.
+export async function beforeGameStart({ processName, snapshotFile, log = console.log, route = "default" } = {}) {
   const quiet = Boolean(process.env.AAS_QUIET_AUDIO_DEVICE);
   const run = (name, ...args) => tool(name, args, { processName, log });
   if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") run("keep-display-awake.mjs", "start");
+  if (quiet && route === "app") {
+    // SoundVolumeView applies /SetAppDefault to a running process (measured 2026-09-24: set before FCEUX started, its
+    // session opened on the speakers), so it is set once the game runs: call started() then, before it plays sound.
+    return {
+      started() { run("audio-route.mjs", "--set-app", "--process", processName); },
+      restore() {},
+      check() { run("audio-route.mjs", "--check", "--process", processName); },
+    };
+  }
   if (quiet) {
     run("audio-route.mjs", "--snapshot", snapshotFile);
     for (let attempt = 1; ; attempt += 1) {
@@ -34,11 +46,19 @@ export async function beforeGameStart({ processName, snapshotFile, log = console
     }
   }
   return {
+    started() {},
     /** Puts the saved defaults back; call it once the game has its audio open (or has failed to start). */
     restore() { if (quiet) run("audio-route.mjs", "--restore", snapshotFile); },
     /** Reports where the game's audio session is; fails when it is not on the quiet device. */
     check() { run("audio-route.mjs", "--check", "--process", processName); },
   };
+}
+
+/** Undoes route "app": the program follows the Windows default again; returns its report line ("" when off). */
+export function clearAppRoute(processName) {
+  if (!process.env.AAS_QUIET_AUDIO_DEVICE) return "";
+  const r = spawnSync(process.execPath, [script("audio-route.mjs"), "--clear-app", "--process", processName], { encoding: "utf8" });
+  return `${r.stdout ?? ""}${r.stderr ?? ""}`.trim();
 }
 
 /** Ends the keep-awake helper a launcher may have started (a no-op when none runs); returns its report line. */

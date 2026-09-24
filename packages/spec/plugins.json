@@ -90,6 +90,15 @@
     },
     {
       "kind": "game",
+      "dir": "games/fceux",
+      "id": "fceux",
+      "name": "FCEUX",
+      "version": "0.33.4",
+      "stub": false,
+      "sha256": "2e6b6a6f1881955e4680a3261fb606470786359e5f05070122ac1dbb22d89380"
+    },
+    {
+      "kind": "game",
       "dir": "games/half-life-2",
       "id": "half_life_2",
       "name": "Half-Life 2 / Episode One / Half-Life: Source",

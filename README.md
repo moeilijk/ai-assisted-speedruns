@@ -28,6 +28,7 @@ games/
   balatro/              Balatro through balatrobot
   portal-2/             Portal 2 through SourceAutoRecord's TAS protocol
   bizhawk/              games on the BizHawk emulator through bizhawk-mcp-native, one profile per game
+  fceux/                NES games on the FCEUX emulator through fceux-mcp's bridge, one profile per game
   half-life-2/ slay-the-spire-2/ celeste/ openrct2/ kerbal-space-program/ unity-bepinex/ unreal-ue4ss/
                         planned, not implemented; each README has the route, license and risks
 docs/                   install, command reference, plugins, design
@@ -164,5 +165,11 @@ The games, and the mods and tools the setup downloads or builds, are not in this
 | BizHawk | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
 | BizHawk | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |
 | BizHawk | [TASVideos movie 3728M](https://tasvideos.org/3728M), "warpless" by HappyLee & Mars608, which `bizhawk:tas` downloads for the `smb` mock | CC BY 2.0 |
+| FCEUX | [FCEUX](https://github.com/TASEmulators/fceux) 2.6.6, the 64-bit Windows build | GPL-2.0-or-later |
+| FCEUX | [fceux-mcp](https://github.com/IngvarKofoed/fceux-mcp) by IngvarKofoed (its bridge, a Lua script inside FCEUX), through our fork [moeilijk/fceux-mcp](https://github.com/moeilijk/fceux-mcp) | MIT |
+| FCEUX | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
+| FCEUX | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
+| FCEUX | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |
+| FCEUX | [TASVideos movie 3728M](https://tasvideos.org/3728M), "warpless" by HappyLee & Mars608, which `fceux:tas` downloads for the `smb` mock | CC BY 2.0 |
 | every game | [LiveSplit](https://github.com/LiveSplit/LiveSplit) (the timer, installed from the GUI) | MIT |
 | every game | [SoundVolumeView](https://www.nirsoft.net/utils/sound_volume_view.html) by NirSoft (optional quiet audio routing) | freeware |

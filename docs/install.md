@@ -151,6 +151,8 @@ Each game has its own install: the mod or the in-game tooling, the bridge, and i
   (Lovely, Steamodded, balatrobot) and `npm run balatro:launch`.
 - **Portal** — [games/portal/README.md](../games/portal/README.md): Source Unpack, SourcePauseTool built with
   portal-agent's scripts, then `npm run portal:install -- --game-root <dir>` and `npm run portal:launch`.
+- **FCEUX (NES)** — [games/fceux/README.md](../games/fceux/README.md): `npm run fceux:install` (FCEUX 2.6.6 and
+  fceux-mcp's bridge, pinned), your own ROM in `.local/roms`, then `npm run fceux:launch`.
 - **Another game** — write a plugin: [plugins.md](plugins.md). Nothing in the core has to change, and a game
   plugin may live outside this repository.
 

@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.33.3",
+  "version": "0.33.4",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -78,7 +78,14 @@
     "bizhawk:stop": "node games/bizhawk/stop-all.mjs",
     "bizhawk:doctor": "node packages/core/src/cli.mjs doctor --game games/bizhawk/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "bizhawk:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/bizhawk/plugin.mjs --bot games/bizhawk/bot.mjs --recorder obs --overlay-port 8765 --run-dir",
-    "bizhawk:tas": "node games/bizhawk/tas.mjs"
+    "bizhawk:tas": "node games/bizhawk/tas.mjs",
+    "fceux:install": "node games/fceux/install-fceux.mjs",
+    "fceux:launch": "node games/fceux/launch-game.mjs",
+    "fceux:stop": "node games/fceux/stop-all.mjs",
+    "fceux:doctor": "node packages/core/src/cli.mjs doctor --game games/fceux/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
+    "fceux:scripted": "node packages/core/src/cli.mjs run --runtime scripted --game games/fceux/plugin.mjs --bot games/fceux/bot.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
+    "fceux:run": "node packages/core/src/cli.mjs run --runtime claude-code --game games/fceux/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
+    "fceux:tas": "node games/fceux/tas.mjs"
   },
   "bin": {
     "aas": "./packages/core/src/cli.mjs"

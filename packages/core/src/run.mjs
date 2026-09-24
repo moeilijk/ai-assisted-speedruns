@@ -6,7 +6,7 @@ import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached } from "./goal.mjs";
 import path from "node:path";
 import { configure } from "./configure.mjs";
-import { createEventLog, followEvents } from "./events.mjs";
+import { createEventLog, followEvents, inOrder } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { formatDuration } from "./videos.mjs";
@@ -20,7 +20,6 @@ import { startOverlayServer } from "./overlay-server.mjs";
 export function createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes = 10 }) {
   let playing = false;
   let pendingInterval = false;
-  let index = countSaves(runDir);
   let busy = false;
   let chain = Promise.resolve();
   // Interval saves are skipped while a save is running; milestone and end-of-session
@@ -34,7 +33,9 @@ export function createAutosave({ plugin, runDir, brief, events, log, autosaveMin
   const doSave = async (reason) => {
     busy = true;
     try {
-      index += 1;
+      // Counted from the log each time: a plugin that saves at its own milestones (savesAtMilestones) writes game.saved
+      // too, from the broker.
+      const index = countSaves(runDir) + 1;
       const name = `aas_${brief.id.replace(/[^A-Za-z0-9]/g, "_")}_${String(index).padStart(3, "0")}`;
       const r = await plugin.saveState({ name });
       let copy = null;
@@ -63,7 +64,12 @@ export function createAutosave({ plugin, runDir, brief, events, log, autosaveMin
           pendingInterval = false;
           await save("interval");
         }
-      } else if (ev.event === "game.milestone" && ev.data?.chapter) await save(`milestone ${ev.data.label ?? ""}`.trim());
+      } else if (ev.event === "game.milestone" && ev.data?.chapter) {
+        // A plugin with savesAtMilestones has saved this milestone itself, in the broker, right after the playback that
+        // reached it and before the agent's next move could run a frame; the session's own end is still saved here.
+        if (plugin.savesAtMilestones && ev.data?.end) return;
+        await save(`milestone ${ev.data.label ?? ""}`.trim());
+      }
     },
     stop() {
       clearInterval(timer);
@@ -178,6 +184,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   // The goal's milestone itself goes on to the recorder, the timer (its final split) and the autosave like any other
   // (measured 2026-09-23: without it LiveSplit never took the last split); the appended game.over comes back through
   // the follower and ends the session below.
+  const ordered = inOrder();
   const forward = async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
       events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
@@ -186,8 +193,11 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
       else if (!ev.data?.victory) { deaths += 1; log(`death ${deaths} (${ev.data?.label ?? "defeat"}); the agent may restart, the clock keeps running`); }
     }
-    await recorder.onEvent(ev);
-    await timer?.onEvent(ev);
+    // The recorder and the timer see the events in the log's order (inOrder); the autosave queues its own saves.
+    await ordered(async () => {
+      await recorder.onEvent(ev);
+      await timer?.onEvent(ev);
+    });
     await autosave?.onEvent(ev);
   };
   const follower = followEvents(runDir, forward);

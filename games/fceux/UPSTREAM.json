@@ -1,0 +1,32 @@
+{
+  "fceux": {
+    "repo": "https://github.com/TASEmulators/fceux",
+    "version": "2.6.6",
+    "commit": "34eb7601c415b81901fd02afbd5cfdc84b5047ac",
+    "url": "https://github.com/TASEmulators/fceux/releases/download/v2.6.6/fceux-2.6.6-win64.zip",
+    "sha256": "bc8f7e420ebf512615bc8bbc5b8beea655ea1feaf474742a2f56b35fd0415aee",
+    "license": "GPL-2.0-or-later",
+    "exe": "fceux64.exe"
+  },
+  "fceux_mcp": {
+    "repo": "https://github.com/moeilijk/fceux-mcp",
+    "version": "v0.1.3",
+    "commit": "812b0188d5b80fabec8f879fb0de79fdcfebe46c",
+    "url": "https://github.com/moeilijk/fceux-mcp/releases/download/v0.1.3/fceux-mcp-0.1.3.zip",
+    "sha256": "32103d8ea35ca9afd0f7340dd48b83cf19c68efd31122f2ec0bb8dd058e10f9a",
+    "bridge": "fceux-mcp-0.1.3/bridge.lua",
+    "license": "MIT, Copyright (c) 2026 Martin Jensen",
+    "endpoint": "127.0.0.1:9999",
+    "upstream": "https://github.com/IngvarKofoed/fceux-mcp 0.1.0 (702e39f); the fork adds Windows (the win32, win64 and win64-QtSDL builds; a file transport where LuaSocket cannot load), a pause that keeps FCEUX's window alive, held buttons (emu.step steps), several clients, gui.screen, emu.reload, savestate files, emu.exit and FCEUX_BRIDGE_DISABLE"
+  },
+  "test_roms": {
+    "nes15": {
+      "repo": "https://github.com/christopherpow/nes-test-roms",
+      "commit": "95d8f621ae55cee0d09b91519a8989ae0e64753b",
+      "url": "https://raw.githubusercontent.com/christopherpow/nes-test-roms/95d8f621ae55cee0d09b91519a8989ae0e64753b/nes15-1.0.0/nes15-NTSC.nes",
+      "sha1": "8FCC5798252370C63A98E7421131ABF3EB22BFCF",
+      "file": "nes15-NTSC.nes",
+      "license": "BSD-2-Clause, Copyright (c) 2011 Mathew Brenaman (nes15-1.0.0/LICENSE)"
+    }
+  }
+}

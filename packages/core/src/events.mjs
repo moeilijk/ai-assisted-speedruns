@@ -67,6 +67,22 @@ export function followEvents(runDir, onEvent, { intervalMs = 500, onRecord = nul
   };
 }
 
+/**
+ * Handlers in the log's order: `followEvents` hands over every event as it reads it, without waiting for the previous
+ * one's handlers, and a handler that waits on something (the recorder's chapter mark in OBS, the timer's split index)
+ * lets the next event overtake it. Measured 2026-09-24 (FCEUX mocks smb-mock-01, nes15-mock-01/02): the game.over
+ * right after the last milestone had its pause in LiveSplit before the milestone's split, and LiveSplit refused the
+ * split. Returns a function that runs its argument after everything queued before it.
+ */
+export function inOrder() {
+  let chain = Promise.resolve();
+  return (fn) => {
+    const p = chain.then(fn);
+    chain = p.catch(() => {});
+    return p;
+  };
+}
+
 export function readRunLog(runDir) {
   const file = path.join(runDir, "run.jsonl");
   if (!fs.existsSync(file)) return [];

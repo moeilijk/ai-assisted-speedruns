@@ -1,0 +1,75 @@
+{
+  "id": "nes15",
+  "name": "nes15 (the Fifteen Puzzle)",
+  "system": "NES",
+  "test": true,
+  "rom": {
+    "file": "nes15-NTSC.nes",
+    "sha1": "8FCC5798252370C63A98E7421131ABF3EB22BFCF",
+    "title": "NES15 2011-01-04NTSC by Matthew Brenaman (PD)",
+    "author": "Mathew Brenaman",
+    "license": "BSD-2-Clause",
+    "source": "https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0",
+    "md5": "F53AF989E2C9C37F01D9A276D8AEC04A",
+    "note": "FCEUX reports the MD5 of the ROM's PRG and CHR data, header and anything after them left out (rom.gethash; src/ines.cpp, 2.6.6); the plugin checks that one, and the doctor the SHA-1 of the file."
+  },
+  "memory": {
+    "play_state": {
+      "address": 47,
+      "values": {
+        "0": "new puzzle",
+        "1": "waiting for input",
+        "2": "tile moving",
+        "3": "solved"
+      }
+    },
+    "play_flags": {
+      "address": 48,
+      "bits": {
+        "6": "auto-solver on",
+        "7": "paused"
+      }
+    },
+    "source": "the game's own source, src/play.s (play_state, play_flags, enum PLAY_*); addresses in the CPU's memory, measured in BizHawk 2.11.1 and in FCEUX 2.6.6 (win64) on 2026-09-23: the mock's auto-solver takes play_state to 3 with SOLVED! on screen at frame 3246."
+  },
+  "ends": [
+    {
+      "id": "solved",
+      "label": "Solved",
+      "split": "Solved",
+      "final": true,
+      "when": {
+        "address": 47,
+        "equals": 3
+      }
+    }
+  ],
+  "goal": "Solve the puzzle: put the tiles in order 1 to 15 with the gap in the bottom right corner.",
+  "controls": "D-pad moves the cursor, A slides the tile under the cursor into the gap, Start pauses, Select toggles the game's auto-solver. At the title screen any button starts a puzzle.",
+  "bot": {
+    "about": "The mock plays with the game's own auto-solver: let the title screen come up, start a puzzle, press Select, wait for SOLVED. The timings were measured in BizHawk 2.11.1 and hold in FCEUX 2.6.6 (win64): solved within the 3246 frames, recorded 2026-09-23 23:42.",
+    "steps": [
+      {
+        "frames": 120
+      },
+      {
+        "buttons": {
+          "A": true
+        },
+        "frames": 3
+      },
+      {
+        "frames": 120
+      },
+      {
+        "buttons": {
+          "Select": true
+        },
+        "frames": 3
+      },
+      {
+        "frames": 3000
+      }
+    ]
+  }
+}

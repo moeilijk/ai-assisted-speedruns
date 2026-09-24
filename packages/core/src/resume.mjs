@@ -9,7 +9,7 @@ import { closeAll } from "./close-all.mjs";
 import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
 import { applyRunEnv } from "./settings.mjs";
 import path from "node:path";
-import { createEventLog, followEvents, readRunLog } from "./events.mjs";
+import { createEventLog, followEvents, readRunLog, inOrder } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
@@ -134,6 +134,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   let over = null;
   let deaths = 0;
   const goal = resolveGoal(plugin, brief.category?.goal);
+  const ordered = inOrder();
   const follower = followEvents(runDir, async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
       // As in run.mjs: the goal's milestone still goes on to the recorder, the timer and the autosave.
@@ -143,8 +144,11 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
       else if (!ev.data?.victory) { deaths += 1; log(`death ${deaths} (${ev.data?.label ?? "defeat"}); the agent may restart, the clock keeps running`); }
     }
-    await recorder.onEvent(ev);
-    await timer?.onEvent(ev);
+    // The recorder and the timer see the events in the log's order (inOrder); the autosave queues its own saves.
+    await ordered(async () => {
+      await recorder.onEvent(ev);
+      await timer?.onEvent(ev);
+    });
     await autosave?.onEvent(ev);
   });
   let result;

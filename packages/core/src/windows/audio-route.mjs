@@ -13,6 +13,13 @@
 //   node packages/core/src/windows/audio-route.mjs --snapshot <file>       save the current defaults
 //   node packages/core/src/windows/audio-route.mjs --set-quiet             make the quiet device the default (all roles)
 //   node packages/core/src/windows/audio-route.mjs --restore <file>        restore the saved defaults
+//   node packages/core/src/windows/audio-route.mjs --set-app --process <exe>   the quiet device as that program's own output
+//   node packages/core/src/windows/audio-route.mjs --clear-app --process <exe> that program follows the Windows default again
+// A program that follows the Windows default when it changes (EmuHawk, FCEUX: measured 2026-09-23) cannot be kept on
+// the quiet device by switching the default for its start. BizHawk has a device setting of its own; FCEUX does not
+// (it always opens the default device, OutputDS.cpp), so for FCEUX the quiet device is set as the program's own output
+// in Windows' per-app setting (Settings > Sound > App volume and device preferences; SoundVolumeView /SetAppDefault,
+// Windows 10 1803 and later), before it starts, and cleared when it closes.
 // Env: AAS_QUIET_AUDIO_DEVICE (device name; unset = feature off), AAS_SOUNDVOLUMEVIEW (path to
 // SoundVolumeView.exe, required when the device is set); --process <exe> or AAS_AUDIO_PROCESS (the game's executable, for the session report)
 import { execFileSync, spawnSync } from "node:child_process";
@@ -87,6 +94,10 @@ export function gameSessions(rows = listAll(), processName = PROCESS) {
 export function setDefault(itemId, role /* 0 console, 1 multimedia, 2 communications, all */) {
   spawnSync(svv, ["/SetDefault", itemId, String(role)], { stdio: "ignore" });
 }
+/** Windows' per-app output for a program: an item ID, or "DefaultRenderDevice" to follow the default again. */
+export function setAppDefault(itemId, processName) {
+  spawnSync(svv, ["/SetAppDefault", itemId, "all", processName], { stdio: "ignore" });
+}
 export function audioStatus({ processName = PROCESS } = {}) {
   const rows = listAll();
   const q = quietDevice(rows);
@@ -121,6 +132,12 @@ if (process.argv[1]?.endsWith("audio-route.mjs")) {
     const d = defaults();
     console.log(`default now: play=${d.names.console}, media=${d.names.multimedia}, comms=${d.names.communications}`);
     if (d.names.console !== DEVICE) throw new Error("default device did not switch");
+  } else if (args.includes("--set-app") || args.includes("--clear-app")) {
+    if (!PROCESS) throw new Error("--set-app and --clear-app need --process <exe>");
+    const q = quietDevice();
+    if (args.includes("--set-app") && !q) throw new Error(`quiet device "${DEVICE}" not active`);
+    setAppDefault(args.includes("--set-app") ? q["Item ID"] : "DefaultRenderDevice", PROCESS);
+    console.log(args.includes("--set-app") ? `${PROCESS}: its own output is now ${DEVICE}` : `${PROCESS}: follows the Windows default again`);
   } else if (args.includes("--restore")) {
     const d = JSON.parse(fs.readFileSync(opt("--restore"), "utf8"));
     if (d.console) setDefault(d.console, 0);

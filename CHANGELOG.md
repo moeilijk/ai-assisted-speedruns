@@ -12,6 +12,43 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.4 — 2026-09-24
+
+- **FCEUX: NES games on the emulator most NES TAS movies were made on** (`games/fceux`), through the bridge of
+  [fceux-mcp](https://github.com/IngvarKofoed/fceux-mcp) by IngvarKofoed, a Lua script inside FCEUX, in our fork
+  [moeilijk/fceux-mcp](https://github.com/moeilijk/fceux-mcp). FCEUX 2.6.6 (the 64-bit Windows build) and the bridge
+  are pinned by sha256; `npm run fceux:install`, `fceux:launch`, `fceux:doctor`, `fceux:scripted`, `fceux:run`,
+  `fceux:stop`, `fceux:tas`. Profiles `smb` (Super Mario Bros., your own ROM) and `nes15` (test, BSD-2-Clause).
+  - FCEUX is paused between the agent's moves by its own pause, and the bridge reads its socket from a callback FCEUX
+    runs while paused, so the window keeps drawing and can be closed. The fork adds that, Windows, held buttons
+    (`emu.step` steps), several clients, `emu.exit`, `emu.reload`, savestates as files and a screenshot without
+    FCEUX's text.
+  - Measured on 2026-09-23: TASVideos #3728 (67,117 frames) played through the plugin's buttons, 600 frames a call,
+    gives the same world, level, position and game state as FCEUX's own playback of the movie after every call; a
+    savestate loads the same RAM after FCEUX was closed and started again.
+  - The recording shows the game only: the launcher sets FCEUX's own settings for the menu bar, the pause sign and the
+    counters, and the run powers the game on by reloading the ROM, which clears FCEUX's messages.
+  - The mock replays the `.fm2` movie as it is, the reset on frame 0 included, to the game's end.
+  - The fork's bridge runs on all three Windows builds of FCEUX 2.6.6 (win32, win64, win64-QtSDL), measured on
+    2026-09-24 with the same tests on each. The win64-QtSDL build ships no LuaSocket and cannot load one, and there the bridge talks
+    through files in a folder; the plugin's client does the same when `AAS_FCEUX_BRIDGE_DIR` names it. A ROM that
+    cannot be opened is refused before FCEUX would show a modal error window.
+- **A milestone's save before the next move.** The harness reads a milestone from the run log up to half a second
+  after the plugin emitted it, and the agent's next move could reach the game first, so the save came a move late. A
+  plugin that can save from inside the broker sets `savesAtMilestones` and saves right after the playback that reached
+  the milestone; the harness leaves those milestones to it and numbers its own saves after them (FCEUX does).
+- **The last split lands.** The harness hands its recorder and timer every event as it reads it from the run log,
+  without waiting for the previous one's handlers. At a milestone the recorder waits on OBS for the chapter mark, and
+  the game.over right after the last milestone overtook it: its pause was in LiveSplit before the milestone's split,
+  and LiveSplit refused the split (measured on 2026-09-24 in three FCEUX mocks: "split index went from 7 to 7" in
+  `recording.json`, the run's end without its split on screen, the timer paused instead of ended). The recorder and
+  the timer now get the events in the log's order; the autosave queues its own saves as before.
+- **Quiet audio for a game that follows the Windows default.** FCEUX has no output setting of its own and moves with
+  the Windows default device, so switching the default for its start does not keep it on the quiet device (measured:
+  its sound was on the speakers after the switch back). With `AAS_QUIET_AUDIO_DEVICE` set, the launcher now sets that
+  device as FCEUX's own output in Windows' per-app setting once FCEUX runs, and the close clears it; the Windows
+  defaults are not touched. Off by default, as before.
+
 ## 0.33.3 — 2026-09-23
 
 - **A run no longer goes on without its timer.** In one Super Mario Bros. mock LiveSplit never started its timer: 8

@@ -64,6 +64,7 @@ and its value therefore stands, and a variable already set in the shell beats bo
 | `AAS_STS_*`, `AAS_BOT_*` | Slay the Spire plugin, scripts and the scripted bot | see [../games/slay-the-spire/README.md](../games/slay-the-spire/README.md) |
 | `AAS_BALATRO_*`, `AAS_BOT_BALATRO_ATTEMPTS` | Balatro plugin, scripts, bridge and the scripted bot | see [../games/balatro/README.md](../games/balatro/README.md) |
 | `AAS_BIZHAWK_DIR`, `AAS_BIZHAWK_PROFILE`, `AAS_BIZHAWK_ROM`, `AAS_BIZHAWK_ROMS` | BizHawk plugin and scripts | see [../games/bizhawk/README.md](../games/bizhawk/README.md) |
+| `AAS_FCEUX_DIR`, `AAS_FCEUX_PROFILE`, `AAS_FCEUX_ROM`, `AAS_FCEUX_ROMS`, `AAS_FCEUX_BRIDGE_HOST`, `AAS_FCEUX_BRIDGE_PORT`, `AAS_FCEUX_BRIDGE_DIR` | FCEUX plugin and scripts | see [../games/fceux/README.md](../games/fceux/README.md) |
 
 Variables the harness sets for the broker process itself (`AAS_RUN_DIR`, `AAS_GAME_MODULE`, `AAS_ALLOWED_ENDPOINTS`, `AAS_TIME_ZONE`) are not settings. The broker's environment holds those and the variables the game plugin declares in its `env` list, nothing else of the machine's environment; the published copy of the configuration shows the plugin's variables as `__ENV__`.
 

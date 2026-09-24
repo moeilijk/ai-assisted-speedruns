@@ -1,0 +1,137 @@
+{
+  "id": "smb",
+  "name": "Super Mario Bros.",
+  "system": "NES",
+  "rom": {
+    "file": "Super Mario Bros. (World).zip",
+    "sha1": "33D23C2F2CFA4C9EFEC87F7BC1321CE3CE6C89BD",
+    "title": "Super Mario Bros. (World) (No-Intro, NES 2.0 header)",
+    "sha1_without_header": "FACEE9C577A5262DBE33AC4930BB0B58C8C037F7",
+    "tasvideos_version": "https://tasvideos.org/Games/1/Versions/View/68 (Super Mario Bros. (W) [!], GoodNES 3.23: the same game data, an iNES 1.0 header)",
+    "note": "Your own dump or copy; never in this repository. `sha1` is the SHA-1 of the whole file (header included), which the doctor checks; `md5` is the MD5 of the ROM's PRG and CHR data, header left out, which FCEUX reports (rom.gethash; src/ines.cpp, 2.6.6) and the plugin checks when the run starts.",
+    "md5": "8E3630186E35D477231BF8FD50E54CDD"
+  },
+  "memory": {
+    "WorldNumber": {
+      "address": 1887,
+      "about": "0 = world 1 \u2026 7 = world 8"
+    },
+    "LevelNumber": {
+      "address": 1884,
+      "about": "0 = level 1 \u2026 3 = level 4"
+    },
+    "OperMode": {
+      "address": 1904,
+      "values": {
+        "0": "title",
+        "1": "game",
+        "2": "victory",
+        "3": "game over"
+      }
+    },
+    "source": "periwinkle9/smb-autosplitter (Zlib), SuperMarioBros.asl: worldNum 0x75F, levelNum 0x75C, operMode 0x770; its end of the run is worldNum >= 7 and operMode becoming 2 (the axe in 8-4). Measured in FCEUX 2.6.6 on 2026-09-23 while FCEUX played TAS 3728 itself: world 1-1 from frame 4, 2-1 at frame 7929, 3-1 at 17070, 8-4 at 64306, operMode 2 on the movie's last frame (67117)."
+  },
+  "ends": [
+    {
+      "id": "world1",
+      "label": "World 1",
+      "split": "World 1",
+      "when": {
+        "address": 1887,
+        "atLeast": 1
+      }
+    },
+    {
+      "id": "world2",
+      "label": "World 2",
+      "split": "World 2",
+      "when": {
+        "address": 1887,
+        "atLeast": 2
+      }
+    },
+    {
+      "id": "world3",
+      "label": "World 3",
+      "split": "World 3",
+      "when": {
+        "address": 1887,
+        "atLeast": 3
+      }
+    },
+    {
+      "id": "world4",
+      "label": "World 4",
+      "split": "World 4",
+      "when": {
+        "address": 1887,
+        "atLeast": 4
+      }
+    },
+    {
+      "id": "world5",
+      "label": "World 5",
+      "split": "World 5",
+      "when": {
+        "address": 1887,
+        "atLeast": 5
+      }
+    },
+    {
+      "id": "world6",
+      "label": "World 6",
+      "split": "World 6",
+      "when": {
+        "address": 1887,
+        "atLeast": 6
+      }
+    },
+    {
+      "id": "world7",
+      "label": "World 7",
+      "split": "World 7",
+      "when": {
+        "address": 1887,
+        "atLeast": 7
+      }
+    },
+    {
+      "id": "credits",
+      "label": "Bowser defeated",
+      "split": "World 8",
+      "final": true,
+      "when": {
+        "all": [
+          {
+            "address": 1887,
+            "atLeast": 7
+          },
+          {
+            "address": 1904,
+            "equals": 2
+          }
+        ]
+      }
+    }
+  ],
+  "goal": "Beat the game: defeat Bowser at the end of World 8-4. Each world counts as a split.",
+  "controls": "D-pad Left/Right to walk, Down to duck (as Super Mario), B to run and to throw fireballs, A to jump (hold longer to jump higher), Start to begin at the title screen and to pause.",
+  "tas": {
+    "publication": "https://tasvideos.org/3728M",
+    "title": "NES Super Mario Bros. \"warpless\" by HappyLee & Mars608 in 18:36.78",
+    "authors": [
+      "HappyLee",
+      "Mars608"
+    ],
+    "license": "CC BY 2.0 (TASVideos): tool-assisted, by HappyLee & Mars608",
+    "url": "https://tasvideos.org/3728M?handler=Download",
+    "sha256": "b099672b65a9305ce6deef16fcf8a1ca106b1a8c7c904d90ed3fab5a081185d3",
+    "movie": "happylee_mars608-smb-warpless.fm2",
+    "emulator": "FCEUX 2.2.1",
+    "sync": "FCEUX 2.6.6 plays the movie itself in sync to the end: World 8-4 from frame 64306 and operMode 2 (the game's end) at frame 67117, the movie's last (measured 2026-09-23 21:49). The same input played through fceux-mcp's bridge, 600 frames a call, gives the same world, level, x position and operMode after every call (112 calls, 0 differences; win64, 2026-09-23 23:26)."
+  },
+  "bot": {
+    "about": "The mock replays the TAS's own input, frame by frame, through the same buttons the agent has, from power-on, with the movie's reset on frame 0; its goal is the game's end.",
+    "movie": "happylee_mars608-smb-warpless.fm2"
+  }
+}
