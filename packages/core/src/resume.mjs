@@ -3,6 +3,7 @@
 // the game side and restores the last save state, resumes the agent's own
 // session (Claude Code --resume), then ends like `aas run`. The resume is a
 // `run.human` record, so the category becomes `restart-only`.
+import { checkName, checkProofMode, checkSessionId } from "./validate.mjs";
 import fs from "node:fs";
 import { renderAfterRun } from "./render.mjs";
 import { spawnSync } from "node:child_process";
@@ -14,12 +15,13 @@ import { createEventLog, followEvents, readRunLog, inOrder } from "./events.mjs"
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
-import { createAutosave, writeRecordingSegment } from "./run.mjs";
+import { createAutosave, earlyStop, writeRecordingSegment } from "./run.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
 export async function resume(opts, { log = (t) => process.stderr.write(`[aas resume] ${t}\n`) } = {}) {
   if (!opts["run-dir"]) throw new Error("--run-dir is required");
+  checkProofMode(opts.proof); checkSessionId(opts.session);
   const runDir = path.resolve(opts["run-dir"]);
   const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
   if (opts["ignore-budget"]) brief.ignoreBudget = true;
@@ -44,7 +46,9 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   const saves = previous.filter((r) => r.kind === "event" && r.event === "game.saved");
   const save = opts.save ?? saves.at(-1)?.data?.name;
   if (!save) throw new Error("No save state to resume from (no game.saved event in run.jsonl; pass --save <name>).");
-  const sessionId = opts.session ?? outcome.sessionId ?? previous.findLast((r) => r.kind === "event" && r.event === "run.ended")?.data?.sessionId ?? null;
+  // A save's name reaches a game's console (Portal: `load <name>`) and file names: only a plain name, also from the log.
+  checkName("--save", save, { max: 128 });
+  const sessionId = checkSessionId(opts.session ?? outcome.sessionId ?? previous.findLast((r) => r.kind === "event" && r.event === "run.ended")?.data?.sessionId ?? null);
   const runtime = await loadRuntime(opts.runtime ?? brief.runtimeModule ?? brief.runtime);
   const recorder = await loadRecorder(opts.recorder ?? "null");
   const timer = opts.timer ? await loadTimer(opts.timer) : null;
@@ -79,12 +83,14 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   if (runtime.reconfigure) await runtime.reconfigure(runDir, spec, brief);
 
   const events = createEventLog(runDir);
+  const early = earlyStop(log);
   // Runs on the Claude plan may only use part of the weekly limit (AAS_BUDGET_WEEKLY_MAX).
   // A runtime that runs on a plan knows its own stand (`budget()`): a run may only use part of it.
   if (runtime.budget && !opts["ignore-budget"]) {
     const b = await runtime.budget();
     log(`budget: ${b.detail}`);
     events.append("budget.checked", { runtime: runtime.id, ok: b.ok, percent: b.percent, max_percent: b.max, ...(b.data ?? {}) });
+    if (!b.ok) early.release();
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
   }
   const segment = (fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")).segments?.length ?? 1 : 0) + 1;
@@ -96,20 +102,25 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   // server and the recorder's connection are closed too, or they keep the process alive after the error.
   try {
     await recorder.preflight(brief, plugin);
+    early.check();
     await timer?.preflight?.(brief, plugin);
   } catch (error) {
-    recorder.disconnect?.();
+    early.release();
+    await recorder.disconnect?.();
     await overlay?.close();
     throw error;
   }
   const { t0 } = await recorder.start(brief, ctx);
   events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString(), segment });
   try {
+    early.check();
     let ready = null;
     if (plugin.prepareRun) ready = await plugin.prepareRun({ runDir, log, resume: true, save, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
     if (plugin.loadState) ready = (await plugin.loadState({ name: save, log, runDir, seed: brief.seed ?? null })) ?? ready;
     events.append("game.ready", { at: new Date().toISOString(), restored: save, seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
+    early.check();
   } catch (error) {
+    early.release();
     // The game did not come up: stop the recording again and discard its file, so that
     // no recording keeps running and no stray segment lands in the run directory.
     const aborted = await recorder.stop().catch(() => ({ files: [] }));
@@ -117,6 +128,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("recording.stopped", { files: [], aborted: String(error?.message ?? error) });
     events.append("run.error", { message: `game start failed: ${String(error?.message ?? error)}` });
     await overlay?.close();
+    // As at the start of a run: what was started is closed, or it stays open after the error.
+    if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
     throw error;
   }
   // In-game time already played before this resume (ticks × 15 ms), so LiveSplit continues from it.
@@ -138,8 +151,14 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   const ordered = inOrder();
   const follower = followEvents(runDir, async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
+      // The victory is fixed here, at the milestone, and the session is interrupted at once: the log is read
+      // every half second, and a fast player would otherwise play on past its goal until its own game.over came
+      // back through the follower (measured 2026-09-25: a mock to act1 played on to the Act 3 victory).
+      over = { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, at: ev.timestamp, deaths, goal: goal.id };
+      log(`game over: ${over.label}; ending the session`);
+      runtime.interrupt?.(`game over: ${over.label}`);
       // As in run.mjs: the goal's milestone still goes on to the recorder, the timer and the autosave.
-      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
+      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, reached_at: ev.timestamp, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
     }
     if (ev.event === "game.over") {
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
@@ -156,12 +175,13 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
   // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
   const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
+  early.release();
   process.once("SIGINT", stopRequested);
   process.once("SIGTERM", stopRequested);
   // `aas stop --run-dir` finds this process by this file, never by a process search.
   fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
   try {
-    result = await runtime.start(runDir, brief);
+    result = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
   } catch (error) {
     result = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
     events.append("run.error", { message: result.notes });
@@ -172,7 +192,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   autosave?.stop();
   // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
   await follower.flush();
-  if (result.status !== "failed") result = { ...result, deaths: (outcome.deaths ?? 0) + deaths, ...(over ? { status: "completed", over, notes: [result.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
+  if (result.status !== "failed") result = { ...result, deaths: (outcome.deaths ?? 0) + deaths, ...(over ? { status: "completed", over, notes: [result.notes, `game over: ${over.label}`].filter((n, i, all) => n && !(i > 0 && String(all[0] ?? "").includes(n))).join("; ") } : {}) };
   if (plugin.saveState && result.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });
   events.append("run.ended", { status: result.status, notes: result.notes ?? null, sessionId: result.sessionId ?? sessionId, segment });
   await follower.stop();

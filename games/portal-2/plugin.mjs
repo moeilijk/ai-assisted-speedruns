@@ -38,7 +38,7 @@ export const ENDS = [
 export default {
   id: "portal_2",
   name: "Portal 2",
-  version: "0.29.1",
+  version: "0.33.8",
   scopeName: "portal2",
   segments: SEGMENTS,
   ends: ENDS,
@@ -136,6 +136,8 @@ export default {
    * for a console command. The file the engine writes is what `aas run` copies next to the run.
    */
   async saveState({ name, log = () => {} }) {
+    // The name goes into the game's console: a plain name only, never a second command (";", a newline, a quote).
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     await this.withSar(async (sar) => {
       await sar.script(`version ${SCRIPT_VERSION}\nstart now\n+0>|||save ${name}|\n`, "aas_save");
       log(`save ${name} sent`);
@@ -160,6 +162,8 @@ export default {
 
   /** `start save <name>` is SAR's own way to begin on a save (docs/p2tas.md), so the game loads it and stands still. */
   async loadState({ name, log = () => {} }) {
+    // The name goes into the game's console: a plain name only, never a second command (";", a newline, a quote).
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     return this.withSar(async (sar) => {
       await sar.script(`version ${SCRIPT_VERSION}\nstart save ${name}\n+0>||||\n`, "aas_load");
       await sar.pause();

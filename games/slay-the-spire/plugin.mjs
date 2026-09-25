@@ -94,7 +94,11 @@ const gs = (s) => s?.game_state ?? null;
 /** The game's own seed code (what the HUD shows and what START accepts) from its 64-bit seed: unsigned, base 35 without the letter O. */
 export function seedString(seed) {
   if (seed === null || seed === undefined || seed === "") return "";
-  if (!/^-?\d+$/.test(String(seed))) return String(seed); // already a seed code
+  // The seed goes into the bridge's line protocol: a newline or a space would start another command.
+  if (!/^-?\d+$/.test(String(seed))) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$/.test(String(seed))) throw new Error(`seed ${JSON.stringify(String(seed)).slice(0, 60)} is not a seed code (letters and digits, _ or - after the first)`);
+    return String(seed); // already a seed code
+  }
   const alphabet = "0123456789ABCDEFGHIJKLMNPQRSTUVWXYZ";
   let n = BigInt.asUintN(64, BigInt(seed));
   if (n === 0n) return "0";
@@ -147,7 +151,7 @@ function lastSeed(runDir) {
 export default {
   id: "slay_the_spire",
   name: "Slay the Spire",
-  version: "0.29.1",
+  version: "0.33.8",
   scopeName: "sts",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_STS_PROCESS || "java.exe",

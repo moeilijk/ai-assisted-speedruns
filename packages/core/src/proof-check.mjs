@@ -18,6 +18,8 @@ export async function regenerate(bundleDir, privateDir) {
   const summary = JSON.parse(fs.readFileSync(path.join(bundleDir, "summary.json"), "utf8"));
   const label = proof.export?.session;
   if (!label) return { equal: false, differences: ["proof.json does not say which session log the timeline was made from"] };
+  // The label names one of the private part's session logs (session:<n>), and nothing else.
+  if (!/^session:\d{1,4}$/.test(String(label))) return { equal: false, differences: [`proof.json names ${JSON.stringify(String(label)).slice(0, 60)} as the session log, which is not a label of the private part (session:<n>)`] };
   const session = path.join(privateDir, `session-${label.split(":")[1]}.jsonl`);
   if (!fs.existsSync(session)) return { equal: false, differences: [`${label} is not in the private part`] };
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "aas-regenerate-"));

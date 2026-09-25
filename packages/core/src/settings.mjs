@@ -27,17 +27,20 @@ export function gameName(gameModule) {
 export const gameEnvFile = (game) => path.join(GAME_ENV_DIR, `${gameName(game) ?? game}.env`);
 
 /** The settings of every game and of the machine, merged as a run sees them: a game's own file wins. */
+/** The settings in one file, as KEY: value ({} when the file is not there). */
+export function readSettingsFile(file) {
+  if (!fs.existsSync(file)) return {};
+  const values = {};
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const m = /^\s*([A-Z0-9_]+)\s*=(.*)$/.exec(line);
+    if (m) values[m[1]] = m[2].trim().replace(/^"(.*)"$/, "$1");
+  }
+  return values;
+}
+
 export function readSettings() {
   const out = {};
-  const one = (file) => {
-    if (!fs.existsSync(file)) return {};
-    const values = {};
-    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-      const m = /^\s*([A-Z0-9_]+)\s*=(.*)$/.exec(line);
-      if (m) values[m[1]] = m[2].trim().replace(/^"(.*)"$/, "$1");
-    }
-    return values;
-  };
+  const one = readSettingsFile;
   Object.assign(out, one(ENV_FILE));
   try { for (const f of fs.readdirSync(GAME_ENV_DIR)) if (f.endsWith(".env")) Object.assign(out, one(path.join(GAME_ENV_DIR, f))); } catch { /* no game settings yet */ }
   return out;

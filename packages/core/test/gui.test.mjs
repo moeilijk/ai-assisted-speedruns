@@ -10,6 +10,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gui-"));
 process.env.AAS_ENV_FILE = path.join(dir, ".env");
 process.env.AAS_GUI_NOTE = path.join(dir, "gui.json");
 process.env.AAS_GUI_CHECKS = path.join(dir, "gui-checks.json");
+process.env.AAS_GAME_ENV_DIR = path.join(dir, "games");
 const { readEnv, writeEnv } = await import("../src/gui/env-file.mjs");
 const { toLocal, toWindows, IS_WSL } = await import("../src/gui/windows-paths.mjs");
 
@@ -188,6 +189,69 @@ test("a button's outcome comes back to the page and stands in the log, done or n
     const lines = (await (await fetch(`${base}/api/state`)).json()).lines.map((l) => `${l.kind} ${l.text}`);
     assert.ok(lines.some((l) => /^ok Runs record their proof anonymously/.test(l)), lines.join("\n"));
     assert.ok(lines.includes("err Failed: archive: Not a ticket."), lines.join("\n"));
+  } finally {
+    gui.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
+});
+
+test("the model and effort chosen on the page go to an AI run's command, never to a mock run's", async () => {
+  const { createSession } = await import("../src/gui/session.mjs");
+  const s = createSession();
+  const runStep = (p) => p.steps.find((x) => x.id === "run").shown;
+  const ai = runStep(await s.plan({ game: "balatro", runtime: "claude-code", model: "claude-opus-5-5", effort: "high" }));
+  assert.match(ai, /--model claude-opus-5-5/);
+  assert.match(ai, /--effort high/);
+  const mock = runStep(await s.plan({ game: "balatro", runtime: "scripted", model: "claude-opus-5-5", effort: "high" }));
+  assert.doesNotMatch(mock, /--model|--effort/);
+  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", effort: "extreme" }), /--effort "extreme" is not allowed: one of low, medium, high, xhigh, max/);
+  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", model: "x; rm -rf /" }), /--model .* is not allowed/);
+});
+
+test("every step a session calls is a step of its plan (a step taken out of the plan is not called any more)", async () => {
+  const src = fs.readFileSync(new URL("../src/gui/session.mjs", import.meta.url), "utf8");
+  const called = [...new Set([...src.matchAll(/byId\.(\w+)\.args/g)].map((m) => m[1]))];
+  const optional = new Set([...src.matchAll(/if \(byId\.(\w+)\)/g)].map((m) => m[1]));
+  const { createSession } = await import("../src/gui/session.mjs");
+  const ids = (await createSession().plan({ game: "balatro", runtime: "scripted" })).steps.map((x) => x.id);
+  for (const id of called) if (!optional.has(id)) assert.ok(ids.includes(id), `the session calls step "${id}", which the plan does not have (${ids.join(", ")})`);
+});
+
+test("a game's profile chosen in its settings file is the one the GUI plans with, also after it changed", async () => {
+  const { createSession } = await import("../src/gui/session.mjs");
+  const { configItems } = await import("../src/gui/checks.mjs");
+  const s = createSession();
+  const file = path.join(process.env.AAS_GAME_ENV_DIR, "fceux.env");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const goalOf = async () => (await s.plan({ game: "fceux", runtime: "scripted" })).steps.find((x) => x.id === "run").shown.match(/--goal (\S+)/)[1];
+  try {
+    fs.writeFileSync(file, "AAS_FCEUX_PROFILE=smb\n");
+    assert.equal(await goalOf(), "world1", "Super Mario Bros.: a mock run aims at the first end");
+    const row = (await configItems()).find((i) => i.env === "AAS_FCEUX_PROFILE");
+    assert.equal(row.kind, "select");
+    assert.equal(row.value, "smb");
+    assert.deepEqual(row.options.map((o) => o.value).sort(), ["nes15", "smb"]);
+    fs.writeFileSync(file, "AAS_FCEUX_PROFILE=nes15\n");
+    assert.equal(await goalOf(), "solved", "back to nes15 without restarting the GUI");
+    fs.rmSync(file);
+    assert.equal(await goalOf(), "solved", "no setting: the plugin's default profile");
+  } finally {
+    fs.rmSync(file, { force: true });
+    delete process.env.AAS_FCEUX_PROFILE;
+  }
+});
+
+test("no button answers with a bare Done, and the page learns when the tooling changed under a running GUI", async () => {
+  const page = fs.readFileSync(new URL("../src/gui/page.html", import.meta.url), "utf8");
+  assert.doesNotMatch(page, /"Done\."/, "a button says what it did, never only that it is done");
+  const acts = [...page.matchAll(/await act\(|\bact\("/g)].length;
+  assert.ok(acts >= 8, "the buttons report through act()");
+  const { startGui } = await import("../src/gui/server.mjs");
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
+  try {
+    const g = await (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/gui`)).json();
+    assert.equal(g.stale, false, "a GUI that runs the code on disk is not stale");
   } finally {
     gui.server.close();
     process.removeAllListeners("SIGINT");

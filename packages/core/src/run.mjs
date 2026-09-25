@@ -104,6 +104,22 @@ export function writeRecordingSegment(runDir, segment, { recorder, timer }) {
   return info;
 }
 
+/**
+ * A stop (the GUI's Stop, Ctrl-C) before the agent session has started: noted, and acted on at the next point where
+ * stopping is clean (`check()` throws; the caller stops the recording, discards it and closes everything, as for a
+ * game that did not come up). Without it the signal's default ended the process at once and left OBS recording.
+ */
+export function earlyStop(log) {
+  let signal = null;
+  const on = (s) => { signal = s; log(`${s}: stopping before the session starts; what was started is closed`); };
+  process.once("SIGINT", on);
+  process.once("SIGTERM", on);
+  return {
+    check() { if (signal) throw new Error(`stopped by the user (${signal}) before the session started`); },
+    release() { process.off("SIGINT", on); process.off("SIGTERM", on); return signal; },
+  };
+}
+
 export async function run(opts, { log = (t) => process.stderr.write(`[aas run] ${t}\n`) } = {}) {
   for (const k of ["runtime", "game", "run-dir"]) if (!opts[k]) throw new Error(`--${k} is required`);
   const runDir = path.resolve(opts["run-dir"]);
@@ -125,12 +141,14 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   if (recorder.id === "null") log("warning: recorder null; this run will not be a valid AI Assisted Speedrun");
   if (runtime.ai) log(`what a run costs: ${COST_TEXT}`);
   const events = createEventLog(runDir);
+  const early = earlyStop(log);
   // Runs on the Claude plan may only use part of the weekly limit (AAS_BUDGET_WEEKLY_MAX).
   // A runtime that runs on a plan knows its own stand (`budget()`): a run may only use part of it.
   if (runtime.budget && !opts["ignore-budget"]) {
     const b = await runtime.budget();
     log(`budget: ${b.detail}`);
     events.append("budget.checked", { runtime: runtime.id, ok: b.ok, percent: b.percent, max_percent: b.max, ...(b.data ?? {}) });
+    if (!b.ok) early.release();
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
   }
 
@@ -146,8 +164,10 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   try {
     await recorder.preflight(brief, plugin);
     await timer?.preflight?.(brief, plugin);
+    early.check();
   } catch (error) {
-    recorder.disconnect?.();
+    early.release();
+    await recorder.disconnect?.();
     await overlay?.close();
     throw error;
   }
@@ -158,12 +178,15 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     // is stopped and discarded below, like a game that fails to come up.
     ({ t0 } = await recorder.start(brief, ctx));
     events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString() });
+    early.check();
     if (plugin.prepareRun) {
       const ready = await plugin.prepareRun({ runDir, log, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
       events.append("game.ready", { at: (ready?.readyAt ?? new Date()).toISOString(), seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
     }
     await timer?.start(brief);
+    early.check();
   } catch (error) {
+    early.release();
     // The game did not come up: stop the recording again and discard its file, so that
     // no recording keeps running and no stray segment lands in the run directory.
     const aborted = await recorder.stop().catch(() => ({ files: [] }));
@@ -190,7 +213,13 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const ordered = inOrder();
   const forward = async (ev) => {
     if (goalReached(goal.end, ev) && !over) {
-      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
+      // The victory is fixed here, at the milestone, and the session is interrupted at once: the log is read
+      // every half second, and a fast player would otherwise play on past its goal until its own game.over came
+      // back through the follower (measured 2026-09-25: a mock to act1 played on to the Act 3 victory).
+      over = { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, at: ev.timestamp, deaths, goal: goal.id };
+      log(`game over: ${over.label}; ending the session`);
+      runtime.interrupt?.(`game over: ${over.label}`);
+      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, reached_at: ev.timestamp, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
     }
     if (ev.event === "game.over") {
       if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
@@ -209,12 +238,13 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
   // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
   const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
+  early.release();
   process.once("SIGINT", stopRequested);
   process.once("SIGTERM", stopRequested);
   // `aas stop --run-dir` finds this process by this file, never by a process search.
   fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
   try {
-    outcome = await runtime.start(runDir, brief);
+    outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
   } catch (error) {
     outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
     events.append("run.error", { message: outcome.notes });
@@ -225,7 +255,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   autosave?.stop();
   // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
   await follower.flush();
-  if (outcome.status !== "failed") outcome = { ...outcome, deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter(Boolean).join("; ") } : {}) };
+  if (outcome.status !== "failed") outcome = { ...outcome, deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter((n, i, all) => n && !(i > 0 && String(all[0] ?? "").includes(n))).join("; ") } : {}) };
   // A final save state, so a stopped run can be resumed from exactly here.
   if (plugin.saveState && outcome.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });
   events.append("run.ended", { status: outcome.status, notes: outcome.notes ?? null, sessionId: outcome.sessionId ?? null });

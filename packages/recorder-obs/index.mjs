@@ -231,7 +231,7 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.33.1",
+    version: "0.33.8",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
     async doctor() {
@@ -245,27 +245,38 @@ export function createObsRecorder(options = {}) {
           const o = await connectObs({ url, password });
           const v = await o.call("GetVersion");
           const st = await o.call("GetRecordStatus");
-          o.close();
+          await o.close();
           rows.push({ ok: true, what: "OBS auth + version", detail: `OBS ${v.obsVersion}, obs-websocket ${v.obsWebSocketVersion}` });
           rows.push({ ok: !st.outputActive, what: "OBS not already recording", detail: "" });
         } catch (e) { rows.push({ ok: false, what: "OBS auth", detail: e.message }); }
       }
       return rows;
     },
-    /** Closes OBS the way a user would (WM_CLOSE to its main window). It exits cleanly, but right after a recording
-     *  obs-websocket's IO thread takes long to stop, and longer with every OBS session of the day so far: measured on
-     *  32 s (11:43), 63 s (15:39) and 93 s (15:45), against 0.1 s eleven minutes after a recording. The
-     *  cause is not found; the wait covers it and the report says how long it took. */
+    /** Closes OBS the way a user would (WM_CLOSE to its main window). OBS waits at exit for every websocket
+     *  connection to be closed; a connection whose close was sent but not finished before this process blocked
+     *  (closeWindows is synchronous) kept obs-websocket's IO thread for about two minutes (measured 2026-09-25: 117 s
+     *  in OBS's own log, against 0 s when the close was awaited). So every connection here is closed and awaited
+     *  before WM_CLOSE; the report still says how long it took. */
     async close() {
       const { closeWindows } = await import("../core/src/close-windows.mjs");
+      // A recording that is still going (a run that ended without stopping it) makes OBS ask "OBS is still currently
+      // active" at WM_CLOSE, in a Qt dialog nothing here can answer, and OBS stays open (measured 2026-09-25): so it
+      // is stopped first, and the report says so.
+      let stopped = "";
+      try {
+        const o = await connectObs({ url, password });
+        if ((await o.call("GetRecordStatus")).outputActive) { const r = await o.call("StopRecord"); stopped = `recording that was still going stopped first: ${r.outputPath}\n`; }
+        await o.close();
+      } catch { /* OBS not reachable: nothing to stop through it */ }
       const t0 = Date.now();
       const out = closeWindows([{ name: "obs64", title: "OBS ", seconds: 180 }], { report: ["obs64"] });
-      return `${out}\nobs64: ${Math.round((Date.now() - t0) / 1000)} s from WM_CLOSE to the report`;
+      return `${stopped}${out}\nobs64: ${Math.round((Date.now() - t0) / 1000)} s from WM_CLOSE to the report`;
     },
     /** Drops the websocket connection without touching OBS: after a failed preflight the run does not start. */
-    disconnect() {
-      obs?.close();
+    async disconnect() {
+      const o = obs;
       obs = null;
+      await o?.close();
     },
     async preflight(brief, game) {
       const o = await connect();
@@ -382,7 +393,7 @@ export function createObsRecorder(options = {}) {
         if (now !== back) log(`OBS's recording folder could not be set to ${back} (it is ${now}); set it in OBS → Settings → Output`);
         else log(`OBS's recording folder set to ${back}`);
       } else log("OBS is left pointing at this run's recording folder: there is no other folder to point it at (set AAS_OUTPUT_DIR)");
-      o.close();
+      await o.close();
       obs = null;
       const files = [outputPath, ...replayPaths].filter(Boolean).map(toLocalPath);
       log(`recording stopped: ${outputPath}`);

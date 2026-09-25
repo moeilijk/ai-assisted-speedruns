@@ -12,7 +12,7 @@ One subject per pull request. Several changes that build on each other go in as 
 
 In the same pull request as the code:
 
-- `npm test` passes: the summary line reads `# fail 0`. `npm run check` passes too.
+- `npm test` passes: the summary line reads `# fail 0`. `npm run check` passes too. A new game plugin goes through the whole harness in a test (`packages/core/test/chain.mjs`), and every value it passes on from outside has a test with a hostile form (see `packages/core/test/hostile-input.test.mjs`).
 - A line under the unreleased version at the top of [CHANGELOG.md](CHANGELOG.md): what is now true that wasn't before, and why when that isn't obvious. The version follows the rule at the top of that file: a minor version only for a new `summary.json` schema or a new SPEC draft, a patch for everything else.
 - The docs that describe what you changed: the plugin's README, [docs/reference.md](docs/reference.md) for a new setting or command, [docs/install.md](docs/install.md) for a new install step, `.env.example` for a new setting.
 - Any part with a version that changed gets the version of the release it goes into (`package.json` of the package, `version` in a plugin). Then run `node packages/spec/make-plugins.mjs --write`: it refuses while a plugin changed and kept its version, and the tests fail while `packages/spec/plugins.json` is out of date.

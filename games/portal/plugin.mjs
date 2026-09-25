@@ -159,7 +159,7 @@ export default {
     return rows;
   },
   name: "Portal",
-  version: "0.29.1",
+  version: "0.33.8",
   scopeName: "portal",
   capabilities: { turnBased: false, canPause: true, stateAccess: "none", inputRoute: "input", igt: false },
   // Source Unpack runs Portal as hl2.exe; used by the OBS recorder for window match and application audio.
@@ -212,6 +212,8 @@ export default {
   // autosave and by aas resume. The demo recording continues across loads
   // and the game stays TAS-paused afterwards (, verified:).
   async saveState({ name }) {
+    // The name goes into the game's console: a plain name only, never a second command (";", a newline, a quote).
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     const session = await sptSession({ host: SPT_HOST, port: SPT_PORT });
     try {
       await consoleCommand(`save ${name}`, session);
@@ -235,6 +237,8 @@ export default {
     return { name, file };
   },
   async loadState({ name, log = () => {} }) {
+    // The name goes into the game's console: a plain name only, never a second command (";", a newline, a quote).
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     const session = await sptSession({ host: SPT_HOST, port: SPT_PORT });
     try {
       await consoleCommand(`load ${name}`, session);

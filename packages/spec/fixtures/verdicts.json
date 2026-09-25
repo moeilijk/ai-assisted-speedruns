@@ -1,0 +1,241 @@
+{
+  "made_by": "packages/spec/fixtures/make-fixtures.mjs",
+  "base": "a mock run of packages/core/test/gui-game through run() and publish()",
+  "classes": [
+    {
+      "class": "mock",
+      "fixture": "mock.zip",
+      "archive": {
+        "http": 200,
+        "status": "review",
+        "mock": true,
+        "ordinary_account": {
+          "http": 422,
+          "status": "rejected",
+          "code": "bundle.mock"
+        }
+      },
+      "tooling": {
+        "requirement": "a model played",
+        "status": "unmet",
+        "match": "mock"
+      }
+    },
+    {
+      "class": "tampered-log",
+      "fixture": "tampered-log.zip",
+      "archive": {
+        "http": 200,
+        "status": "review",
+        "unmet": [
+          "Every file matches its hash"
+        ]
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "invalid",
+        "match": "session.sanitized.jsonl: sha256 mismatch"
+      }
+    },
+    {
+      "class": "tampered-timeline",
+      "fixture": "tampered-timeline.zip",
+      "archive": {
+        "http": 200,
+        "status": "review",
+        "unmet": [
+          "Every file matches its hash"
+        ]
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "invalid",
+        "match": "timeline.json: sha256 mismatch"
+      }
+    },
+    {
+      "class": "zip-slip",
+      "fixture": "zip-slip.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.unsafe-path"
+      },
+      "tooling": {
+        "throws": "outside"
+      }
+    },
+    {
+      "class": "absolute-path",
+      "fixture": "absolute-path.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.unsafe-path"
+      },
+      "tooling": {
+        "throws": "outside"
+      }
+    },
+    {
+      "class": "hidden-file",
+      "fixture": "hidden-file.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.unsafe-path"
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "invalid",
+        "match": ".hidden: a hidden file"
+      }
+    },
+    {
+      "class": "zip-bomb",
+      "fixture": "zip-bomb.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.inflate"
+      },
+      "tooling": {
+        "throws": "does not inflate to its declared 100 bytes"
+      }
+    },
+    {
+      "class": "duplicate-entry",
+      "fixture": "duplicate-entry.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.duplicate"
+      },
+      "tooling": {
+        "throws": "is in it twice"
+      }
+    },
+    {
+      "class": "bad-crc",
+      "fixture": "bad-crc.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.malformed"
+      },
+      "tooling": {
+        "throws": "its CRC-32 does not match its data"
+      }
+    },
+    {
+      "class": "malformed-zip",
+      "fixture": "malformed-zip.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "zip.malformed"
+      },
+      "tooling": {
+        "throws": "not a zip that can be read safely"
+      }
+    },
+    {
+      "class": "manifest-path",
+      "fixture": "manifest-path.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.manifest-path"
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "invalid",
+        "match": "not a plain path inside the bundle; not read"
+      }
+    },
+    {
+      "class": "not-published",
+      "fixture": "not-published.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.not-published"
+      },
+      "tooling": {
+        "requirement": "public bundle",
+        "status": "unmet",
+        "match": "expected \"aas-public\""
+      }
+    },
+    {
+      "class": "no-run-id",
+      "fixture": "no-run-id.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.run-id"
+      },
+      "tooling": {
+        "requirement": "run id",
+        "status": "invalid",
+        "match": "manifest.run_id null and summary.run_id null"
+      }
+    },
+    {
+      "class": "privacy",
+      "fixture": "privacy.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.privacy"
+      },
+      "tooling": {
+        "requirement": "privacy",
+        "status": "invalid",
+        "match": "AGENTS.md: private Unix home path"
+      }
+    },
+    {
+      "class": "recording-in-bundle",
+      "fixture": "recording-in-bundle.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.recording"
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "invalid",
+        "match": "recording/run.mp4"
+      }
+    },
+    {
+      "class": "wrong-version",
+      "fixture": "wrong-version.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.version"
+      },
+      "tooling": {
+        "requirement": "summary.json",
+        "status": "invalid",
+        "match": "schema"
+      }
+    },
+    {
+      "class": "hostile-strings",
+      "fixture": "hostile-strings.zip",
+      "archive": {
+        "http": 200,
+        "status": "review",
+        "escaped": "<script>alert(\"aas\")</script><img src=x onerror=alert(1)>\"'&‮"
+      },
+      "tooling": {
+        "requirement": "manifest.json",
+        "status": "met",
+        "match": "files verified"
+      }
+    }
+  ]
+}

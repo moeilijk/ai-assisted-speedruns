@@ -5,12 +5,13 @@
 //
 //   node packages/core/src/gui/checks.mjs <id>     the check of one row, as JSON
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as detect from "./detect.mjs";
 import { ENV_FILE } from "./env-file.mjs";
-import { readSettings as readEnv } from "../settings.mjs";
+import { gameEnvFile, readSettings as readEnv, readSettingsFile } from "../settings.mjs";
 import { IS_WSL, ON_WINDOWS, powershell, toLocal, toWindows, windowsFolders } from "./windows-paths.mjs";
 import { loadGamePlugin } from "../mcp-client.mjs";
 
@@ -37,14 +38,35 @@ const HARNESS = IS_WSL ? "WSL (the harness)" : "The harness";
 /** The game plugins that have a GUI set-up (games/<id>/plugin.mjs with `setup`, not stubs). */
 /** Every game plugin in the repository, playable or not: the GUI names the stubs too, so it is clear what exists
  *  and what a machine would need for it. A stub has no settings and cannot be started. */
+// A game plugin reads its settings (a profile, a ROM) when it loads, and the GUI runs for hours while they change.
+// So before each load the game's own file (.local/games/<game>.env) is applied to this process, and the plugin is
+// imported again when those settings differ from its last load; the CLIs the GUI starts inherit the same values.
+const appliedKeys = new Map();
+// Where the game plugins are: the repository's games/, or AAS_GAMES_DIR (the tests' own game, so the whole GUI session
+// can run in a test without a real game).
+const gamesDir = () => process.env.AAS_GAMES_DIR || path.join(REPO, "games");
+const loadedPlugins = new Map();
+async function loadForGui(file, dir) {
+  const values = readSettingsFile(gameEnvFile(dir));
+  for (const k of appliedKeys.get(dir) ?? []) if (!(k in values)) delete process.env[k];
+  for (const [k, v] of Object.entries(values)) process.env[k] = v;
+  appliedKeys.set(dir, Object.keys(values));
+  const version = crypto.createHash("sha256").update(JSON.stringify(values)).digest("hex").slice(0, 12);
+  const hit = loadedPlugins.get(file);
+  if (hit?.version === version) return hit.plugin;
+  const plugin = await loadGamePlugin(file, { version: loadedPlugins.has(file) ? version : null });
+  loadedPlugins.set(file, { version, plugin });
+  return plugin;
+}
+
 export async function allGames() {
-  const dir = path.join(REPO, "games");
+  const dir = gamesDir();
   const out = [];
   for (const d of fs.readdirSync(dir).sort()) {
     const file = path.join(dir, d, "plugin.mjs");
     if (!exists(file)) continue;
     try {
-      const plugin = await loadGamePlugin(file);
+      const plugin = await loadForGui(file, d);
       if (plugin.stub || plugin.setup) out.push({ file, dir: d, plugin });
     } catch { /* a plugin that does not load is not offered */ }
   }
@@ -52,13 +74,13 @@ export async function allGames() {
 }
 
 export async function guiGames() {
-  const dir = path.join(REPO, "games");
+  const dir = gamesDir();
   const out = [];
   for (const d of fs.readdirSync(dir).sort()) {
     const file = path.join(dir, d, "plugin.mjs");
     if (!exists(file)) continue;
     try {
-      const plugin = await loadGamePlugin(file);
+      const plugin = await loadForGui(file, d);
       if (!plugin.stub && plugin.setup) out.push({ file, plugin });
     } catch { /* a plugin that does not load is not offered */ }
   }
@@ -111,7 +133,9 @@ export async function configItems() {
     ...games.flatMap(({ plugin }) => {
       const first = plugin.setup.settings[0];
       const checkKey = (first && (pathValue(first.env) || (settingDefault(first) ? toWindows(settingDefault(first)) : ""))) || "";
-      return plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, what: st.what ?? null, checkKey, ...(settingDefault(st) ? { placeholder: `default: ${toWindows(settingDefault(st))}` } : {}) }));
+      return plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, what: st.what ?? null, checkKey, ...(settingDefault(st) ? { placeholder: `default: ${toWindows(settingDefault(st))}` } : {}),
+        // A choice (a game's profile): its options, and the one in use when the setting is empty.
+        ...(st.kind === "select" ? { options: typeof st.options === "function" ? st.options() : st.options ?? [], value: env[st.env] || st.value || "" } : {}) }));
     }),
     // Every other game the repository knows: named here too, so the list of games is the whole list and it is
     // visible which ones this machine cannot run at all.

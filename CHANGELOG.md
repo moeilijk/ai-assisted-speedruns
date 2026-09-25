@@ -12,6 +12,84 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.8 — 2026-09-26
+
+- **A run started from the GUI makes its bundle again.** Since 0.33.5 the GUI still called the separate timeline
+  step it no longer had, so every session ended as failed right after the run, without a bundle and without Upload.
+  A test now checks that every step a session calls is a step of its plan.
+- **Model and effort on the Run tab.** An AI run takes the model (for example `claude-opus-5-5`) and the effort
+  (low to max) given there, as `--model` and `--effort`, shown in the commands; empty is the AI's own default. A mock
+  run asks no model anything and does not show them.
+- **A game's profile is chosen on the Setup tab.** FCEUX and BizHawk have a row "Game" with their profiles (nes15,
+  Super Mario Bros.). The GUI reads a game's settings again when they change, so its goals, splits and ROM follow at
+  once on both tabs, without restarting the GUI.
+- **Stop while a run is still starting stops it cleanly.** A stop before the session began ended `aas run` or
+  `aas resume` at once and left OBS recording; now the recording is stopped and discarded and everything is closed,
+  and the GUI says "stopped before the session started". A resume that does not come up closes what it started, as
+  a run already did. Closing OBS stops a recording that is still going first, because OBS otherwise waits on a
+  question at exit.
+- **OBS closes in seconds instead of two to three minutes after a run.** OBS waits at exit until every websocket
+  connection is closed, and the recorder's last connection was only asked to close: the closing of OBS that follows
+  blocks this process, the close never finished, and obs-websocket's IO thread waited about two minutes (OBS's own
+  log, 2026-09-25: 117 s; the same close awaited: 0 s). Every connection to OBS is now closed and awaited before
+  OBS is closed; measured through a GUI mock run afterwards: 6 s from WM_CLOSE to OBS gone.
+- **`aas check` finds what the Archive refuses.** A hidden file in a bundle, a missing or differing run id, and
+  private data in any text file (the rules of `aas publish` and `aas scan`) are now reported; a zip entry that is
+  absolute or climbs out is refused as such, and so is a file whose CRC-32 does not match its data.
+- **Shared fixtures with the Archive, and the chain tested live.** `packages/spec/fixtures/` holds a bundle for every
+  class of damage the Archive recognises (tampered log or timeline, zip-slip, absolute path, hidden file, zip bomb,
+  duplicate entry, a wrong CRC-32, malformed zip, manifest path outside the bundle, no marker, no run id, private data, a recording,
+  a wrong version, hostile strings), made from a real mock run by `make-fixtures.mjs`, with the verdict both sides
+  expect in `verdicts.json`; `npm test` asserts the tooling's column. `npm run e2e:chain` uploads them to the live
+  Archive with its e2e account and asserts its column, accepts a mock and the hostile strings (hidden, 404 to the
+  public, nothing raw on the page), records a run on the Archive's own tickets and compares the heads it stored,
+  sends hostile requests, and wipes everything at the end. The hostile strings stand in every field the run page and
+  the agent page show, and must come out escaped on both.
+- **`npm run e2e:real`: every game's mock through the real GUI on the real programs.** Playwright drives the GUI the
+  way a person does: each game with a scripted player plays to its first end (Balatro on the seed its player is
+  proven on), its sound is measured while it runs (only the quiet device or no session), the bundle is uploaded to
+  the Archive's e2e account, the log must hold no error, and the game, OBS and LiveSplit must be closed afterwards;
+  one game is stopped mid-run and continued; the machine's settings are compared before and after.
+- **Every button's answer says what happened.** A button whose answer carried no sentence showed "Done."; each now
+  has its own text. The GUI serves the page it started with, so page and server always belong together, and when
+  the tooling on disk changes under a running GUI the page says to restart it.
+- **An older bundle's timeline is made again as it was.** The goal's milestone time is taken only from logs that
+  carry it (0.33.8 and later); for an older log the first victory stays the moment, so the Archive's byte-for-byte
+  check of a waiting older bundle does not change.
+- **`AAS_ARCHIVE_FETCH`**: a module whose `archiveFetch` authenticates each request to the Archive itself; every
+  command that talks to the Archive, and every command the GUI starts, uses it, and `aas login` then follows the
+  Archive's answer itself instead of opening a browser. Off by default.
+- The messages of the proof check name "the Archive" as the rest of the tooling does.
+- **Hostile and wrong input is refused where it enters, with the reason** (owner, 2026-09-25: the code is the
+  example of how robust a plugin must be). The command line refuses unknown, empty, doubled and non-numeric options;
+  a model, effort, seed, run id, save name, session id, proof mode and ticket id are checked before they reach a
+  command line, a file name, a game's console or another program's settings (a seed such as `--ignore-budget` was
+  read as an option, an effort went unchecked into Codex's TOML, `--save` reached Portal's console); `aas stop`
+  signals only a real other process (pid 0 would have signalled the whole process group). The GUI sets only the
+  settings it shows (NODE_OPTIONS or PATH could be set through it), opens, continues and uploads only what lies in
+  the output location, and uploads only a .zip. The zip reader checks every offset and refuses duplicate names,
+  unknown methods and entries that inflate past their declared size (a zip bomb); a manifest path outside the
+  bundle, hidden, through a link or at a device is refused unread (found by the site session); a proof may only name
+  its own private session log. Game plugins check what they pass on: Slay the Spire's seed, Portal's and Portal 2's
+  save names, Codex's effort. `packages/core/test/hostile-input.test.mjs` holds every case; it fails as a whole on
+  0.33.7.
+- **A goal ends the session at its milestone, however fast the player is.** The harness saw a milestone only when it
+  next read the run log (every half second), so a fast player played on past its goal: a mock to act1 went on to the
+  Act 3 victory, and the goal was recorded as reached at that later victory. The scripted runtime now lets the
+  harness read the log after every step, the victory is fixed at the goal's milestone, and the goal's game.over
+  carries the milestone's own time (`reached_at`), which the goal history takes over a victory the game declared
+  later.
+- **A resumed Balatro run can start over after a game over.** The bridge only allowed a restart for a run it had
+  started itself, and a resumed run is loaded from its save: `aas.restart` was refused ("the harness did not start
+  this run through the bridge"), also in an AI run. After loading, the plugin tells the bridge how the run was
+  started (deck, stake, and the seed of a set-seed run).
+- **Every game goes through the whole harness in `npm test`.** Balatro, Slay the Spire, Portal, Portal 2, BizHawk
+  and FCEUX each go through run → resume → publish → check against their fakes with a scripted player
+  (`packages/core/test/chain.mjs`, the chain a plugin writer puts their own game through), and the GUI's session
+  (Start → run → bundle → Continue → new revision) runs through the real commands with a test game. BizHawk and
+  FCEUX take the address the agent may reach from the same setting as their client, instead of a fixed port the
+  broker blocked for any other; their fakes and Portal 2's write save files as the programs do.
+
 ## 0.33.7 — 2026-09-25
 
 - **`npm test` no longer writes the GUI's check results.** Since 0.33.6 the GUI checks a row with a standard location

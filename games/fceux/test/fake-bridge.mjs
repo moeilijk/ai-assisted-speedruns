@@ -5,6 +5,10 @@
 import fs from "node:fs";
 import net from "node:net";
 import path from "node:path";
+import { toLocal } from "../../../packages/core/src/gui/windows-paths.mjs";
+
+// The path the plugin hands FCEUX is the Windows form of a WSL path, with / or \ (//wsl.localhost/<distro>/tmp/…).
+const local = (p) => { const m = /^[\\/]{2}wsl(?:\.localhost|\$)[\\/][^\\/]+([\\/].*)$/i.exec(String(p)); return m ? m[1].replaceAll("\\", "/") : toLocal(String(p)); };
 
 export async function startFakeBridge({ md5 = "F53AF989E2C9C37F01D9A276D8AEC04A", memory = {}, dir = null } = {}) {
   const state = { md5, framecount: 0, paused: true, steps: [], calls: [], memory: { ...memory }, onFrame: null, connections: 0, saves: [], messages: [], inFiles: 0 };
@@ -32,8 +36,9 @@ export async function startFakeBridge({ md5 = "F53AF989E2C9C37F01D9A276D8AEC04A"
     "memory.readword": (p) => (state.memory[p.address] ?? 0) + 256 * (state.memory[p.address + 1] ?? 0),
     "memory.readbyterange": (p) => Array.from({ length: p.length }, (_, i) => state.memory[p.address + i] ?? 0),
     "gui.screen": () => ({ width: 2, height: 1, rgb: Buffer.from([255, 0, 0, 0, 0, 255]).toString("base64") }),
-    "savestate.savefile": (p) => { state.saves.push(p.path); return { path: p.path, framecount: state.framecount }; },
-    "savestate.loadfile": (p) => ({ path: p.path, framecount: state.framecount }),
+    // A savestate is the frame count and the memory, written where the plugin asks, and read back on load.
+    "savestate.savefile": (p) => { state.saves.push(p.path); try { fs.writeFileSync(local(p.path), JSON.stringify({ framecount: state.framecount, memory: state.memory })); } catch { /* a path that is not on this machine (the unit tests' Windows paths) */ } return { path: p.path, framecount: state.framecount }; },
+    "savestate.loadfile": (p) => { try { const s = JSON.parse(fs.readFileSync(local(p.path), "utf8")); state.framecount = s.framecount; state.memory = { ...s.memory }; } catch { /* as above */ } return { path: p.path, framecount: state.framecount }; },
     "emu.exit": () => true,
   };
   const answer = (req) => {

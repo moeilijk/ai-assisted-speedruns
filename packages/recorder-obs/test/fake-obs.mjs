@@ -135,5 +135,5 @@ export async function startFakeObs({ password = "secret", inputs = [], specialIn
     socket.on("error", () => clients.delete(socket));
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { port: server.address().port, url: `ws://127.0.0.1:${server.address().port}`, state, close: () => new Promise((r) => { for (const c of clients) c.destroy(); server.close(() => r()); }) };
+  return { port: server.address().port, url: `ws://127.0.0.1:${server.address().port}`, state, clientCount: () => clients.size, close: () => new Promise((r) => { for (const c of clients) c.destroy(); server.close(() => r()); }) };
 }

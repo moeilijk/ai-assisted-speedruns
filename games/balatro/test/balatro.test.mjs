@@ -186,3 +186,30 @@ test("the scripted player plays the hand that scores most, not the biggest group
   assert.equal(best.type, "Three of a Kind");
   assert.deepEqual(best.indices, [1, 3, 6], "the three kings, and nothing that does not score");
 });
+
+test("in a resumed run (loaded, not started, by a fresh bridge) a game over can still be restarted, the same way", async () => {
+  const t = await setup({ chipsPerCard: 1, hands: 1 });
+  try {
+    const harness = jsonRpcClient({ port: t.bridge.port, headers: { "X-AAS-Token": t.bridge.token } });
+    const agent = jsonRpcClient({ port: t.bridge.port });
+    // A resume: the game was loaded from a save, so this bridge never saw a start.
+    const save = join(dir, "resumed.jkr");
+    await harness.call("start", { deck: "BLUE", stake: "WHITE", seed: "SETSEED1" });
+    await harness.call("save", { path: save });
+    const fresh = await startBridge({ port: 0, botPort: t.bot.port, shotDir: dir });
+    try {
+      const h2 = jsonRpcClient({ port: fresh.port, headers: { "X-AAS-Token": fresh.token } });
+      const a2 = jsonRpcClient({ port: fresh.port });
+      await h2.call("load", { path: save });
+      await assert.rejects(a2.call("aas.started", { deck: "RED", stake: "GOLD" }), /not available to the agent/, "only the harness says how a run started");
+      await assert.rejects(h2.call("aas.started", { deck: "BLUE", stake: "WHITE", seed: "x;y" }), /optional plain seed/);
+      await h2.call("aas.started", { deck: "BLUE", stake: "WHITE", seed: "SETSEED1" });
+      let s = await a2.call("select");
+      while (s.state !== "GAME_OVER") s = await a2.call("play", { cards: [0] });
+      s = await a2.call("aas.restart");
+      assert.equal(s.state, "BLIND_SELECT", "the restart after the resume's game over works");
+      assert.equal(s.seed, "SETSEED1", "with the run's set seed");
+    } finally { await fresh.close(); }
+    void agent;
+  } finally { await t.close(); }
+});

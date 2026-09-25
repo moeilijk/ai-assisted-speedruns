@@ -6,6 +6,9 @@ import { accessToken } from "./auth.mjs";
 import { currentArchiveFetch, proofUrl } from "./proof.mjs";
 
 export async function uploadBundle(zipFile, { fetchImpl = currentArchiveFetch(), baseUrl = proofUrl(), timeoutMs = 300000 } = {}) {
+  // What is uploaded first: a bundle's zip that is there, before anything is asked of the account or the network.
+  if (!fs.existsSync(zipFile) || !fs.statSync(zipFile).isFile()) throw new Error(`${zipFile} is not there: upload the .zip that aas publish made`);
+  if (!/\.zip$/i.test(zipFile)) throw new Error(`${zipFile} is not a bundle's .zip`);
   const token = await accessToken();
   // Without an account only a caller that authenticates its own requests can upload (useArchiveFetch).
   if (!token && fetchImpl === fetch) throw new Error("uploading needs an account: sign in with `aas login` first");

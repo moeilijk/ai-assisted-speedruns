@@ -16,18 +16,18 @@
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.32.1",
+      "version": "0.33.8",
       "ai": true,
-      "sha256": "5cb63357baa1835dc81d41d50ac52db12d27344dd5c7863961db310fa97267b3"
+      "sha256": "62450b9938827f5e194dc0dd40663d036804c5e9c34f8db5cf573e5a32fc0f97"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-scripted",
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.32.0",
+      "version": "0.33.8",
       "ai": false,
-      "sha256": "e0e2ab2b9d951e157b36fb5cfdd1d097697fc13764ba56262454f6890ea79c8d"
+      "sha256": "0ad0480450644b346b0f5f9941816c37793e69c46fe2ba67bda0cdabdd47f1d3"
     },
     {
       "kind": "recorder",
@@ -42,8 +42,8 @@
       "dir": "packages/recorder-obs",
       "id": "obs",
       "name": "OBS Studio (video)",
-      "version": "0.33.1",
-      "sha256": "9704a3d43eaac4b761078bab40b898c992f86e53347d40beb41f3a0b63cba9dd"
+      "version": "0.33.8",
+      "sha256": "e3f1ee3ffb3351ccf273e92eb8f72a9b3826b132b80d66821d6cd015a1d90e9e"
     },
     {
       "kind": "recorder",
@@ -66,18 +66,18 @@
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.29.5",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "88aff7dc7f656c072b37bf291774e9e8f1847280a7afe6261bca479b9f7f3567"
+      "sha256": "1924c65cfabe27db30c22a61b96ec7e588fdffd7cacc4e7f48588150e57a1c54"
     },
     {
       "kind": "game",
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.33.6",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "5261d0b19305659a632df30a2adc6eee4d467f58f28159af3b9a4683fb90524c"
+      "sha256": "4758ecdf8b463c7ff9a191157d0cce42d25836cc9399370582256c5cfbf60a70"
     },
     {
       "kind": "game",
@@ -93,9 +93,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "0.33.6",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "13eb51fc9fde532cabfc7641394dac7dff36b4c46c49211d4c925e79cadacfc7"
+      "sha256": "873c93df2b88d0a10faa0a312e18a82fbc20e73d6f16e1eaf3a794fe79117a7d"
     },
     {
       "kind": "game",
@@ -129,27 +129,27 @@
       "dir": "games/portal",
       "id": "portal",
       "name": "Portal",
-      "version": "0.29.1",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "3459eec3bf838c408b5d0f0200b6ba28536f016c30b268dbe2a8e80c91c9f391"
+      "sha256": "26929aede8febb7baf8c91b2431042327699f9a9446bd47cf04faa32eb4ba08c"
     },
     {
       "kind": "game",
       "dir": "games/portal-2",
       "id": "portal_2",
       "name": "Portal 2",
-      "version": "0.29.1",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "94859ce10b720464ad9a186f8774fa69eabcd43add83bf7ef26bc94cc4a7b2f8"
+      "sha256": "b85ce061b45bc76f01e634b661ebc1e78ef95d88ae1f2719f986458eb3d815cb"
     },
     {
       "kind": "game",
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "0.29.1",
+      "version": "0.33.8",
       "stub": false,
-      "sha256": "c2d1aacf598c0765806a6333d33cf15d9f93ac1862d6da4d116afaf163c35e28"
+      "sha256": "83c8a95a1392920f5775b21ef2b926ba02fb788ed8e4e73bae3d1962a3af3cc6"
     },
     {
       "kind": "game",

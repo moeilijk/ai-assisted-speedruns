@@ -12,8 +12,8 @@ import net from "node:net";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 
-const HOST = process.env.AAS_FCEUX_BRIDGE_HOST || "127.0.0.1";
-const PORT = Number(process.env.AAS_FCEUX_BRIDGE_PORT || 9999);
+export const HOST = process.env.AAS_FCEUX_BRIDGE_HOST || "127.0.0.1";
+export const PORT = Number(process.env.AAS_FCEUX_BRIDGE_PORT || 9999);
 // FCEUX's Qt build on Windows ships no LuaSocket and cannot load one, and the bridge then talks through files in a folder
 // (bridge.lua, "File transport"); set to that folder (the bridge's FCEUX_BRIDGE_DIR, or "ipc" next to bridge.lua).
 const FILE_DIR = process.env.AAS_FCEUX_BRIDGE_DIR || null;

@@ -12,6 +12,8 @@ import { readSettings as readEnv } from "../settings.mjs";
 import { agentsPresent, createSession, recorderOptions, RUNTIMES } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
+import { checkInside } from "../validate.mjs";
+import { createHash } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 // Only one GUI at a time: it starts games, OBS and runs, so a second one would fight the first over the same run
@@ -75,6 +77,12 @@ export function settingReady(setting, env) {
     return false;
   }
 }
+// The page is the one this GUI started with, so page and server always belong together; when the tooling on disk
+// changes while the GUI runs (an update, a pull), the page says so and asks for a restart instead of mixing the two.
+const codeHash = () => { const h = createHash("sha256"); for (const f of ["page.html", "server.mjs", "session.mjs", "checks.mjs"]) { try { h.update(fs.readFileSync(path.join(here, f))); } catch { /* */ } } return h.digest("hex"); };
+const STARTED_WITH = codeHash();
+const PAGE = fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION);
+
 export async function startGui({ port = 8770, open = true, checkAtStart = true, log = console.log } = {}) {
   let note = null;
   try { note = JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")); } catch { /* no GUI has run yet, or the note is gone */ }
@@ -158,9 +166,9 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
     try {
       if (req.method === "GET" && url.pathname === "/") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
-        res.end(fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION));
+        res.end(PAGE);
       } else if (req.method === "GET" && url.pathname === "/api/gui") {
-        send(res, 200, { gui: "aas", version: FRAMEWORK_VERSION, url: `http://127.0.0.1:${port}/`, pid: process.pid });
+        send(res, 200, { gui: "aas", version: FRAMEWORK_VERSION, url: `http://127.0.0.1:${port}/`, pid: process.pid, stale: codeHash() !== STARTED_WITH });
       } else if (req.method === "GET" && url.pathname === "/api/setup") {
         const items = (await configItems()).map(withResult);
         send(res, 200, { items, envFile: toWindows(ENV_FILE), checked: Object.keys(cache).length > 0, configured: Object.keys(readEnv()).some((k) => k.startsWith("AAS_")) });
@@ -172,8 +180,15 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         send(res, 200, { ok: true, message: `Checking ${n} row${n === 1 ? "" : "s"}…` });
       } else if (req.method === "POST" && url.pathname === "/api/settings") {
         const b = await body(req);
+        // Only the settings this page shows can be set from it: a key such as NODE_OPTIONS or PATH would reach every
+        // program the GUI starts. A value is text on one line.
+        const allowed = new Set((await configItems()).map((i) => i.env).filter(Boolean));
+        for (const k of Object.keys(b.values ?? {})) if (!allowed.has(k)) throw new Error(`${String(k).slice(0, 60)} is not a setting this page sets`);
+        for (const v of Object.values(b.values ?? {})) if (typeof v !== "string" || /[\r\n\0]/.test(v) || v.length > 1000) throw new Error("A setting's value is one line of text, at most 1000 characters");
         const changes = {};
         for (const [k, v] of Object.entries(b.values ?? {})) changes[k] = b.paths?.includes(k) && v ? toLocal(v) : v;
+        if (b.display !== undefined && b.display !== "" && !/^-?\d{1,5},-?\d{1,5}$/.test(String(b.display))) throw new Error("A display is given as x,y of its top-left corner");
+        if (b.displaySize !== undefined && b.displaySize !== "" && !/^\d{2,5}x\d{2,5}$/.test(String(b.displaySize))) throw new Error("A display's size is given as WIDTHxHEIGHT");
         if (b.display !== undefined) {
           const games = await guiGames();
           const [x, y] = String(b.display || "").split(",").map(Number);
@@ -260,7 +275,9 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         send(res, 200, { ok: true, message: `Done: ${fixLabel}; checking the row again` });
       } else if (req.method === "POST" && url.pathname === "/api/open") {
         // Opens a folder or file from the page in Windows Explorer / the default program.
-        const p = toLocal((await body(req)).path ?? "");
+        const p = toLocal(String((await body(req)).path ?? ""));
+        // The page opens what a session made: only paths in the output location.
+        await checkInside("Path", p, toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
         if (!p || !fs.existsSync(p)) { session.log(`Failed: open ${toWindows(p) || "(no path)"}: it is not there`, "err"); send(res, 404, { error: `${toWindows(p) || "(no path)"} is not there` }); return; }
         // A folder is opened; a file is shown selected in its folder, so it can be dragged, copied or uploaded.
         const file = fs.statSync(p).isFile();

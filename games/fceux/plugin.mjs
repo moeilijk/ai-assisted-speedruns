@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { batch, call } from "./bridge.mjs";
+import { batch, call, HOST as BRIDGE_HOST, PORT as BRIDGE_PORT } from "./bridge.mjs";
 import { fceuxDir, hostPath } from "./paths.mjs";
 import { rgbToPng } from "./png.mjs";
 
@@ -65,17 +65,18 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "fceux",
   name: "FCEUX",
-  version: "0.33.6",
+  version: "0.33.8",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "fceux64.exe",
   windowTitle: "FCEUX",
   /** FCEUX has a second window (the Lua console of the bridge): the game is in "FCEUX 2.6.6: <game>". */
   windowTitlePattern: "^FCEUX \\d",
-  endpoints: [{ host: "127.0.0.1", port: 9999 }],
+  // The one address the agent's side may reach: the bridge's, from the same settings the client uses.
+  endpoints: [{ host: BRIDGE_HOST, port: BRIDGE_PORT }],
   /** The milestone's save is made here, in the broker, before the agent's next move (see connect()). */
   savesAtMilestones: true,
-  env: ["AAS_FCEUX_PROFILE"],
+  env: ["AAS_FCEUX_PROFILE", "AAS_FCEUX_BRIDGE_HOST", "AAS_FCEUX_BRIDGE_PORT", "AAS_FCEUX_BRIDGE_DIR"],
   runEnv: ["AAS_FCEUX_PROFILE"],
   ends: ENDS,
   profile: PROFILE,
@@ -83,6 +84,7 @@ export default {
     folder: "FCEUX",
     settings: [
       { env: "AAS_FCEUX_DIR", label: "FCEUX folder", kind: "dir", expect: "fceux64.exe", default: fceuxDir, what: "Where FCEUX is: the folder with fceux64.exe in it. The install puts it in %LOCALAPPDATA%\\aas\\FCEUX." },
+      { env: "AAS_FCEUX_PROFILE", label: "Game", kind: "select", options: () => Object.values(PROFILES).map((p) => ({ value: p.id, label: p.name })), value: "nes15", what: "Which game FCEUX plays: one of the profiles in games/fceux/profiles, each naming its ROM, its ends and its splits." },
       { env: "AAS_FCEUX_ROM", label: "ROM of the game", kind: "file", default: () => { const r = romPath(); return r && existsSync(r) ? r : ""; }, what: "The game's ROM (a .nes file, or a zip with one in it). The profile checks it by its SHA-1, so it has to be the exact dump the profile names." },
     ],
     install: join(here, "install-fceux.mjs"),

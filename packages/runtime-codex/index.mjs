@@ -89,7 +89,7 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Codex",
-  version: "0.32.1",
+  version: "0.33.8",
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
   /** Every rollout Codex wrote with this run directory as its working directory, oldest first: what the proof covers. */
   sessionLogs(runDir) {
@@ -172,6 +172,8 @@ export default {
     const prompt = brief.resume ? brief.resume.prompt : brief.goalPrompt;
     if (!prompt) throw new Error("Headless runs need a goal prompt (aas configure --prompt, or goalPrompt in the game plugin).");
     const args = ["exec", ...(brief.resume?.sessionId ? ["resume", brief.resume.sessionId] : []), "--json", "--skip-git-repo-check", "--cd", runDir, "--sandbox", "read-only", ...model];
+    // The effort is written into Codex's TOML config: only a known word, never a quote that ends the string.
+    if (brief.reasoningEffort && !["low", "medium", "high", "xhigh", "max"].includes(brief.reasoningEffort)) throw new Error(`effort ${JSON.stringify(String(brief.reasoningEffort)).slice(0, 40)} is not one of low, medium, high, xhigh, max`);
     if (brief.reasoningEffort) args.push("-c", `model_reasoning_effort="${brief.reasoningEffort}"`);
     args.push("-o", path.join(runDir, "codex-last-message.txt"), prompt);
     const env = { ...process.env };

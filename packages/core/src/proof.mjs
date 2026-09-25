@@ -125,7 +125,7 @@ export function verifySigned(message, signature, given = null) {
   for (const k of keys) {
     try { if (crypto.verify(null, Buffer.from(message, "utf8"), k.key, Buffer.from(String(signature), "base64"))) return { valid: true, fingerprint: k.fingerprint, problem: null }; } catch { /* next key */ }
   }
-  return { valid: false, fingerprint: null, problem: "not signed by a proof key of the archive" };
+  return { valid: false, fingerprint: null, problem: "not signed by a proof key of the Archive" };
 }
 
 /** A local list of this machine's tickets, so the tool can show and manage them (AAS GUI, `aas tickets`). */
@@ -180,9 +180,9 @@ export function segmentProof({ runDir, segment, mode, runtime, client, events, l
     mode,
     async begin() {
       const t = await client.ticket();
-      if (!/^[0-9a-f]{32}$/.test(String(t?.ticket))) throw new Error("the archive answered without a ticket");
+      if (!/^[0-9a-f]{32}$/.test(String(t?.ticket))) throw new Error("the Archive answered without a ticket");
       const v = verifySigned(ticketMessage(t), t.signature);
-      if (!v.valid) throw new Error(`the ticket is not the archive's (${v.problem})`);
+      if (!v.valid) throw new Error(`the ticket is not the Archive's (${v.problem})`);
       ticket = { ...t, segment };
       state.tickets.push(ticket);
       writeState(runDir, state);
@@ -267,7 +267,7 @@ export function checkProof(bundleDir, { privateDir = null, keys = null } = {}) {
   }
   const received = new Set((proof.receipts ?? []).map((r) => r.seq));
   const missing = heads.filter((h) => !received.has(h.seq));
-  if (missing.length) review.push(`${missing.length} head(s) never reached the archive (${missing.map((h) => `${h.kind} of segment ${h.segment}`).join(", ")})`);
+  if (missing.length) review.push(`${missing.length} head(s) never reached the Archive (${missing.map((h) => `${h.kind} of segment ${h.segment}`).join(", ")})`);
   for (const s of new Set(heads.map((h) => h.segment))) if (!heads.some((h) => h.segment === s && h.kind === "end" && received.has(h.seq))) review.push(`segment ${s} has no received end head`);
   // Every segment of the run has its own ticket: a resume without proof leaves a segment nobody fixed.
   const timeline = path.join(bundleDir, "session.sanitized.jsonl");
@@ -286,6 +286,6 @@ export function checkProof(bundleDir, { privateDir = null, keys = null } = {}) {
     }
   }
   const status = problems.length ? "invalid" : review.length ? "review" : "signed";
-  const detail = problems.length ? problems.join("; ") : review.length ? review.join("; ") : `${heads.length} head(s) over ${tickets.size} segment(s), every one signed by the archive${privateDir ? " and recomputed from the private logs" : ""}`;
+  const detail = problems.length ? problems.join("; ") : review.length ? review.join("; ") : `${heads.length} head(s) over ${tickets.size} segment(s), every one signed by the Archive${privateDir ? " and recomputed from the private logs" : ""}`;
   return { status, detail, problems, review };
 }

@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { modelParts } from "./models.mjs";
 import { readZipEntries } from "./zip-read.mjs";
+import { SCAN_RULES } from "./sanitize.mjs";
 import { BUNDLE_VERSIONS, SUMMARY_SCHEMAS } from "./versions.mjs";
 import { CODE_SCHEMA, bindingLine, formatDuration, hasCode, videoCode } from "./videos.mjs";
 
@@ -35,6 +36,11 @@ const SUMMARY_V2_KEYS = [
  * `core` is accepted and ignored: it used to mean "a bundle without its recording files", which is now every
  * bundle, because a recording is published where video is published and the bundle carries no link to it.
  */
+/** Every file under `dir`, relative, with / as the separator. */
+function walkFiles(dir, prefix = "") {
+  return fs.readdirSync(path.join(dir, prefix), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walkFiles(dir, `${prefix}${e.name}/`) : e.isFile() ? [`${prefix}${e.name}`] : []));
+}
+
 export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null, proofKeys = null } = {}) {
   const results = []; // { requirement, status: "met" | "unmet" | "invalid", detail }
   const add = (requirement, status, detail = "") => results.push({ requirement, status, detail });
@@ -419,8 +425,18 @@ export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null
     if (manifest) {
       // The marker a reader checks before trusting this as a published bundle (a run directory has no manifest).
       add("public bundle", manifest.bundle === "aas-public" ? "met" : "unmet", manifest.bundle === "aas-public" ? `${manifest.run_id ?? "?"} revision ${manifest.revision ?? "?"}, run ${manifest.run_uid ?? "no uid"}, spec ${manifest.spec_version ?? "?"}` : `manifest.bundle is ${JSON.stringify(manifest.bundle)}, expected "aas-public"`);
-      const listed = new Map((manifest.files ?? []).map((f) => [String(f.path).replaceAll("\\", "/"), f]));
+      const listed = new Map((manifest.files ?? []).map((f) => [String(f.path), f]));
       for (const [p, f] of listed) {
+        // A manifest comes with the bundle, so its paths are input: a plain relative path inside the bundle, to a
+        // plain file. Anything else (../, an absolute path, a backslash, a hidden or empty segment, a control
+        // character, a symlink or a device such as /dev/zero) is refused unread.
+        const segments = p.split("/");
+        const plain = p.length > 0 && p.length <= 512 && !/[\\\x00-\x1f\x7f]/.test(p) && !path.isAbsolute(p) && !/^[A-Za-z]:/.test(p) && segments.every((x) => x !== "" && !x.startsWith("."));
+        const inside = plain && !path.relative(runDir, path.resolve(runDir, p)).startsWith("..");
+        let isFile = false;
+        try { isFile = inside && fs.lstatSync(file(p)).isFile(); } catch { /* missing: reported below */ }
+        if (!plain || !inside) { problems.push(`${JSON.stringify(p).slice(0, 80)}: not a plain path inside the bundle; not read`); continue; }
+        if (fs.existsSync(file(p)) && !isFile) { problems.push(`${p}: not a plain file (a link or a device); not read`); continue; }
         if (!fs.existsSync(file(p))) {
           problems.push(`${p}: listed but missing`);
           continue;
@@ -437,11 +453,29 @@ export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null
       for (const p of walk(runDir)) {
         // signature.json signs the manifest, so the manifest cannot list it.
         // private/ is the upload's private part: bound through proof.json, never listed or published.
-        if (["manifest.json", "run.jsonl", "signature.json"].includes(p) || p.startsWith(".") || p.startsWith("private/")) continue;
+        if (["manifest.json", "run.jsonl", "signature.json"].includes(p) || p.startsWith("private/")) continue;
+        // A bundle has no hidden files: the publisher writes none, and a reader might not show one.
+        if (p.split("/").some((x) => x.startsWith("."))) { problems.push(`${p}: a hidden file, which a bundle does not have`); continue; }
         if (!listed.has(p)) problems.push(`${p}: not in manifest`);
       }
     }
     add("manifest.json", problems.length ? "invalid" : "met", problems.slice(0, 10).join("; ") || `${manifest?.files?.length ?? 0} files verified`);
+    if (manifest) {
+      // The run's id names it at the Archive and in file names: present, the same in manifest and summary, plain.
+      let summaryId = null;
+      try { summaryId = JSON.parse(fs.readFileSync(file("summary.json"), "utf8")).run_id ?? null; } catch { /* summary.json is judged on its own */ }
+      const id = manifest.run_id ?? null;
+      const idOk = typeof id === "string" && /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(id) && summaryId === id;
+      add("run id", idOk ? "met" : "invalid", idOk ? id : `manifest.run_id ${JSON.stringify(id)} and summary.run_id ${JSON.stringify(summaryId)}: a run id is present in both, the same, and letters, digits, _ and -`);
+      // The same privacy rules as `aas publish` and `aas scan`, on every text file of the bundle (not its private part).
+      const findings = [];
+      for (const p of walkFiles(runDir)) {
+        if (p.startsWith("private/") || /\.(png|jpe?g|gif|webp|mp4|mkv|zip|dem|sav|lss)$/i.test(p)) continue;
+        const text = fs.readFileSync(file(p), "utf8");
+        for (const [rule, re] of SCAN_RULES) if (re.test(text)) findings.push(`${p}: ${rule}`);
+      }
+      add("privacy", findings.length ? "invalid" : "met", findings.slice(0, 10).join("; ") || "no private data found by the scan rules");
+    }
   }
 
   return { results, records: records.length, summary };
@@ -468,6 +502,8 @@ export function checkBundle(target, options = {}) {
   if (!fs.statSync(target).isFile()) return checkRun(target, options);
   const entries = readZipEntries(target);
   if (!entries) throw new Error(`${target} is neither a bundle directory nor a zip`);
+  // An entry that is absolute or climbs out is refused as what it is, before anything else is said about the zip.
+  for (const { name } of entries) if (path.isAbsolute(name) || /^[A-Za-z]:/.test(name) || name.includes("\\") || name.split("/").includes("..")) throw new Error(`${target}: entry ${name} points outside the bundle`);
   const tops = new Set(entries.map((e) => e.name.split("/")[0]));
   if (tops.size !== 1 || entries.some((e) => !e.name.includes("/"))) throw new Error(`${target}: the zip must hold the bundle under one directory named after the run`);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "aas-check-"));

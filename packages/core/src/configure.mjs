@@ -2,6 +2,7 @@
 // its own module so that run.mjs and cli.mjs can both import it (cli.mjs
 // has a top-level await; a module importing cli.mjs from a dynamic import
 // inside it would deadlock).
+import { checkEffort, checkModel, checkName, checkProofMode, checkSeed } from "./validate.mjs";
 import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import { resolveGoal } from "./goal.mjs";
@@ -30,6 +31,9 @@ export async function brokerSpec({ gameModule, runDir, timeZone }) {
 
 export async function configure(opts) {
   for (const k of ["runtime", "game", "run-dir"]) if (!opts[k]) throw new Error(`--${k} is required`);
+  // What goes into the brief goes on into command lines, file names and a game's console: checked here, once.
+  checkModel(opts.model); checkEffort(opts.effort); checkSeed(opts.seed); checkProofMode(opts.proof);
+  checkName("the run's id (--id, or the run directory's name)", opts.id ?? path.basename(path.resolve(opts["run-dir"])));
   const runDir = path.resolve(opts["run-dir"]);
   const runtime = await loadRuntime(opts.runtime);
   const spec = await brokerSpec({ gameModule: opts.game, runDir, timeZone: process.env.AAS_TIME_ZONE });

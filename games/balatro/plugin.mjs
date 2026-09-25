@@ -59,7 +59,7 @@ const toMenu = async (rpc, log) => {
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.29.5",
+  version: "0.33.8",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",
@@ -222,7 +222,7 @@ export default {
     return { name, file };
   },
   /** Resume: the named save (from <run>/saves/ or next to the game) is loaded into the running game. */
-  async loadState({ name = null, log = () => {}, runDir = null } = {}) {
+  async loadState({ name = null, log = () => {}, runDir = null, seed = null } = {}) {
     const dir = toolsDir();
     const candidates = [runDir && name ? join(runDir, "saves", `${name}.jkr`) : null, dir && name ? join(dir, "saves", `${name}.jkr`) : null].filter(Boolean);
     const src = candidates.find((f) => existsSync(f));
@@ -232,6 +232,9 @@ export default {
     const { gamePath } = await import("./bridge.mjs");
     const rpc = await harnessClient();
     await rpc.call("load", { path: gamePath(file) });
+    // The bridge started this game session fresh: tell it how the run was started, so aas.restart after a game over
+    // works in a resumed run too (it was refused: "the harness did not start this run through the bridge").
+    await rpc.call("aas.started", { deck: DECK, stake: STAKE, ...(seed ? { seed: String(seed) } : {}) });
     const s = await rpc.call("gamestate");
     log(`save ${name} loaded: ${s.state}, ante ${s.ante_num}, round ${s.round_num}, seed ${s.seed ?? "?"}`);
     return { readyAt: new Date(), seed: s.seed ?? null, seed_code: s.seed ?? null };

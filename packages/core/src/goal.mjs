@@ -69,11 +69,16 @@ export function goalHistory(events, current) {
       if (!now) goals.push({ id: e.data?.from ?? current, declared_at: null, reached_at: null });
       now = { id: e.data?.to, declared_at: e.timestamp, reached_at: null };
       goals.push(now);
-    } else if (e.event === "game.over" && e.data?.victory === true && now && !now.reached_at) {
-      now.reached_at = e.timestamp;
+    } else if (e.event === "game.over" && e.data?.victory === true && now) {
+      // The harness's own game.over for this goal carries the moment of the goal's milestone (reached_at): it wins
+      // over a victory the game declared later, which a fast player may reach before the harness's event is written.
+      // Logs from before 0.33.8 carry no reached_at: for them the first victory stays the moment, as it was, so an
+      // older bundle's timeline is made again exactly as it was made (the Archive checks that byte for byte).
+      if (e.data?.goal === now.id && e.data.reached_at) { now.reached_at = e.data.reached_at; now.byGoal = true; }
+      else if (!now.reached_at) now.reached_at = e.timestamp;
     }
   }
-  return goals;
+  return goals.map(({ byGoal, ...g }) => g);
 }
 
 /** Whether a `game.milestone` event marks this end. The plugin's own victory milestone (`victory: true`) is left to its `game.over`. */

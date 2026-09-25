@@ -56,7 +56,9 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
   await new Promise((resolve, reject) => { server.once("error", reject); server.listen(0, "127.0.0.1", resolve); });
   const redirect = `http://127.0.0.1:${server.address().port}/callback`;
   const url = `${baseUrl}/auth/oauth/authorize/?${new URLSearchParams({ client_id: CLIENT_ID, response_type: "code", redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state })}`;
+  let fail = () => {};
   const code = new Promise((resolve, reject) => {
+    fail = reject;
     const timer = setTimeout(() => reject(new Error("no answer from the browser within 5 minutes")), timeoutMs);
     server.on("request", (req, res) => {
       const u = new URL(req.url, redirect);
@@ -69,7 +71,8 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
     });
   });
   log(`Opening ${baseUrl} in your browser to sign in. If it does not open, go to:\n${url}`);
-  open(url);
+  // An opener that fails (no browser, or an answer that does not lead back here) ends the sign-in with its reason.
+  Promise.resolve().then(() => open(url)).catch((e) => fail(e));
   try {
     const got = await code;
     return store(await tokenRequest({ grant_type: "authorization_code", code: got, redirect_uri: redirect, code_verifier: verifier }, { baseUrl, fetchImpl }), baseUrl);

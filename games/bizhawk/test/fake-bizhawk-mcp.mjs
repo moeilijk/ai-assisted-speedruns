@@ -2,6 +2,11 @@
 // (BizHawk 2.11.1, v0.3.2, 2026-09-23): the tools the plugin calls, JSON-RPC `tools/call` over HTTP, text results,
 // and a screenshot that comes back as a resource.
 import http from "node:http";
+import fs from "node:fs";
+import { toLocal } from "../../../packages/core/src/gui/windows-paths.mjs";
+
+// The path the plugin hands BizHawk is the Windows form of a WSL path, with / or \ (//wsl.localhost/<distro>/tmp/…).
+const local = (p) => { const m = /^[\\/]{2}wsl(?:\.localhost|\$)[\\/][^\\/]+([\\/].*)$/i.exec(String(p)); return m ? m[1].replaceAll("\\", "/") : toLocal(String(p)); };
 
 export async function startFakeBizHawk({ romHash = "8FCC5798252370C63A98E7421131ABF3EB22BFCF", memory = {} } = {}) {
   const state = { romHash, framecount: 0, paused: false, pressed: [], calls: [], memory: { ...memory }, onFrame: null };
@@ -30,6 +35,9 @@ export async function startFakeBizHawk({ romHash = "8FCC5798252370C63A98E7421131
     read_memory: (a) => ({ value: state.memory[`${a.domain}:${a.address}`] ?? 0, requested: a.address, address: a.address }),
     get_joypad: () => ({ buttons: { "P1 Up": false, "P1 Down": false, "P1 Left": false, "P1 Right": false, "P1 Start": false, "P1 Select": false, "P1 B": false, "P1 A": false, Reset: false, Power: false } }),
     screenshot: () => ({ path: "C:/temp/shot.png", resource: "bizhawk://shot-1" }),
+    // A savestate is the frame count and the memory, written where the plugin asks (a Windows path under WSL).
+    save_state: (a) => { fs.writeFileSync(local(a.path), JSON.stringify({ framecount: state.framecount, memory: state.memory })); return `saved ${a.path}`; },
+    load_state: (a) => { const s = JSON.parse(fs.readFileSync(local(a.path), "utf8")); state.framecount = s.framecount; state.memory = { ...s.memory }; return `loaded ${a.path}`; },
   };
   const server = http.createServer((req, res) => {
     let body = "";

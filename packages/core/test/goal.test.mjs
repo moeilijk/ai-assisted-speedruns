@@ -118,3 +118,13 @@ test("the goal history keeps every goal with when it held and when it was reache
   const plain = [ev("1", "run.started", { goal: "end" }), ev("2", "game.over", { victory: false }), ev("3", "game.over", { victory: true })];
   assert.deepEqual(goalHistory(plain, "end"), [{ id: "end", declared_at: "1", reached_at: "3" }]);
 });
+
+test("the goal history of a log from before 0.33.8 is what it was; a newer log takes the goal's milestone time", async () => {
+  const { goalHistory } = await import("../src/goal.mjs");
+  const started = { event: "run.started", timestamp: "2026-09-25T20:00:00.000+02:00", data: { goal: "solved" } };
+  const own = { event: "game.over", timestamp: "2026-09-25T20:05:00.500+02:00", data: { victory: true, label: "Solved" } };
+  const old = { event: "game.over", timestamp: "2026-09-25T20:05:01.000+02:00", data: { victory: true, label: "Victory (Solved)", goal: "solved" } };
+  assert.equal(goalHistory([started, own, old], "solved")[0].reached_at, own.timestamp, "0.33.7 and before: the first victory");
+  const now = { ...old, data: { ...old.data, reached_at: "2026-09-25T20:05:00.100+02:00" } };
+  assert.equal(goalHistory([started, own, now], "solved")[0].reached_at, "2026-09-25T20:05:00.100+02:00", "0.33.8: the goal's milestone");
+});

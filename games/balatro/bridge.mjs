@@ -73,6 +73,14 @@ export async function startBridge({ port = BRIDGE_PORT, botPort = BOT_PORT, stat
       if (r.error) return r;
       try { return { result: { png: readFileSync(file).toString("base64") } }; } finally { rmSync(file, { force: true }); }
     }
+    // After a resume the run was loaded from a save, not started here: the harness says how it was started (deck,
+    // stake, and the seed only when the run has a set seed), so a restart after a game over starts the same way.
+    if (method === "aas.started") {
+      if (!harness) return refuse("aas.started is not available to the agent");
+      if (typeof params?.deck !== "string" || typeof params?.stake !== "string" || (params.seed !== undefined && !/^[A-Za-z0-9]{1,16}$/.test(String(params.seed)))) return { error: { code: -32602, message: "aas.started needs deck, stake and an optional plain seed", data: { name: "BAD_REQUEST" } } };
+      lastStart = { deck: params.deck, stake: params.stake, ...(params.seed ? { seed: String(params.seed) } : {}) };
+      return { result: { ok: true } };
+    }
     if (method === "aas.restart") {
       const now = await pass("gamestate");
       if (now.error) return now;

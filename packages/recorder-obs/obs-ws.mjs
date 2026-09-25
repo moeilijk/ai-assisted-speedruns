@@ -60,6 +60,9 @@ export function connectObs({ url = "ws://127.0.0.1:4455", password = "", eventSu
           waits.add(done);
         });
       },
+      /** Closes the connection and resolves once it is closed (at most 3 s). Awaiting it matters: a caller that
+       *  goes on to block this process (spawnSync) before the socket is closed leaves OBS waiting for it, and OBS
+       *  then takes about two minutes to exit (measured 2026-09-25). */
       close() {
         for (const p of pending.values()) {
           clearTimeout(p.t);
@@ -67,7 +70,12 @@ export function connectObs({ url = "ws://127.0.0.1:4455", password = "", eventSu
         }
         pending.clear();
         for (const done of [...waits]) done(null);
-        ws.close();
+        return new Promise((res) => {
+          if (ws.readyState === WebSocket.CLOSED) return res();
+          const t = setTimeout(res, 3000);
+          ws.addEventListener("close", () => { clearTimeout(t); res(); }, { once: true });
+          ws.close();
+        });
       },
     };
     ws.addEventListener("error", () => {

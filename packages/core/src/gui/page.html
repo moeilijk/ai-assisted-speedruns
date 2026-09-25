@@ -124,7 +124,7 @@
   <p class="muted" style="margin:10px 0 0">The report opens a new issue that asks for the lines from the window the GUI ran in — that is where the reason is. What this page knows (version, address, browser, its own log if it had one) is filled in; read it over before you send it, it names folders and tools of this machine.</p>
 </div></div>
 <header>
-  <div class="brand"><h1>AI Assisted Speedruns</h1><span class="ver" id="ver">tooling %VERSION%</span></div>
+  <div class="brand"><h1>AI Assisted Speedruns</h1><span class="ver" id="ver">tooling %VERSION%</span><span class="feedback fail" id="stale" style="margin:0 0 0 12px"></span></div>
   <nav><button id="tab-run" class="on">Run</button><button id="tab-setup">Setup</button></nav>
 </header>
 <main>
@@ -135,6 +135,8 @@
       <label class="f">Game<select id="game"></select></label>
       <label class="f">Played by<select id="playedby"><option value="scripted">The game's script (mock run)</option><option value="ai">An AI</option></select></label>
       <label class="f" id="aifield">AI<select id="ai"></select></label>
+      <label class="f" id="modelfield">Model<input id="model" placeholder="the AI's own default" autocomplete="off" spellcheck="false"></label>
+      <label class="f" id="effortfield">Effort<select id="effort"><option value="">the AI's own default</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label>
       <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Recording<select id="recorder"></select></label>
@@ -206,9 +208,10 @@ const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<
 // The same outcome stands in the log, written there by the GUI itself.
 const now = () => new Date().toTimeString().slice(0, 8);
 function feedback(id, state, text) { const el = $(id); if (!el) return; el.className = `feedback ${state}`; el.textContent = `${now()} ${text}`; }
-async function act(id, busyText, fn) {
+// `done` says what happened when the GUI's answer carries no sentence of its own: never a bare "Done".
+async function act(id, busyText, fn, done) {
   feedback(id, "busy", busyText);
-  try { const j = await fn(); feedback(id, "ok", j?.message ?? "Done."); return j; }
+  try { const j = await fn(); feedback(id, "ok", j?.message ?? done); return j; }
   catch (e) { feedback(id, "fail", `Not done: ${e.message}`); return null; }
 }
 
@@ -273,11 +276,13 @@ function fillRuntime() {
   if (!nameTouched) $("runname").value = "";
   if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
   if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
+  // The model and its effort belong to an AI run; a mock run plays the game's script and asks no model anything.
+  for (const f of ["modelfield", "effortfield"]) $(f).style.display = rt === "scripted" ? "none" : "";
   refreshPlan();
 }
 // The run type the harness knows: the script, or the agent that plays. The AI field means one or the other.
 const runtimeId = () => ($("playedby").value === "scripted" ? "scripted" : $("ai").value);
-const choices = () => ({ game: $("game").value, runtime: runtimeId(), ai: $("ai").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value });
+const choices = () => ({ game: $("game").value, runtime: runtimeId(), ai: $("ai").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value, model: $("model").value.trim(), effort: $("effort").value });
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);
@@ -293,7 +298,7 @@ function refreshPlan() {
     } catch (e) { $("cmds").textContent = e.message; }
   }, 120);
 }
-for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed", "runname"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
+for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed", "runname", "model", "effort"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
   if (id === "ai") aiTouched = true; if (id === "goal") goalTouched = true; if (id === "game") goalTouched = false; if (id === "game") fillGame(); else if (id === "playedby") fillPlayedBy(); else if (id === "ai") fillRuntime(); else refreshPlan(); });
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
@@ -301,7 +306,7 @@ $("start").onclick = async () => {
   // The one question, the first time: without an account, may the proof be recorded anonymously?
   if (!proof.signedIn && !proof.answered) {
     const yes = confirm("Record proof of your runs with the Archive, anonymously?\n\nBefore each part of a run the tool fetches a ticket from ai-assisted-speedruns.org, and every hour it sends one hash of the run's logs. Nothing about you or the run goes with it.\n\nOK: yes, anonymously. Cancel: no, runs are unsigned. You can sign in instead at any time.");
-    await act("runmsg", "Saving your answer…", () => api("/api/proof-answer", { anonymous: yes }));
+    await act("runmsg", "Saving your answer…", () => api("/api/proof-answer", { anonymous: yes }), yes ? "Runs record their proof anonymously from now on." : "Runs are unsigned from now on.");
     await loadProof();
   }
   if (proof.mode === "off" && !confirm("This run is unsigned: the Archive accepts it and marks it unsigned. Start?")) { feedback("runmsg", "busy", "Cancelled; nothing was started."); return; }
@@ -367,7 +372,7 @@ function showState(s) {
 }
 $("result").onclick = (e) => {
   const p = e.target.dataset?.open;
-  if (p) act("runmsg", "Opening…", () => api("/api/open", { path: p }));
+  if (p) act("runmsg", "Opening…", () => api("/api/open", { path: p }), `Opened ${p} in Explorer.`);
   const cr = e.target.dataset?.continue;
   if (cr) {
     if (proof.mode === "off" && !confirm("This part of the run is unsigned: the Archive accepts it and marks it unsigned. Continue?")) { feedback("runmsg", "busy", "Cancelled; the run was not continued."); return; }
@@ -375,7 +380,7 @@ $("result").onclick = (e) => {
   }
   const z = e.target.dataset?.upload;
   if (z && !confirm("Upload this bundle to the Archive under your account? The zip carries the run's logs in a private part, which the Archive uses to check the proof and deletes after its decision.")) feedback("runmsg", "busy", "Cancelled; nothing was uploaded.");
-  else if (z) act("runmsg", "Uploading to the Archive…", () => api("/api/archive", { action: "upload", arg: z }));
+  else if (z) act("runmsg", "Uploading to the Archive…", () => api("/api/archive", { action: "upload", arg: z }), "Upload sent; the Archive's answer stands in the log below.");
 };
 // The archive: signed in or not, how runs record their proof, and the tickets of this machine's runs.
 let proof = { signedIn: false, answered: true, mode: "off", tickets: [] };
@@ -401,7 +406,7 @@ $("proof").onclick = async (e) => {
   const busy = { login: "Signing in: finish it in the browser window that opens…", logout: "Signing out…", "proof-off": "Saving…", "proof-anonymous": "Saving…", extend: `Extending ticket ${ticket?.slice(0, 8)}…`, revoke: `Revoking ticket ${ticket?.slice(0, 8)}…`, delete: `Deleting ticket ${ticket?.slice(0, 8)}…` }[action];
   await act("archivemsg", busy, () => (action === "proof-off" || action === "proof-anonymous"
     ? api("/api/proof-answer", { anonymous: action === "proof-anonymous" })
-    : api("/api/archive", ticket ? { action, arg: ticket } : { action })));
+    : api("/api/archive", ticket ? { action, arg: ticket } : { action })), { login: "Signed in.", logout: "Signed out.", "proof-off": "Runs are unsigned from now on.", "proof-anonymous": "Runs record their proof anonymously from now on.", extend: `Ticket ${ticket?.slice(0, 8)} extended.`, revoke: `Ticket ${ticket?.slice(0, 8)} revoked.`, delete: `Ticket ${ticket?.slice(0, 8)} deleted.` }[action]);
   loadProof();
 };
 function addLine(l) {
@@ -512,7 +517,8 @@ const envOf = (id) => setup.items.find((i) => i.id === id)?.env;
 async function saveValue(key, value) {
   const item = setup.items.find((i) => i.env === key) ?? setup.items.find((i) => i.id === key);
   const j = await api("/api/settings", { values: { [item.env]: value }, paths: item.kind === "dir" || item.kind === "file" ? [item.env] : [] });
-  await loadSetup();
+  // A setting can change what the Run tab offers (a game's profile brings its own goals): both tabs are read again.
+  await Promise.all([loadSetup(), loadGames()]);
   return j;
 }
 $("groups").addEventListener("click", async (e) => {
@@ -524,14 +530,14 @@ $("groups").addEventListener("click", async (e) => {
     let j = null;
     if (t.dataset.save) { rowFeedback(key, "busy", "Saving…"); j = await saveValue(t.dataset.save, $(`v-${t.dataset.save}`).value.trim()); }
     else if (t.dataset.use) { rowFeedback(key, "busy", "Saving…"); j = await saveValue(t.dataset.use, t.dataset.value); }
-    else if (t.dataset.fix) { const label = t.textContent; t.disabled = true; t.textContent = "Working…"; rowFeedback(key, "busy", `${label}: working; each step follows in the log on the Run tab…`); j = await api("/api/fix", { id: t.dataset.fix }); await loadSetup(); }
+    else if (t.dataset.fix) { const label = t.textContent; t.disabled = true; t.textContent = "Working…"; rowFeedback(key, "busy", `${label}: working; each step follows in the log on the Run tab…`); j = await api("/api/fix", { id: t.dataset.fix }); await Promise.all([loadSetup(), loadGames()]); }
     else if (t.dataset.browse) {
       const picked = await browse($(`v-${t.dataset.browse}`).value, t.dataset.kind, t.dataset.expect);
       if (!picked) { rowFeedback(key, "busy", "Nothing chosen; the setting is as it was."); return; }
       rowFeedback(key, "busy", "Saving…");
       j = await saveValue(t.dataset.browse, picked);
     } else return;
-    rowFeedback(key, "ok", j?.message ?? "Done.");
+    rowFeedback(key, "ok", j?.message ?? (t.dataset.fix ? `${t.dataset.fix}: finished; the row is checked again.` : `Saved ${key}; the row is checked again.`));
   } catch (err) { rowFeedback(key, "fail", `Not done: ${err.message}`); await loadSetup().catch(() => {}); }
 });
 $("groups").addEventListener("change", async (e) => {
@@ -541,12 +547,12 @@ $("groups").addEventListener("change", async (e) => {
   try {
     let j = null;
     if (t.dataset.autosave) { rowFeedback(key, "busy", "Saving…"); j = await saveValue(t.dataset.autosave, t.type === "checkbox" ? (t.checked ? "1" : "") : t.value); }
-    else if (t.dataset.display !== undefined) { rowFeedback(key, "busy", "Saving…"); const o = t.selectedOptions[0]; j = await api("/api/settings", { display: t.value, displaySize: o?.dataset.size ?? "" }); await loadSetup(); }
+    else if (t.dataset.display !== undefined) { rowFeedback(key, "busy", "Saving…"); const o = t.selectedOptions[0]; j = await api("/api/settings", { display: t.value, displaySize: o?.dataset.size ?? "" }); await Promise.all([loadSetup(), loadGames()]); }
     else return;
-    rowFeedback(key, "ok", j?.message ?? "Saved.");
+    rowFeedback(key, "ok", j?.message ?? `Saved ${key}.`);
   } catch (err) { rowFeedback(key, "fail", `Not saved: ${err.message}`); }
 });
-$("recheck").onclick = async () => { $("recheck").textContent = "Check again"; await act("setupmsg", "Asking for the checks…", () => api("/api/check", {})); };
+$("recheck").onclick = async () => { $("recheck").textContent = "Check again"; await act("setupmsg", "Asking for the checks…", () => api("/api/check", {}), "Checking every row; each result appears in its row and in the log."); };
 
 // Folder and file picker (the browser cannot hand full paths to the page, so the harness lists them)
 function browse(start, kind, expect) {
@@ -596,6 +602,12 @@ function browse(start, kind, expect) {
   ev.addEventListener("line", (e) => addLine(JSON.parse(e.data)));
   ev.addEventListener("check", (e) => updateRow(JSON.parse(e.data)));
 })().catch(() => showLive(false));
+// The tooling on disk changed since this GUI started (an update): its buttons would run the new commands behind an old
+// page and server, so the page says so and names the fix.
+async function checkStale() {
+  try { const g = await api("/api/gui"); $("stale").textContent = g.stale ? "The tooling was updated since this GUI started: close the GUI and start it again (AAS.cmd or npm run gui)." : ""; } catch { /* the offline banner covers a GUI that is gone */ }
+}
+checkStale(); setInterval(checkStale, 60000);
 (() => { let tab = new URLSearchParams(location.search).get("tab"); try { tab = tab || localStorage.getItem("aas-tab"); } catch {} if (tab === "setup") $("tab-setup").click(); })();
 </script>
 </body>

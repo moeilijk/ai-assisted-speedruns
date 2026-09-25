@@ -1,6 +1,8 @@
 // What the GUI's Start and Stop do. Every step is one of the harness's own commands, run as a child process and
 // shown in the log with the command line, so whatever the GUI does can be done (and continued) from a shell.
-// One session at a time: start the game, OBS and LiveSplit, run `aas run`, then `aas timeline` and `aas publish`.
+// One session at a time: start the game, OBS and LiveSplit, run `aas run` (which makes the timeline and the cut), then
+// `aas publish`.
+import { checkEffort, checkInside, checkModel, checkName, checkNumber, checkSeed } from "../validate.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -94,12 +96,13 @@ export function createSession() {
     const setup = g.plugin.setup;
     const runtime = RUNTIMES.find((r) => r.id === opts.runtime);
     if (!runtime) throw new Error(`Unknown run type: ${opts.runtime}`);
-    const run = String(opts.run || nextRunName(setup.folder, runtime.prefix)).trim();
+    const run = checkName("Run name", String(opts.run || nextRunName(setup.folder, runtime.prefix)).trim());
     const runDir = output ? path.join(output, setup.folder, run) : `<output>/${setup.folder}/${run}`;
     const pub = output ? path.join(output, setup.folder, "public", run) : `<output>/${setup.folder}/public/${run}`;
     // Without a goal from the page: the game's own end for an AI run, its first end for a mock run, which is a
     // test of the machine and not an attempt (owner, 2026-09-19). The runtime plugin says which of the two it is.
     const runtimePlugin = await loadRuntime(runtime.id).catch(() => null);
+    if (opts.goal && !g.plugin.ends.some((e) => e.id === opts.goal)) throw new Error(`Goal ${JSON.stringify(String(opts.goal)).slice(0, 60)} is not one of ${g.plugin.name}'s ends: ${g.plugin.ends.map((e) => e.id).join(", ")}`);
     const goal = opts.goal || (runtimePlugin?.ai === true ? g.plugin.ends.find((e) => e.final)?.id : g.plugin.ends[0]?.id);
     const livesplit = Boolean(env.AAS_LIVESPLIT_EXE) && fs.existsSync(toLocal(env.AAS_LIVESPLIT_EXE));
     const splits = setup.splits?.[goal];
@@ -108,9 +111,13 @@ export function createSession() {
     const recorder = await loadRecorder(recorderId);
     const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
     if (runtime.id === "scripted") runArgs.push("--bot", setup.bot);
-    if (opts.maxMinutes) runArgs.push("--max-minutes", String(Number(opts.maxMinutes)));
+    if (opts.maxMinutes) runArgs.push("--max-minutes", String(checkNumber("Time limit (minutes)", opts.maxMinutes, { min: 0.01 })));
+    // The model and its effort go to an AI run only, as `aas run` takes them (--model, --effort); empty is the AI's
+    // own default. A mock run asks no model anything.
+    if (runtime.id !== "scripted" && opts.model) runArgs.push("--model", checkModel(String(opts.model)));
+    if (runtime.id !== "scripted" && opts.effort) runArgs.push("--effort", checkEffort(opts.effort));
     // A game without a seed never gets one, whatever the page sends.
-    if (opts.seed && setup.seed) runArgs.push("--seed", String(opts.seed));
+    if (opts.seed && setup.seed) runArgs.push("--seed", checkSeed(String(opts.seed)));
     // Long command lines are shown one option per line (bash continuation), so they stay readable and still paste.
     const shownArgs = (args) => {
       const words = args.map((a) => (a === g.file || a === setup.bot ? rel(a) : q(a)));
@@ -139,7 +146,7 @@ export function createSession() {
     return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
 
-  /** Runs a session's steps in order: the checks, the game, the recorder, LiveSplit, the run, the timeline, the bundle. */
+  /** Runs a session's steps in order: the checks, the game, the recorder, LiveSplit, the run (with its timeline and cut), the bundle. */
   function execute(p, { runDir, pub }) {
     const { runtime } = p;
     const byId = Object.fromEntries(p.steps.map((st) => [st.id, st]));
@@ -164,12 +171,13 @@ export function createSession() {
         set({ phase: "finishing", step: "publish" });
         let outcome = null;
         try { outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8")); } catch { /* the run did not get that far */ }
-        const result = { status: outcome?.status ?? (runCode === 0 ? "unknown" : "failed"), notes: outcome?.notes ?? null, runDir: toWindows(runDir), recording: null, bundle: null };
+        // A stop before the session started leaves no outcome: that is the user's stop, not a failure.
+        const stoppedEarly = !outcome && /before the session started/.test(lastLine);
+        const result = { status: outcome?.status ?? (stoppedEarly ? "stopped before the session started" : runCode === 0 ? "unknown" : "failed"), notes: outcome?.notes ?? (stoppedEarly ? "the recording of those seconds was discarded; start again for a new run" : null), runDir: toWindows(runDir), recording: null, bundle: null };
         try { const rec = fs.readdirSync(path.join(runDir, "recording")).find((f) => /\.(mp4|mkv)$/i.test(f)); if (rec) result.recording = toWindows(path.join(runDir, "recording", rec)); } catch { /* no recording */ }
         // A run that ended before it started (a failed check) has closed nothing: close it here.
         if (!outcome && p.stop) { log("The run did not start; closing what was started.", "note"); await node(p.stop.args, p.stop.shown); }
         if (fs.existsSync(path.join(runDir, "run.jsonl")) && outcome) {
-          await node(byId.timeline.args, byId.timeline.shown);
           const code = await node(byId.publish.args, byId.publish.shown);
           if (fs.existsSync(`${pub}.zip`)) result.bundle = toWindows(`${pub}.zip`);
           if (code !== 0) log("The bundle does not meet every rule yet; see the check above.", "note");
@@ -190,7 +198,6 @@ export function createSession() {
     const { game: g, setup, runtime, run, runDir, pub, output } = p;
     if (!output || !fs.existsSync(output)) throw new Error("Choose an output location first (Setup).");
     if (runtime.id === "scripted" && !setup.bot) throw new Error(`${g.plugin.name} has no scripted player for a mock run.`);
-    if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/.test(run)) throw new Error("A run name may only have letters, digits, - and _.");
     if (fs.existsSync(runDir)) throw new Error(`${toWindows(runDir)} already exists; choose another run name.`);
     cancelled = false;
     set({ phase: "starting", step: "game", game: g.plugin.id, run, runDir: toWindows(runDir), runtime: runtime.id, startedAt: new Date().toISOString(), result: null });
@@ -206,6 +213,8 @@ export function createSession() {
   async function resume(runDirShown) {
     if (state.phase !== "idle") throw new Error("A session is already running.");
     const runDir = toLocal(runDirShown ?? "");
+    // Only a run in the output location: a run directory names the modules `aas resume` loads.
+    await checkInside("Run folder", runDir, toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
     if (!runDir || !fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run that has started.");
     const outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8"));
     if (outcome.status === "completed") throw new Error("This run reached its goal; there is nothing to continue.");
@@ -215,7 +224,8 @@ export function createSession() {
     const g = games.find((x) => x.plugin.id === (started.game ?? brief.category?.game));
     if (!g) throw new Error("The game of this run is not in this tooling.");
     const setup = g.plugin.setup;
-    const runtime = RUNTIMES.find((r) => r.id === brief.runtime) ?? { id: brief.runtime, label: brief.runtime };
+    const runtime = RUNTIMES.find((r) => r.id === brief.runtime);
+    if (!runtime) throw new Error(`This run was made with ${JSON.stringify(String(brief.runtime)).slice(0, 60)}, which the GUI does not run; continue it with aas resume.`);
     const recorderId = started.recorder ?? "obs";
     const recorder = await loadRecorder(recorderId);
     const livesplit = started.timer === "livesplit";
@@ -267,6 +277,11 @@ export function createSession() {
       delete: [["tickets", "delete", arg], `tickets delete ${arg}`],
       upload: [["upload", toLocal(arg ?? "")], `upload ${q(toLocal(arg ?? ""))}`],
     };
+    // Upload sends a file to the Archive: only a bundle (a .zip) from the output location.
+    if (action === "upload") {
+      if (!/\.zip$/i.test(String(arg ?? ""))) throw new Error("Only a bundle (.zip) can be uploaded.");
+      await checkInside("Bundle", toLocal(arg), toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
+    }
     const c = cmds[action];
     if (!c || (action !== "login" && action !== "logout" && !arg)) throw new Error(`Unknown action: ${action}`);
     if (!/^[0-9a-f]{32}$/.test(String(arg)) && ["extend", "revoke", "delete"].includes(action)) throw new Error("Not a ticket.");

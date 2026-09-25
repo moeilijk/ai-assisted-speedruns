@@ -118,7 +118,7 @@ test("a head the archive does not receive is logged, the run goes on, and a revi
   fs.writeFileSync(join(bundle, "proof.json"), JSON.stringify(publicProof(runDir)));
   const c = checkProof(bundle);
   assert.equal(c.status, "review");
-  assert.match(c.detail, /never reached the archive/);
+  assert.match(c.detail, /never reached the Archive/);
 });
 
 test("a run that has started is continued, never started again", async () => {

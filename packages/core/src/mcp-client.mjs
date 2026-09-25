@@ -131,9 +131,10 @@ export function startBroker({ gameModule, runDir, readable, endpoints, timeZone,
 }
 
 /** Load a game plugin module in-process (not sandboxed; for configuration and checks). */
-export async function loadGamePlugin(modulePath) {
+export async function loadGamePlugin(modulePath, { version = null } = {}) {
   const { pathToFileURL } = await import("node:url");
-  const loaded = await import(pathToFileURL(resolve(modulePath)).href);
+  // A version imports the module again (the GUI, after a game's settings changed: a plugin reads them when it loads).
+  const loaded = await import(`${pathToFileURL(resolve(modulePath)).href}${version ? `?v=${version}` : ""}`);
   const plugin = loaded.default ?? loaded;
   if (!plugin || typeof plugin.id !== "string") throw new Error(`${modulePath} does not export a GamePlugin.`);
   const { endsOf } = await import("./goal.mjs");

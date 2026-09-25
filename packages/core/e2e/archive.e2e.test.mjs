@@ -75,14 +75,14 @@ test("the live archive: a run with proof on its tickets, and the upload", { skip
     const a1 = await uploadBundle(good.zip);
     log(`signed: tickets ${good.state.tickets.map((t) => t.ticket).join(", ")}; submission ${a1.submission}; status ${a1.status}; proof ${a1.proof}; ${(a1.reasons ?? []).join("; ")}`);
     assert.equal(a1.proof, "signed", JSON.stringify(a1));
-    assert.equal(a1.status, "rejected", "a test upload is refused after the checks");
+    // Since 2026-09-25 the Archive takes an e2e upload in as a test (hidden, wiped within 24 h) instead of refusing it.
+    assert.equal(a1.status, "review", "a test upload is taken in for review, as a test");
     assert.equal(a1.test, true);
-    // The archive received every head it signed; a test upload leaves the tickets unsubmitted (nothing is kept).
+    // The archive received every head it signed.
     for (const t of good.state.tickets) {
       const info = await ticketInfo(t.ticket);
       assert.equal(info.heads, good.state.heads.filter((h) => h.segment === t.segment).length);
       assert.equal(info.forks, 0);
-      assert.equal(info.submitted_at, null);
     }
 
     // 2. The public timeline edited after it was made, manifest made again so the bundle is consistent: invalid.
@@ -106,12 +106,10 @@ test("the live archive: a run with proof on its tickets, and the upload", { skip
     const a3 = await uploadBundle(forked.zip);
     log(`fork: tickets ${forked.state.tickets.map((x) => x.ticket).join(", ")}; submission ${a3.submission}; proof ${a3.proof}; ${(a3.reasons ?? []).join("; ")}`);
     assert.equal(a3.proof, "review", JSON.stringify(a3));
-    // What this test made at the archive, removed again.
-    for (const r of [good, edited, forked]) for (const t of r.state.tickets) {
-      const d = await archiveFetch(`${proofUrl()}/api/v1/tickets/${t.ticket}`, { method: "DELETE", headers: { Accept: "application/json" }, signal: AbortSignal.timeout(15000) });
-      assert.equal(d.status, 200, `deleting ${t.ticket} answered ${d.status}`);
-    }
-    log("the test's tickets are deleted at the archive");
+    // What this test made at the archive, removed again: the e2e account's own wipe (tickets, submissions, files).
+    const d = await archiveFetch(`${proofUrl()}/api/v1/e2e/`, { method: "DELETE", headers: { Accept: "application/json" }, signal: AbortSignal.timeout(30000) });
+    assert.equal(d.status, 200, `the wipe answered ${d.status}`);
+    log(`the test's objects are wiped at the archive: ${JSON.stringify((await d.json()).removed)}`);
   } finally {
     useArchiveFetch(null);
     await spt.close?.();

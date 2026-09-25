@@ -13,28 +13,47 @@ import { pathToFileURL } from "node:url";
 import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
 import { formatDuration } from "./videos.mjs";
+import { checkNumber, checkTicket } from "./validate.mjs";
 export { brokerSpec, configure };
 
 // Settings come from two files: the game's own (.local/games/<game>.env) and the machine's (.env). The CLI loads
 // them itself, so the same command works from any shell; see settings.mjs for the order and why.
 const gameArg = (() => { const i = process.argv.indexOf("--game"); return i === -1 ? null : process.argv[i + 1]; })();
 loadSettings(gameArg);
+// A module whose `archiveFetch` authenticates every request to the Archive itself (useArchiveFetch), for a machine
+// whose account is reached that way. Everything the CLI sends to the Archive, and every CLI the GUI starts, uses it.
+if (process.env.AAS_ARCHIVE_FETCH) {
+  const { useArchiveFetch } = await import("./proof.mjs");
+  useArchiveFetch((await import(pathToFileURL(path.resolve(process.env.AAS_ARCHIVE_FETCH)).href)).archiveFetch);
+}
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
 const BOOLEAN_FLAGS = new Set(["upload", "keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
-function parse(argv) {
+// Flags whose value may be left out: `--verify` reads stdin, `--claim` alone asks for a claim, `--key` and `--sign`
+// alone mean the default key.
+const OPTIONAL_VALUE = new Set(["verify", "claim", "key", "sign", "video-url"]);
+// The one flag that may be given more than once (`--identity a --identity b`).
+const REPEATABLE = new Set(["identity"]);
+// Every option a command reads; anything else is a typo or a trick, and is refused instead of ignored.
+const VALUE_FLAGS = new Set(["game", "runtime", "run-dir", "timer", "recorder", "model", "effort", "max-turns", "max-minutes", "seed", "overlay-port", "out", "goal", "session", "prompt", "margin-before", "margin-after", "instructions", "build", "bot", "autosave-minutes", "attempt", "video", "save", "proof", "port", "note", "identity", "id", "crf", "completion-marker", "burn", "bundle", "max"]);
+// Options that are a number, checked here once for every command.
+const NUMBERS = { "max-turns": { integer: true, min: 1 }, "max-minutes": { min: 0.01 }, "overlay-port": { integer: true, min: 0, max: 65535 }, "autosave-minutes": { min: 0.001 }, port: { integer: true, min: 0, max: 65535 }, crf: { integer: true, min: 0, max: 51 }, "margin-before": { min: 0, max: 3600 }, "margin-after": { min: 0, max: 3600 }, attempt: { integer: true, min: 1 }, max: { min: 0, max: 100 } };
+export function parse(argv) {
   const opts = { _: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
     if (a.startsWith("--")) {
       const key = a.slice(2);
+      if (!BOOLEAN_FLAGS.has(key) && !OPTIONAL_VALUE.has(key) && !VALUE_FLAGS.has(key)) throw new Error(`unknown option --${key} (aas help lists the options)`);
       const next = argv[i + 1];
       const value = BOOLEAN_FLAGS.has(key) || next === undefined || next.startsWith("--") ? true : argv[++i];
-      // A flag given more than once collects its values (`--identity a --identity b`).
+      if (value === true && VALUE_FLAGS.has(key)) throw new Error(`--${key} needs a value`);
+      if (key in opts && !REPEATABLE.has(key)) throw new Error(`--${key} is given more than once`);
       if (key in opts) opts[key] = [].concat(opts[key], value);
       else opts[key] = value;
     } else opts._.push(a);
   }
+  for (const [k, rule] of Object.entries(NUMBERS)) if (k in opts) checkNumber(`--${k}`, opts[k], rule);
   return opts;
 }
 
@@ -55,8 +74,9 @@ function runEnded(what, status, files, seconds) {
 
 if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") || process.argv[1]?.endsWith("\\aas")) {
   const [command, ...rest] = process.argv.slice(2);
-  const opts = parse(rest);
+  let opts = { _: [] };
   try {
+    opts = parse(rest);
     switch (command) {
       case "configure": {
         const r = await configure(opts);
@@ -105,6 +125,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       case "budget": {
         // Every runtime that runs on a plan reports its own stand; nothing here knows the plans by name.
         const { PACKAGES, loadRuntime } = await import("./plugins.mjs");
+        // --max: the share of the week this check holds runs to, instead of AAS_BUDGET_WEEKLY_MAX.
+        if (opts.max !== undefined) process.env.AAS_BUDGET_WEEKLY_MAX = String(opts.max);
         let stop = false;
         for (const dir of fs.readdirSync(PACKAGES).filter((d) => d.startsWith("runtime-")).sort()) {
           try {
@@ -197,6 +219,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         const file = path.join(path.resolve(runDir), "run.pid");
         if (!fs.existsSync(file)) { console.log("no session is running in this run directory"); break; }
         const { pid } = JSON.parse(fs.readFileSync(file, "utf8"));
+        // The file is only a pointer: a pid that is not a single other process (0 and negative pids signal whole
+        // process groups) is refused, never signalled.
+        if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid) throw new Error(`${file} names pid ${JSON.stringify(pid)}, which is not a session's process; nothing was signalled`);
         const alive = () => { try { process.kill(pid, 0); return true; } catch { return false; } };
         if (!alive()) { fs.rmSync(file, { force: true }); console.log(`the session (pid ${pid}) is no longer running`); break; }
         process.kill(pid, "SIGINT");
@@ -207,7 +232,16 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "login": {
         const { login } = await import("./auth.mjs");
-        const c = await login();
+        // Requests that authenticate themselves (AAS_ARCHIVE_FETCH) need no person at the Archive's page: the Archive
+        // answers the signed authorize request with the redirect to this machine, which is followed here.
+        const open = process.env.AAS_ARCHIVE_FETCH ? async (url) => {
+          const { currentArchiveFetch } = await import("./proof.mjs");
+          const r = await currentArchiveFetch()(url, { redirect: "manual", signal: AbortSignal.timeout(15000) });
+          const to = r.headers.get("location");
+          if (r.status !== 303 || !to?.startsWith("http://127.0.0.1:")) throw new Error(`the Archive answered the sign-in with ${r.status}${to ? ` to ${new URL(to, url).pathname}` : ""}, not with the way back to this machine`);
+          await fetch(to, { signal: AbortSignal.timeout(15000) });
+        } : undefined;
+        const c = await login(open ? { open } : {});
         console.log(`signed in to ${c.archive}; runs record their proof under this account from now on`);
         break;
       }
@@ -228,6 +262,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
           break;
         }
         if (!["extend", "revoke", "delete"].includes(action) || !id) throw new Error("Usage: aas tickets [extend|revoke|delete <ticket>]");
+        checkTicket(id);
         const t = list.find((x) => x.ticket === id);
         if (!t) throw new Error(`${id} is not a ticket of this machine (aas tickets lists them)`);
         const answer = await proofClient({ token: t.account ? () => accessToken() : async () => null }).manage(t, action);
@@ -288,6 +323,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         break;
       }
       default:
+        // An unknown command says so first; no command at all is a request for this help.
+        if (command && command !== "help") console.error(`unknown command: ${command}\n`);
         console.error(
           [
             "Usage:",
@@ -314,7 +351,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas scan <dir>",
           ].join("\n"),
         );
-        process.exitCode = command ? 1 : 0;
+        process.exitCode = command && command !== "help" ? 1 : 0;
     }
   } catch (error) {
     console.error(`FAIL: ${error.message}`);

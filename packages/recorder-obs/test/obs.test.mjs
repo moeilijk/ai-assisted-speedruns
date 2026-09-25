@@ -145,3 +145,18 @@ test("recorder-obs: a game capture OBS cannot render at all refuses the run inst
     await obs.close();
   }
 });
+
+test("close() resolves once the connection is really closed, so a caller that then blocks leaves OBS nothing to wait for", async () => {
+  const fake = await startFakeObs();
+  try {
+    const o = await connectObs({ url: fake.url, password: "secret" });
+    assert.equal(fake.clientCount(), 1);
+    const closing = o.close();
+    assert.ok(closing instanceof Promise, "close() can be awaited");
+    await closing;
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(fake.clientCount(), 0, "OBS's side of the connection is gone when close() has resolved");
+  } finally {
+    await fake.close();
+  }
+});

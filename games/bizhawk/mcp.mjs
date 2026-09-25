@@ -3,7 +3,7 @@
 // node:http (json-rpc-http.mjs), because the broker blocks `fetch` and lets node:http reach only the declared endpoint.
 import { jsonRpcClient } from "../../packages/core/src/json-rpc-http.mjs";
 
-const url = new URL(process.env.AAS_BIZHAWK_MCP_URL || "http://127.0.0.1:8767/mcp/");
+export const url = new URL(process.env.AAS_BIZHAWK_MCP_URL || "http://127.0.0.1:8767/mcp/");
 const clients = new Map();
 const client = (timeoutMs) => {
   if (!clients.has(timeoutMs)) clients.set(timeoutMs, jsonRpcClient({ host: url.hostname, port: Number(url.port), path: url.pathname, timeoutMs }));

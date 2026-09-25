@@ -290,3 +290,17 @@ test("a run keeps one identifier across renames and republications, and the name
   assert.equal(second.summary.bundle.revision, 2, "the counter belongs to the run, so it carries over the rename");
   assert.equal(JSON.parse(readFileSync(join(dir, "second-name", "manifest.json"), "utf8")).run_uid, uid);
 });
+
+test("a stop before the agent session has started is noted, not fatal, and stops the start at the next clean point", async () => {
+  const { earlyStop } = await import("../src/run.mjs");
+  const lines = [];
+  const early = earlyStop((t) => lines.push(t));
+  try {
+    early.check();
+    process.emit("SIGINT", "SIGINT");
+    assert.throws(() => early.check(), /stopped by the user \(SIGINT\) before the session started/);
+    assert.match(lines[0], /^SIGINT: stopping before the session starts/);
+  } finally {
+    assert.equal(early.release(), "SIGINT");
+  }
+});

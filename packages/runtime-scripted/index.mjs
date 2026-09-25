@@ -18,7 +18,7 @@ export default {
   /** a script plays, not a model: every run of this runtime is a mock. */
   ai: false,
   name: "Scripted bot",
-  version: "0.32.0",
+  version: "0.33.8",
   interrupt(reason) { interrupted = reason; },
   async configure(runDir, broker, brief) {
     const bot = brief.bot ?? process.env.AAS_BOT ?? null;
@@ -34,7 +34,9 @@ export default {
   },
   /** The session log this runtime writes into the run directory: what the run's proof covers. */
   sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
-  async start(runDir, brief) {
+  /** `checkpoint` (from the harness): reads the run log and acts on it, so a goal or a stop reached by the step just
+   *  taken ends the session before the next step, however fast the player is. */
+  async start(runDir, brief, { checkpoint = null } = {}) {
     interrupted = null;
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".scripted-broker.json"), "utf8"));
     const botPath = brief.bot ?? spec.bot ?? process.env.AAS_BOT;
@@ -64,6 +66,7 @@ export default {
         if (r.isError) result = { error: text };
         else { try { result = JSON.parse(text); } catch { result = { text }; } }
         if (steps % 50 === 0) log(`${steps} steps${step.note ? `; last: ${step.note}` : ""}`);
+        await checkpoint?.();
       }
       if (interrupted) notes = `interrupted: ${interrupted}`;
       if (steps >= maxSteps) notes = `step budget of ${maxSteps} reached`;

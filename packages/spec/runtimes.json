@@ -12,16 +12,16 @@
     {
       "id": "codex",
       "name": "Codex",
-      "version": "0.32.1",
+      "version": "0.33.8",
       "ai": true,
-      "sha256": "5cb63357baa1835dc81d41d50ac52db12d27344dd5c7863961db310fa97267b3"
+      "sha256": "62450b9938827f5e194dc0dd40663d036804c5e9c34f8db5cf573e5a32fc0f97"
     },
     {
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.32.0",
+      "version": "0.33.8",
       "ai": false,
-      "sha256": "e0e2ab2b9d951e157b36fb5cfdd1d097697fc13764ba56262454f6890ea79c8d"
+      "sha256": "0ad0480450644b346b0f5f9941816c37793e69c46fe2ba67bda0cdabdd47f1d3"
     }
   ]
 }
