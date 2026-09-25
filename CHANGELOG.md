@@ -12,6 +12,29 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.6 — 2026-09-25
+
+- **The Setup tab shows what BizHawk and FCEUX use.** 0.33.5 fixed only the Run tab: the Setup rows still read
+  their folder and ROM from `.env` alone, so they stood empty and unchecked while the plugins ran from their install
+  folder and the profile's ROM in `.local/roms`. A row now shows that default in its empty box, and its check uses it.
+  A check result is kept under what was checked, the first setting's value or its default, so a result from before
+  the default is not shown for it, and every row of a game shows the game's one check.
+- **Save on a game's second row saved into its first.** The rows of a game shared one id, and Save, Browse and "Use
+  this" found a row by it: saving BizHawk's or FCEUX's ROM wrote the ROM's path into the emulator folder's setting.
+  A row's box and buttons now go by its own setting; a check result updates every row of its game; the conditions
+  and the install button stand once, under the game's first row; long button labels wrap inside the page.
+- **The GUI checks what it finds in a standard location.** At start, a row that shows a default location and has no
+  kept result for it is checked once in the background (owner, 2026-09-25: those places may always be looked at);
+  every other row keeps its kept result or waits for its button, as before.
+
+- **What a run costs, in the README and in `aas run`.** The archive's text on the cost of a run (owner, 2026-09-23;
+  "dearer" became "more expensive" on 2026-09-25) stands in the README under "What a run costs", and `aas run` logs
+  it before a run with a model starts. `packages/core/src/cost-text.mjs` holds it; a test keeps the README equal.
+
+- **CONTRIBUTING.md and CLAUDE.md.** How to contribute: an issue first for a design choice, one subject per pull
+  request, tests, CHANGELOG, docs and versions in the same pull request, and what was measured. CLAUDE.md adds for an
+  AI assistant where things run and how work is checked, including the GUI tried with Playwright.
+
 ## 0.33.5 — 2026-09-25
 
 - **A run makes its own cut.** `aas run` and `aas resume` make the timeline and the cut (the video without the

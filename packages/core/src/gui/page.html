@@ -65,7 +65,9 @@
   .setting:first-of-type { border-top: 0; }
   .setting .name { font-weight: 600; }
   .setting .field { display: flex; gap: 8px; flex-wrap: wrap; }
-  .setting .field input, .setting .field select { flex: 1 1 280px; }
+  .setting .field input, .setting .field select { flex: 1 1 280px; min-width: 0; }
+  .setting .field button.b { white-space: normal; text-align: left; }
+  .setting > * { min-width: 0; }
   .setting .detail { grid-column: 2; font-size: 13px; }
   .suggest { grid-column: 2; font-size: 13px; }
   .suggest button { margin-left: 6px; }
@@ -412,14 +414,24 @@ async function loadSetup() {
 /** One row came back from its check (or went pending): replace just that row, keep what is typed elsewhere. */
 function updateRow(item) {
   if (!setup) return;
-  const i = setup.items.findIndex((x) => x.id === item.id);
-  if (i < 0) return;
-  setup.items[i] = item;
-  const el = document.querySelector(`.setting[data-id="${CSS.escape(item.id)}"]`);
-  if (!el) return;
-  const typed = document.activeElement && el.contains(document.activeElement) ? document.activeElement.value : null;
-  el.outerHTML = row(item);
-  if (typed !== null) { const f = $(`v-${item.id}`); if (f) { f.value = typed; f.focus(); } }
+  // A check result belongs to every row of that check (a game's rows share one); each row keeps its own setting.
+  const RESULT = ["status", "detail", "tests", "fix", "suggest", "suggestSource", "at", "options"];
+  const rows = setup.items.map((x, n) => [x, n]).filter(([x]) => x.id === item.id);
+  if (!rows.length) return;
+  for (const [x, n] of rows) {
+    const merged = { ...x };
+    for (const k of RESULT) if (k in item) merged[k] = item[k];
+    setup.items[n] = merged;
+  }
+  for (const [, n] of rows) {
+    const x = setup.items[n];
+    const el = document.querySelector(`.setting[data-id="${CSS.escape(x.id)}"][data-env="${CSS.escape(x.env ?? "")}"]`);
+    if (!el) continue;
+    const key = x.env || x.id;
+    const typed = document.activeElement && el.contains(document.activeElement) ? document.activeElement.value : null;
+    el.outerHTML = row(x);
+    if (typed !== null) { const f = $(`v-${key}`); if (f) { f.value = typed; f.focus(); } }
+  }
   if (!setup.checked && item.status !== "pending" && item.status !== "unchecked") { setup.checked = true; $("recheck").textContent = "Check again"; $("checkinfo").textContent = ""; }
 }
 // What a row is for: this part of the machine can be used in a run. So the status says whether it can, and the
@@ -438,22 +450,26 @@ const STATUS = {
   // says something about us rather than about the machine is not a status.
 };
 function row(i) {
+  // The rows of one game share its check (i.id); what a row sets is its own setting, so its box and buttons are keyed
+  // by that setting (i.env). Only the game's first row shows the check's conditions and its install button.
+  const key = i.env || i.id;
+  const first = setup.items.find((x) => x.id === i.id) === i;
   let field = "";
   // An empty box that says "folder" asks the question instead of answering it: the setting says which folder.
-  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${i.id}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? (i.expect ? `the folder with ${i.expect} in it` : "a folder on this machine") : i.expect ? `the path to ${i.expect}` : "a file on this machine"))}" spellcheck="false"><button class="b" data-browse="${i.id}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${i.id}">Save</button>`;
-  else if (i.kind === "select") field = `<select id="v-${i.id}" data-autosave="${i.id}">${i.options.map((o) => `<option value="${esc(o.value)}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
-  else if (i.kind === "display") field = `<select id="v-${i.id}" data-display="1"><option value="">Where Windows puts it</option>${i.options.map((o) => `<option value="${esc(o.value)}" data-size="${o.width}x${o.height}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
-  else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${i.id}" data-autosave="${i.id}" ${i.value ? "checked" : ""}> on</label>`;
+  if (i.kind === "dir" || i.kind === "file") field = `<input id="v-${key}" value="${esc(i.value)}" placeholder="${esc(i.placeholder ?? (i.kind === "dir" ? (i.expect ? `the folder with ${i.expect} in it` : "a folder on this machine") : i.expect ? `the path to ${i.expect}` : "a file on this machine"))}" spellcheck="false"><button class="b" data-browse="${key}" data-kind="${i.kind}" data-expect="${esc(i.expect ?? "")}">Browse…</button><button class="b" data-save="${key}">Save</button>`;
+  else if (i.kind === "select") field = `<select id="v-${key}" data-autosave="${key}">${i.options.map((o) => `<option value="${esc(o.value)}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+  else if (i.kind === "display") field = `<select id="v-${key}" data-display="1"><option value="">Where Windows puts it</option>${i.options.map((o) => `<option value="${esc(o.value)}" data-size="${o.width}x${o.height}" ${o.value === i.value ? "selected" : ""}>${esc(o.label)}</option>`).join("")}</select>`;
+  else if (i.kind === "check") field = `<label><input type="checkbox" id="v-${key}" data-autosave="${key}" ${i.value ? "checked" : ""}> on</label>`;
   else field = `<span class="path">${esc(i.value || "—")}</span>`;
-  const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${i.id}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
+  const suggest = i.suggest ? `<div class="suggest muted">Found${i.suggestSource ? ` in ${esc(i.suggestSource)}` : ""}: <span class="path">${esc(i.suggest)}</span><button class="b" data-use="${key}" data-value="${esc(i.suggest)}">Use this</button></div>` : "";
   // A button names what it does, and the command it runs stands under it: nothing here happens unnamed.
-  const fix = i.fix ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
-  const fixCommand = i.fix?.command ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
+  const fix = i.fix && first ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
+  const fixCommand = i.fix?.command && first ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
   const what = i.what ? `<div class="what muted">${linkFiles(i.what)}</div>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
     <div><div class="name">${esc(i.label)}</div>${i.status && STATUS[i.status] ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status]}</span>` : ""}${what}</div>
     <div class="field">${field}${fix}</div>
-    <div class="detail muted">${i.tests?.length ? "" : esc(i.detail)}</div>${tests(i)}${suggest}${fixCommand}</div>`;
+    <div class="detail muted">${!first || i.tests?.length ? "" : esc(i.detail)}</div>${first ? tests(i) : ""}${suggest}${fixCommand}</div>`;
 }
 // What a row really establishes: every condition it tried, with its outcome. Whatever is not in this list was not
 // established — so the list is complete, and naming a few unproved things next to it would suggest the rest is
@@ -467,8 +483,8 @@ function tests(i) {
   return rows.length ? `<ul class="tests">${rows.join("")}</ul>` : "";
 }
 const envOf = (id) => setup.items.find((i) => i.id === id)?.env;
-async function saveValue(id, value) {
-  const item = setup.items.find((i) => i.id === id);
+async function saveValue(key, value) {
+  const item = setup.items.find((i) => i.env === key) ?? setup.items.find((i) => i.id === key);
   await api("/api/settings", { values: { [item.env]: value }, paths: item.kind === "dir" || item.kind === "file" ? [item.env] : [] });
   await loadSetup();
 }

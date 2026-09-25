@@ -88,11 +88,14 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   try { cache = JSON.parse(fs.readFileSync(cacheFile, "utf8")); } catch { /* no results yet */ }
   const saveCache = () => { try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 2)); } catch { /* not kept */ } };
   const pending = new Set();
+  // A result belongs to what was checked: the value, or for an empty row the default it falls back to, so a result
+  // from before a plugin had a default is not shown for it.
+  const checkedValue = (item) => item.checkKey ?? (item.value || item.placeholder || "");
   const withResult = (item) => {
     if (item.check === false) return item;
     if (pending.has(item.id)) return { ...item, status: "pending", detail: "" };
     const c = cache[item.id];
-    if (!c || c.value !== item.value) return { ...item, status: "unchecked", detail: "" };
+    if (!c || c.value !== checkedValue(item)) return { ...item, status: "unchecked", detail: "" };
     return { ...item, ...c.result, value: item.value, options: c.result.options ?? item.options, at: c.at };
   };
   // Every check is a child process (checks.mjs <id>), a few at a time; each result is pushed to the page when it is in.
@@ -113,7 +116,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         try { result = JSON.parse(out); } catch { result = { status: "fail", detail: "The check did not answer." }; }
         const item = (await configItems()).find((i) => i.id === id);
         if (item) {
-          cache[id] = { value: item.value, result, at: new Date().toTimeString().slice(0, 8) };
+          cache[id] = { value: checkedValue(item), result, at: new Date().toTimeString().slice(0, 8) };
           saveCache();
           emitAll("check", withResult(item));
         }
@@ -273,6 +276,10 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   process.once("exit", forget);
   log(`aas gui: ${address}  (Ctrl-C ends the GUI: a running session is stopped first, saved, with its recording)`);
   if (open) openBrowser(address);
+  // A row that shows a standard location (the default a tool or plugin uses when .env names none) and has no result
+  // for it yet is checked once, in the background: those places may always be looked at (owner, 2026-09-25). Every
+  // other row keeps its kept result, or waits for the button (owner, 2026-09-17: no full check on every open).
+  startChecks([...new Set((await configItems()).filter((i) => i.check !== false && !i.value && i.placeholder?.startsWith("default:") && withResult(i).status === "unchecked").map((i) => i.id))]).catch(() => {});
   const shutdown = async () => {
     if (session.state.phase !== "idle") { log("stopping the session first"); await session.stop(); }
     forget();

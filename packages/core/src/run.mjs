@@ -12,6 +12,7 @@ import { startSegmentProof } from "./proof-run.mjs";
 import { formatDuration } from "./videos.mjs";
 import { renderAfterRun } from "./render.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
+import { COST_TEXT } from "./cost-text.mjs";
 
 /**
  * Autosave: a save state after every chapter milestone and every
@@ -122,6 +123,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const recorder = await loadRecorder(opts.recorder ?? "null");
   const timer = opts.timer ? await loadTimer(opts.timer) : null;
   if (recorder.id === "null") log("warning: recorder null; this run will not be a valid AI Assisted Speedrun");
+  if (runtime.ai) log(`what a run costs: ${COST_TEXT}`);
   const events = createEventLog(runDir);
   // Runs on the Claude plan may only use part of the weekly limit (AAS_BUDGET_WEEKLY_MAX).
   // A runtime that runs on a plan knows its own stand (`budget()`): a run may only use part of it.

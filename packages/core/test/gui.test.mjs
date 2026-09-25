@@ -164,3 +164,10 @@ test("a game is set up by its first setting in .env, or by the folder its plugin
   assert.equal(settingReady(setting, {}), true, "the default folder with the expected file");
   assert.equal(settingReady({ env: "AAS_Y_ROOT", kind: "dir" }, {}), false, "no value and no default");
 });
+
+test("a setting's default is what the plugin uses without a value, and nothing when it fails", async () => {
+  const { settingDefault } = await import("../src/gui/checks.mjs");
+  assert.equal(settingDefault({ env: "AAS_X", default: () => "/some/folder" }), "/some/folder");
+  assert.equal(settingDefault({ env: "AAS_X", default: () => { throw new Error("no"); } }), "");
+  assert.equal(settingDefault({ env: "AAS_X" }), "");
+});

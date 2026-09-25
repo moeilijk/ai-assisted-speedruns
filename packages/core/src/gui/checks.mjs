@@ -65,6 +65,12 @@ export async function guiGames() {
   return out;
 }
 
+/** The folder a game plugin uses when its setting is empty (`setup.settings[].default`, a function), or "". */
+export function settingDefault(st) {
+  if (typeof st?.default !== "function") return "";
+  try { return st.default() || ""; } catch { return ""; }
+}
+
 // The paths the harness uses when a setting is not in .env (the launchers' own defaults).
 function defaultPath(key) {
   const f = ON_WINDOWS ? windowsFolders() : {};
@@ -100,7 +106,13 @@ export async function configItems() {
       // A plain preference: there is nothing to check, so this row has no check and no status at all.
       item("Screen and sound", "awake", "Keep displays awake during a run", "check", "AAS_KEEP_DISPLAYS_AWAKE", { check: false }),
     ] : []),
-    ...games.flatMap(({ plugin }) => plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, what: st.what ?? null }))),
+    // All rows of a game share one check, the game's, which starts from its first setting: its value, or the default
+    // it falls back to, is what a result belongs to (checkKey), for every row of the game.
+    ...games.flatMap(({ plugin }) => {
+      const first = plugin.setup.settings[0];
+      const checkKey = (first && (pathValue(first.env) || (settingDefault(first) ? toWindows(settingDefault(first)) : ""))) || "";
+      return plugin.setup.settings.map((st) => item("Games", `game-${plugin.id}`, st.label, st.kind, st.env, { game: plugin.id, expect: st.expect, what: st.what ?? null, checkKey, ...(settingDefault(st) ? { placeholder: `default: ${toWindows(settingDefault(st))}` } : {}) }));
+    }),
     // Every other game the repository knows: named here too, so the list of games is the whole list and it is
     // visible which ones this machine cannot run at all.
     ...(await allGames()).filter(({ plugin }) => plugin.stub).map(({ dir, plugin }) => item("Games", `stub-${plugin.id}`, plugin.name, "info", null, { value: "", doc: `games/${dir}/README.md` })),
@@ -275,7 +287,8 @@ export async function checkItem(id) {
     const g = (await guiGames()).find((x) => `game-${x.plugin.id}` === id);
     if (!g) { t("the game plugin is known", false, { detail: "Unknown game." }); return done(); }
     const st = g.plugin.setup.settings[0];
-    const current = toLocal(env[st.env] ?? "");
+    // The folder the plugin uses without a setting (setup.settings[].default, e.g. an emulator's install folder).
+    const current = toLocal(env[st.env] ?? "") || settingDefault(st);
     const found = st.find && ON_WINDOWS ? detect.findGame(st.find) : null;
     const extra = { suggest: found && found.path !== current ? toWindows(found.path) : null, suggestSource: found?.source ?? null };
     // The button says what it does and which command it runs. "Install" on its own can mean the game, the mod, the

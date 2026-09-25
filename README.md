@@ -80,6 +80,10 @@ extends, revokes or deletes them. Without either, a run is unsigned: the archive
 >
 > **Everything you do with this repository is at your own risk.** The authors are not responsible for bans, lost accounts or other damage.
 
+## What a run costs
+
+Every turn, the model reads the whole conversation so far again, so a run gets more expensive the longer it lasts, and the later parts of a game take more turns than the start. Measured on the runs made while this archive was built, with Claude Sonnet 5 and the cost as Claude Code reported it: Slay the Spire up to the Act 1 boss, one act of three, cost $12.70, so the whole climb comes to tens of dollars at least and can reach the hundreds. A Portal attempt ran for four hours, cost $218.51 and got through about six minutes of the game's own clock, a few percent of the game; played to the credits, that comes to several thousand dollars, and to five figures on a more expensive model. Check the price at your own provider before you start, set a spending limit, and watch your usage during the run.
+
 ## Install
 
 Full instructions, with a check per step: [docs/install.md](docs/install.md).
