@@ -90,7 +90,7 @@ test("no ticket, no start: a run that wants proof does not start without it", as
   const { runDir, runtime, events, site } = await setup(t);
   process.env.AAS_PROOF = "anonymous";
   site.down = true;
-  await assert.rejects(startSegmentProof({ runDir, segment: 1, runtime, events }), /no ticket from the archive .*Not starting/);
+  await assert.rejects(startSegmentProof({ runDir, segment: 1, runtime, events }), /no ticket from the Archive .*Not starting/);
 });
 
 test("without an account or a yes, a run is unsigned and says so; --proof off overrides both", async (t) => {
@@ -127,4 +127,21 @@ test("a run that has started is continued, never started again", async () => {
   fs.writeFileSync(join(dir, "run.jsonl"), '{"kind":"event","event":"run.started"}\n');
   await assert.rejects(run({ runtime: "scripted", game: "games/balatro/plugin.mjs", "run-dir": dir }, { log: () => {} }), /this run has already started .*aas resume --run-dir/);
   assert.equal(fs.readFileSync(join(dir, "run.jsonl"), "utf8"), '{"kind":"event","event":"run.started"}\n', "the log is left as it was");
+});
+
+test("aas tickets says in words what extend, revoke and delete did, and the local list follows", async (t) => {
+  const { runDir, runtime, events } = await setup(t);
+  const p = segmentProof({ runDir, segment: 1, mode: "anonymous", runtime, client: proofClient(), events });
+  await p.begin();
+  const id = readTicketIndex()[0].ticket;
+  const before = readTicketIndex()[0].expires_at;
+  const { execFile } = await import("node:child_process");
+  // Asynchronous: the fake archive answers from this same process.
+  const aas = (...args) => new Promise((resolve, reject) => execFile(process.execPath, [new URL("../src/cli.mjs", import.meta.url).pathname, "tickets", ...args], { env: process.env, encoding: "utf8" }, (e, out, err) => (e ? reject(new Error(err || e.message)) : resolve(out.trim()))));
+  assert.match(await aas("extend", id), new RegExp(`^extended ticket ${id.slice(0, 8)}…: it now expires on \\d{4}-\\d\\d-\\d\\d \\d\\d:\\d\\d UTC$`));
+  assert.ok(Date.parse(readTicketIndex()[0].expires_at) > Date.parse(before), "the new expiry is kept on this machine");
+  assert.equal(await aas("revoke", id), `revoked ticket ${id.slice(0, 8)}…: its run can no longer be submitted with proof`);
+  assert.ok(readTicketIndex()[0].revoked_at);
+  assert.equal(await aas("delete", id), `deleted ticket ${id.slice(0, 8)}… at the Archive and from this machine's list`);
+  assert.equal(readTicketIndex().length, 0);
 });

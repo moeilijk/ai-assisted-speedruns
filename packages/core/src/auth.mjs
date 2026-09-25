@@ -34,7 +34,7 @@ export function openBrowser(url) {
 async function tokenRequest(form, { baseUrl, fetchImpl, timeoutMs = 15000 }) {
   const res = await fetchImpl(`${baseUrl}/auth/oauth/token`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" }, body: new URLSearchParams({ client_id: CLIENT_ID, ...form }).toString(), signal: AbortSignal.timeout(timeoutMs) });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok || !json.access_token) throw new Error(`the archive refused the token request (${res.status}${json.error ? `: ${json.error}` : ""})`);
+  if (!res.ok || !json.access_token) throw new Error(`the Archive refused the token request (${res.status}${json.error ? `: ${json.error}` : ""})`);
   return json;
 }
 const store = (json, baseUrl) => {

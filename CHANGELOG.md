@@ -12,6 +12,28 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.7 — 2026-09-25
+
+- **`npm test` no longer writes the GUI's check results.** Since 0.33.6 the GUI checks a row with a standard location
+  once at start. The tests start the GUI with their own settings file, but the results went into the real
+  `.local/gui-checks.json`: OBS then stood as "Not ready" with a password and an address that did not match, taken
+  from the tests' settings, while `.env` and OBS agreed. The results file can now be named with `AAS_GUI_CHECKS`,
+  the tests use their own, and they start the GUI without the check at start.
+- **Every button in the GUI says what it did** (owner, 2026-09-25). Next to the button: busy while it works, then
+  done, or not done with the reason; Cancel in a question says that nothing happened. The same outcome stands in the
+  log: saves (with file and setting; a password, token or key only as set or empty), each check result with the
+  condition that failed, the proof answer, Sign in and out, extend, revoke, delete, upload, the one-click fixes,
+  opening a folder, and every action that failed. The links for these actions are buttons now, and the pop-up
+  alerts are gone.
+- **`aas tickets extend|revoke|delete` answers in words, and the list on this machine follows.** It printed the
+  Archive's raw answer and kept the old expiry, so the GUI still showed the old date after an extend. Now it says,
+  for example, `extended ticket 480fc9c0…: it now expires on 2026-11-24 12:47 UTC`, and the local list keeps the new
+  date, marks a revoked ticket and drops a deleted one.
+- **`aas run`, `aas resume`, `aas start` and `aas scan` end with a sentence instead of JSON:** how the run ended,
+  after how long and where its recording is; for `scan`, which files may not be published and why.
+- **The Archive is written as a name** in what the GUI and the command line say ("the Archive"), as in "the AAS
+  Archive".
+
 ## 0.33.6 — 2026-09-25
 
 - **The Setup tab shows what BizHawk and FCEUX use.** 0.33.5 fixed only the Run tab: the Setup rows still read

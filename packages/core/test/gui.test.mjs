@@ -9,6 +9,7 @@ import path from "node:path";
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gui-"));
 process.env.AAS_ENV_FILE = path.join(dir, ".env");
 process.env.AAS_GUI_NOTE = path.join(dir, "gui.json");
+process.env.AAS_GUI_CHECKS = path.join(dir, "gui-checks.json");
 const { readEnv, writeEnv } = await import("../src/gui/env-file.mjs");
 const { toLocal, toWindows, IS_WSL } = await import("../src/gui/windows-paths.mjs");
 
@@ -35,7 +36,7 @@ test("paths: Windows form for people, local form for the harness", { skip: !IS_W
 
 test("the page server refuses other hosts and cross-origin changes", async () => {
   const { startGui } = await import("../src/gui/server.mjs");
-  const gui = await startGui({ port: 0, open: false, log() {} });
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
   const port = gui.server.address().port;
   const http = await import("node:http");
   const call = (method, p, headers, body) => new Promise((resolve) => {
@@ -55,11 +56,11 @@ test("the page server refuses other hosts and cross-origin changes", async () =>
 
 test("a second start opens the GUI that is already running instead of failing on the port", async () => {
   const { startGui } = await import("../src/gui/server.mjs");
-  const first = await startGui({ port: 0, open: false, log() {} });
+  const first = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
   const url = `http://127.0.0.1:${first.server.address().port}/`;
   try {
     assert.equal(JSON.parse(fs.readFileSync(process.env.AAS_GUI_NOTE, "utf8")).url, url, "the running GUI leaves a note");
-    const second = await startGui({ port: 0, open: false, log() {} });
+    const second = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
     assert.equal(second.already, true, "the second start does not start a second GUI");
     assert.equal(second.url, url, "it points at the one that is running");
     assert.equal(second.server, undefined, "and it holds no server of its own");
@@ -70,7 +71,7 @@ test("a second start opens the GUI that is already running instead of failing on
   }
   // A GUI that was killed leaves its note behind; the next start must not believe it.
   fs.writeFileSync(process.env.AAS_GUI_NOTE, JSON.stringify({ url, pid: 1 }));
-  const again = await startGui({ port: 0, open: false, log() {} });
+  const again = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
   try {
     assert.equal(again.already, undefined, "a stale note does not block a start");
     assert.notEqual(`http://127.0.0.1:${again.server.address().port}/`, url);
@@ -170,4 +171,26 @@ test("a setting's default is what the plugin uses without a value, and nothing w
   assert.equal(settingDefault({ env: "AAS_X", default: () => "/some/folder" }), "/some/folder");
   assert.equal(settingDefault({ env: "AAS_X", default: () => { throw new Error("no"); } }), "");
   assert.equal(settingDefault({ env: "AAS_X" }), "");
+});
+
+test("a button's outcome comes back to the page and stands in the log, done or not with the reason", async () => {
+  const { startGui } = await import("../src/gui/server.mjs");
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
+  const base = `http://127.0.0.1:${gui.server.address().port}`;
+  const post = async (p, body) => { const r = await fetch(base + p, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }); return { status: r.status, json: await r.json() }; };
+  try {
+    const ok = await post("/api/proof-answer", { anonymous: true });
+    assert.equal(ok.status, 200);
+    assert.match(ok.json.message, /anonymously from now on/);
+    const bad = await post("/api/archive", { action: "extend", arg: "not-a-ticket" });
+    assert.equal(bad.status, 400);
+    assert.equal(bad.json.error, "Not a ticket.");
+    const lines = (await (await fetch(`${base}/api/state`)).json()).lines.map((l) => `${l.kind} ${l.text}`);
+    assert.ok(lines.some((l) => /^ok Runs record their proof anonymously/.test(l)), lines.join("\n"));
+    assert.ok(lines.includes("err Failed: archive: Not a ticket."), lines.join("\n"));
+  } finally {
+    gui.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
 });

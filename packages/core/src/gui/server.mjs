@@ -16,6 +16,10 @@ import { FRAMEWORK_VERSION } from "../plugins.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 // Only one GUI at a time: it starts games, OBS and runs, so a second one would fight the first over the same run
 // directory. The note below points at the page that is already up; a second start opens that page instead of failing.
+// How a check's outcome reads in the log: the same words as the row's status on the page.
+const CHECK_WORDS = { ok: "ready", warn: "not ready", fail: "not ready", missing: "not installed", absent: "not built yet", pending: "checking" };
+// Settings whose value is a secret: the log names them, never their value.
+const SECRET = /PASSWORD|TOKEN|SECRET|KEY$/;
 const NOTE_FILE = process.env.AAS_GUI_NOTE || path.join(here, "..", "..", "..", "..", ".local", "gui.json");
 
 // Does an AAS GUI answer here? Under WSL a connection to a closed port hangs for minutes, so the probe has a deadline.
@@ -71,7 +75,7 @@ export function settingReady(setting, env) {
     return false;
   }
 }
-export async function startGui({ port = 8770, open = true, log = console.log } = {}) {
+export async function startGui({ port = 8770, open = true, checkAtStart = true, log = console.log } = {}) {
   let note = null;
   try { note = JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")); } catch { /* no GUI has run yet, or the note is gone */ }
   const live = note?.url ? await probe(note.url) : null;
@@ -83,7 +87,8 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   const session = createSession();
   // Check results per row, kept in <repo>/.local/gui-checks.json so a restart keeps them; a row whose value changed
   // since its check shows as not checked.
-  const cacheFile = path.join(here, "..", "..", "..", "..", ".local", "gui-checks.json");
+  // AAS_GUI_CHECKS names another file (the tests), so a GUI with other settings never writes its results here.
+  const cacheFile = process.env.AAS_GUI_CHECKS || path.join(here, "..", "..", "..", "..", ".local", "gui-checks.json");
   let cache = {};
   try { cache = JSON.parse(fs.readFileSync(cacheFile, "utf8")); } catch { /* no results yet */ }
   const saveCache = () => { try { fs.mkdirSync(path.dirname(cacheFile), { recursive: true }); fs.writeFileSync(cacheFile, JSON.stringify(cache, null, 2)); } catch { /* not kept */ } };
@@ -118,6 +123,9 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         if (item) {
           cache[id] = { value: checkedValue(item), result, at: new Date().toTimeString().slice(0, 8) };
           saveCache();
+          const failed = (result.tests ?? []).find((x) => !x.ok);
+          // A game that is not built yet is information, not a failure: it is listed, not marked.
+          session.log(`Check ${item.label}: ${CHECK_WORDS[result.status] ?? result.status}${failed ? ` — ${failed.what}: ${failed.detail}` : result.detail && result.status !== "ok" ? ` — ${result.detail}` : ""}`, result.status === "ok" ? "ok" : result.status === "absent" ? "out" : "err");
           emitAll("check", withResult(item));
         }
         pump();
@@ -158,8 +166,10 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, { items, envFile: toWindows(ENV_FILE), checked: Object.keys(cache).length > 0, configured: Object.keys(readEnv()).some((k) => k.startsWith("AAS_")) });
       } else if (req.method === "POST" && url.pathname === "/api/check") {
         const b = await body(req);
+        const n = b.ids?.length ?? (await configItems()).filter((i) => i.check !== false).length;
+        session.log(`Checking ${n} row${n === 1 ? "" : "s"}; each result follows here and on the Setup tab`, "note");
         await startChecks(b.ids ?? null);
-        send(res, 200, { ok: true });
+        send(res, 200, { ok: true, message: `Checking ${n} row${n === 1 ? "" : "s"}…` });
       } else if (req.method === "POST" && url.pathname === "/api/settings") {
         const b = await body(req);
         const changes = {};
@@ -181,10 +191,14 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           if (!perFile.has(file)) perFile.set(file, {});
           perFile.get(file)[k] = v;
         }
-        for (const [file, values] of perFile) { fs.mkdirSync(path.dirname(file), { recursive: true }); writeEnv(values, file); }
+        for (const [file, values] of perFile) {
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          writeEnv(values, file);
+          session.log(`Saved in ${toWindows(file)}: ${Object.entries(values).map(([k, v]) => `${k}=${SECRET.test(k) ? (v ? "(set)" : "(empty)") : v ? toWindows(v) : "(empty)"}`).join(", ")}`, "ok");
+        }
         // What was saved is checked at once.
         await startChecks(await affectedBy(Object.keys(changes)));
-        send(res, 200, { ok: true });
+        send(res, 200, { ok: true, message: `Saved ${Object.keys(changes).join(", ")}; checking it now` });
       } else if (req.method === "GET" && url.pathname === "/api/browse") {
         send(res, 200, listDir(url.searchParams.get("path") ?? ""));
       } else if (req.method === "GET" && url.pathname === "/api/games") {
@@ -226,22 +240,28 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
         send(res, 200, { signedIn: Boolean(c?.access_token), archive: c?.archive ?? proofUrl(), mode, answered: Boolean(answer), tickets: readTicketIndex().map(({ control, ...t }) => ({ ...t, run_dir: toWindows(t.run_dir) })) });
       } else if (req.method === "POST" && url.pathname === "/api/proof-answer") {
         // The one question: record proof anonymously, or not. The answer is kept in .env, where the CLI reads it too.
-        writeEnv({ AAS_PROOF: (await body(req)).anonymous ? "anonymous" : "off" });
-        send(res, 200, { ok: true });
+        const anonymous = Boolean((await body(req)).anonymous);
+        writeEnv({ AAS_PROOF: anonymous ? "anonymous" : "off" });
+        const message = anonymous ? "Runs record their proof anonymously from now on (AAS_PROOF=anonymous in .env)" : "Runs are unsigned from now on (AAS_PROOF=off in .env)";
+        session.log(message, "ok");
+        send(res, 200, { ok: true, message });
       } else if (req.method === "POST" && url.pathname === "/api/archive") {
         const b = await body(req);
-        await session.archive(b.action, b.arg ?? null);
-        send(res, 200, { ok: true });
+        const message = await session.archive(b.action, b.arg ?? null);
+        session.log(`Done: ${message}`, "ok");
+        send(res, 200, { ok: true, message });
       } else if (req.method === "POST" && url.pathname === "/api/fix") {
         const fixId = (await body(req)).id;
         await session.fix(fixId);
+        const fixLabel = Object.values(cache).find((c) => c.result?.fix?.id === fixId)?.result.fix.label ?? fixId;
+        session.log(`Done: ${fixLabel}; checking the row again`, "ok");
         const fixed = { "obs-password": ["obs"], "install-livesplit": ["livesplit"], "livesplit-server": ["livesplit"], "livesplit-windows": ["livesplit"], "install-svv": ["svv", "quiet"] }[fixId] ?? (fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : fixId.startsWith("fix:") ? [`game-${fixId.split(":")[1]}`] : []);
         await startChecks(fixed);
-        send(res, 200, { ok: true });
+        send(res, 200, { ok: true, message: `Done: ${fixLabel}; checking the row again` });
       } else if (req.method === "POST" && url.pathname === "/api/open") {
         // Opens a folder or file from the page in Windows Explorer / the default program.
         const p = toLocal((await body(req)).path ?? "");
-        if (!p || !fs.existsSync(p)) { send(res, 404, { error: "not found" }); return; }
+        if (!p || !fs.existsSync(p)) { session.log(`Failed: open ${toWindows(p) || "(no path)"}: it is not there`, "err"); send(res, 404, { error: `${toWindows(p) || "(no path)"} is not there` }); return; }
         // A folder is opened; a file is shown selected in its folder, so it can be dragged, copied or uploaded.
         const file = fs.statSync(p).isFile();
         if (IS_WSL || process.platform === "win32") {
@@ -250,12 +270,16 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
           // the whole switch and opens Documents instead (measured 19-09).
           spawn("explorer.exe", file ? ["/select,", win] : [win], { detached: true, stdio: "ignore" }).unref();
         } else spawn("xdg-open", [file ? path.dirname(p) : p], { detached: true, stdio: "ignore" }).unref();
-        send(res, 200, { ok: true });
+        session.log(`Opened ${toWindows(p)}${file ? " (selected in its folder)" : ""}`, "ok");
+        send(res, 200, { ok: true, message: `Opened ${toWindows(p)}` });
       } else {
         send(res, 404, { error: "not found" });
       }
     } catch (error) {
-      send(res, 400, { error: String(error?.message ?? error) });
+      const message = String(error?.message ?? error);
+      // A button that did not do its work says so in the log as well as on the page, with the reason.
+      if (req.method === "POST") session.log(`Failed: ${url.pathname.replace("/api/", "")}: ${message}`, "err");
+      send(res, 400, { error: message });
     }
   });
   const listened = await new Promise((resolve) => { server.once("error", resolve); server.listen(port, "127.0.0.1", () => resolve(null)); });
@@ -279,7 +303,7 @@ export async function startGui({ port = 8770, open = true, log = console.log } =
   // A row that shows a standard location (the default a tool or plugin uses when .env names none) and has no result
   // for it yet is checked once, in the background: those places may always be looked at (owner, 2026-09-25). Every
   // other row keeps its kept result, or waits for the button (owner, 2026-09-17: no full check on every open).
-  startChecks([...new Set((await configItems()).filter((i) => i.check !== false && !i.value && i.placeholder?.startsWith("default:") && withResult(i).status === "unchecked").map((i) => i.id))]).catch(() => {});
+  if (checkAtStart) startChecks([...new Set((await configItems()).filter((i) => i.check !== false && !i.value && i.placeholder?.startsWith("default:") && withResult(i).status === "unchecked").map((i) => i.id))]).catch(() => {});
   const shutdown = async () => {
     if (session.state.phase !== "idle") { log("stopping the session first"); await session.stop(); }
     forget();

@@ -131,6 +131,12 @@ export function verifySigned(message, signature, given = null) {
 /** A local list of this machine's tickets, so the tool can show and manage them (AAS GUI, `aas tickets`). */
 export const ticketIndexFile = () => path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config"), "aas", "tickets.json");
 export const readTicketIndex = () => { try { return JSON.parse(fs.readFileSync(ticketIndexFile(), "utf8")); } catch { return []; } };
+/** Changes one ticket in the local list after the Archive answered: `null` removes it, an object is merged into it. */
+export function updateTicketIndex(ticket, patch) {
+  const list = readTicketIndex().flatMap((e) => (e.ticket !== ticket ? [e] : patch === null ? [] : [{ ...e, ...patch }]));
+  fs.mkdirSync(path.dirname(ticketIndexFile()), { recursive: true, mode: 0o700 });
+  fs.writeFileSync(ticketIndexFile(), `${JSON.stringify(list, null, 2)}\n`, { mode: 0o600 });
+}
 function addToTicketIndex(entry) {
   const list = readTicketIndex().filter((e) => e.ticket !== entry.ticket);
   list.push(entry);

@@ -42,9 +42,12 @@ export function createSession() {
   let child = null;
   let cancelled = false;
   const emit = (type, data) => { for (const l of listeners) l(type, data); };
+  // The last line a command printed: what an action reports back to the page, or why it failed.
+  let lastLine = "";
   const log = (text, kind = "out") => {
     for (const t of String(text).split(/\r?\n/)) {
       if (!t.trim()) continue;
+      if (kind === "out" || kind === "err") lastLine = t.trim();
       const line = { at: new Date().toTimeString().slice(0, 8), kind, text: t };
       lines.push(line);
       if (lines.length > 3000) lines.shift();
@@ -131,7 +134,7 @@ export function createSession() {
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
       { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end, then makes the timeline and the cut (the video without the thinking pauses)`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
-      { id: "publish", title: "The bundle for the archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+      { id: "publish", title: "The bundle for the Archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
     ];
     return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
@@ -269,8 +272,12 @@ export function createSession() {
     if (!/^[0-9a-f]{32}$/.test(String(arg)) && ["extend", "revoke", "delete"].includes(action)) throw new Error("Not a ticket.");
     set({ phase: "working", step: action });
     try {
+      lastLine = "";
       const code = await node([CLI, ...c[0]], `${CLI_SHOWN} ${c[1]}`);
-      if (code !== 0) throw new Error(`${action} did not succeed; see the log.`);
+      // The command's own last line says what happened (or, as "FAIL: …", why not): that is the answer.
+      const said = lastLine.replace(/^FAIL:\s*/, "");
+      if (code !== 0) throw new Error(said || `${action} did not succeed`);
+      return said || `${action}: done`;
     } finally {
       set({ phase: "idle", step: null });
     }
@@ -321,9 +328,6 @@ export function createSession() {
         const code = await node([g.plugin.setup.install], `node ${rel(g.plugin.setup.install)}`);
         if (code !== 0) throw new Error(`Installing for ${g.plugin.name} failed.`);
       } else throw new Error(`Unknown fix: ${id}`);
-    } catch (error) {
-      log(error.message, "err");
-      throw error;
     } finally {
       set({ phase: "idle", step: null });
     }

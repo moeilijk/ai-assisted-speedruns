@@ -12,6 +12,7 @@ import { loadSettings } from "./settings.mjs";
 import { pathToFileURL } from "node:url";
 import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
+import { formatDuration } from "./videos.mjs";
 export { brokerSpec, configure };
 
 // Settings come from two files: the game's own (.local/games/<game>.env) and the machine's (.env). The CLI loads
@@ -45,6 +46,13 @@ export async function start(opts) {
   return runtime.start(runDir, brief);
 }
 
+/** The last line of `aas run` and `aas resume`: how it ended, how long it took and where the recording is. */
+function runEnded(what, status, files, seconds) {
+  const whole = typeof seconds === "number" ? ` after ${formatDuration(seconds, { whole: true })}` : "";
+  const rec = files?.length ? `; recording: ${files.join(", ")}` : "; no recording";
+  return `${what} ${status}${whole}${rec}`;
+}
+
 if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") || process.argv[1]?.endsWith("\\aas")) {
   const [command, ...rest] = process.argv.slice(2);
   const opts = parse(rest);
@@ -58,7 +66,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "start": {
         const outcome = await start(opts);
-        console.log(JSON.stringify(outcome));
+        console.log(`session ${outcome.status}${outcome.reason ? `: ${outcome.reason}` : ""}`);
         process.exitCode = outcome.status === "failed" ? 1 : 0;
         break;
       }
@@ -115,14 +123,14 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       case "run": {
         const { run } = await import("./run.mjs");
         const r = await run(opts);
-        console.log(JSON.stringify({ status: r.outcome.status, recording: r.recording.files, wall_clock_seconds: r.recording.wall_clock_seconds }));
+        console.log(runEnded("run", r.outcome.status, r.recording.files, r.recording.wall_clock_seconds));
         process.exitCode = r.outcome.status === "failed" ? 1 : 0;
         break;
       }
       case "resume": {
         const { resume } = await import("./resume.mjs");
         const r = await resume(opts);
-        console.log(JSON.stringify({ status: r.outcome.status, segment: r.segment, recording: r.recording.files }));
+        console.log(runEnded(`segment ${r.segment} of the run`, r.outcome.status, r.recording.files, r.recording.wall_clock_seconds));
         process.exitCode = r.outcome.status === "failed" ? 1 : 0;
         break;
       }
@@ -147,7 +155,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         console.log(k.publicLine);
         console.log(k.fingerprint);
         if (!opts.claim) {
-          console.log(`That public line is what identifies you as a publisher: record it on your account page at the archive (${ARCHIVE_URL}/account/, Record key).`);
+          console.log(`That public line is what identifies you as a publisher: record it on your account page at the Archive (${ARCHIVE_URL}/account/, Record key).`);
           console.log("To publish it anywhere instead: aas key --claim --identity <uri> [--identity <uri>]");
           break;
         }
@@ -205,12 +213,12 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "logout": {
         const { logout } = await import("./auth.mjs");
-        console.log((await logout()) ? "signed out: the archive revoked this machine's token and it is forgotten here" : "not signed in");
+        console.log((await logout()) ? "signed out: the Archive revoked this machine's token and it is forgotten here" : "not signed in");
         break;
       }
       case "tickets": {
         // The tickets of this machine's runs: what they are, until when, and extend, revoke or delete one.
-        const { readTicketIndex, proofClient } = await import("./proof.mjs");
+        const { readTicketIndex, updateTicketIndex, proofClient } = await import("./proof.mjs");
         const { accessToken } = await import("./auth.mjs");
         const [action, id] = opts._;
         const list = readTicketIndex();
@@ -223,7 +231,12 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         const t = list.find((x) => x.ticket === id);
         if (!t) throw new Error(`${id} is not a ticket of this machine (aas tickets lists them)`);
         const answer = await proofClient({ token: t.account ? () => accessToken() : async () => null }).manage(t, action);
-        console.log(`${action}: ${JSON.stringify(answer)}`);
+        // The local list follows what the Archive answered, so aas tickets and the GUI show the ticket as it now is.
+        updateTicketIndex(id, action === "delete" ? null : action === "extend" ? { expires_at: answer.expires_at ?? t.expires_at } : { revoked_at: new Date().toISOString() });
+        const short = `${id.slice(0, 8)}…`;
+        if (action === "extend") console.log(`extended ticket ${short}: it now expires on ${answer.expires_at ? answer.expires_at.slice(0, 16).replace("T", " ") + " UTC" : "a date the Archive did not give"}`);
+        else if (action === "revoke") console.log(`revoked ticket ${short}: its run can no longer be submitted with proof`);
+        else console.log(`deleted ticket ${short} at the Archive and from this machine's list`);
         break;
       }
       case "timeline": {
@@ -255,7 +268,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         const dir = opts._[0];
         if (!dir) throw new Error("Usage: aas scan <dir>");
         const r = scanPublication(path.resolve(dir));
-        console.log(JSON.stringify(r, null, 2));
+        if (!r.findings.length) console.log(`nothing found that may not be published in ${dir}`);
+        else { console.log(`${r.findings.length} file${r.findings.length === 1 ? "" : "s"} in ${dir} may not be published:`); for (const f of r.findings) console.log(`  ${f.file}: ${f.rule}${f.detail ? ` (${f.detail})` : ""}`); }
         process.exitCode = r.findings.length ? 1 : 0;
         break;
       }

@@ -13,6 +13,6 @@ export async function uploadBundle(zipFile, { fetchImpl = currentArchiveFetch(),
   const json = await res.json().catch(() => ({}));
   // A refusal with a decision (a mock, a proof that does not match) is the archive's answer, not a failed upload.
   if (!res.ok && json.status && json.submission) return json;
-  if (!res.ok) throw new Error(`the archive refused the upload (${res.status}${json.error ? `: ${json.error}` : ""}${json.reasons?.length ? `: ${json.reasons.join("; ")}` : ""})`);
+  if (!res.ok) throw new Error(`the Archive refused the upload (${res.status}${json.error ? `: ${json.error}` : ""}${json.reasons?.length ? `: ${json.reasons.join("; ")}` : ""})`);
   return json;
 }
