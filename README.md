@@ -36,6 +36,8 @@ docs/                   install, command reference, plugins, design
 
 There are four kinds of plugin: game, runtime (starts the model), recorder and timer. The `aas` commands work the same with any combination.
 
+**A game that is not here is researched and added on request.** The tooling, its game plugins and the Archive belong together: a game is listed on the Archive once its plugin exists here. Ask for one in an [issue](https://github.com/moeilijk/ai-assisted-speedruns/issues), naming the game and, when you know it, the mod or tool that exposes it to a program. The route, its license and the risks (anti-cheat, bans) are looked at first, as the READMEs of the planned games show; what comes out of that goes into the plugin or into the reason it is not built.
+
 ## From run to upload
 
 1. `aas run` starts the recorder, the timer and the model against a game you started with its launch script. Everything that happens goes into one log in the run directory, which stays on your machine. At the end it makes the timeline and the cut: the video without the model's thinking pauses, next to the full recording.

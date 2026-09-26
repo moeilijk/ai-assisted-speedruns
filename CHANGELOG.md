@@ -12,6 +12,13 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.10 — 2026-09-26
+
+- **A game that is not here is researched and added on request.** The README says so, next to the four kinds of
+  plugin: the tooling, its game plugins and the Archive belong together, a game is listed on the Archive once its
+  plugin exists here, and an issue naming the game (and the mod or tool that exposes it, when known) is the way to
+  ask. The route, its license and the risks are looked at first; the Archive says the same on its games page.
+
 ## 0.33.9 — 2026-09-26
 
 - **A resumed Balatro run keeps its blind reward.** A run stopped in the cash-out screen and continued got the money
