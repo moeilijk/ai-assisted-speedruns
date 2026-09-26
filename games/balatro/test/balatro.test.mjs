@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeBalatrobot } from "./fake-balatrobot.mjs";
 import { jsonRpcClient } from "../../../packages/core/src/json-rpc-http.mjs";
+import { STATES, describeGamestate, describeSave, parseLuaTable, readSave, sameMoment, waitForSave } from "../save-file.mjs";
 
 const dir = mkdtempSync(join(tmpdir(), "aas-balatro-"));
 process.env.AAS_BALATRO_BRIDGE_STATE = join(dir, "bridge.json");
@@ -17,8 +18,11 @@ process.env.AAS_BALATRO_DECK = "blue";
 process.env.AAS_BALATRO_STAKE = "white";
 const { startBridge } = await import("../bridge.mjs");
 
+let setups = 0;
 async function setup(opts) {
-  const bot = await startFakeBalatrobot(opts);
+  // The game's own save file, which the plugin copies as the run's save; the fake keeps it like the game does.
+  process.env.AAS_BALATRO_SAVE_FILE = join(dir, `save-${++setups}.jkr`);
+  const bot = await startFakeBalatrobot({ saveFile: process.env.AAS_BALATRO_SAVE_FILE, ...opts });
   const bridge = await startBridge({ port: 0, botPort: bot.port, shotDir: dir });
   process.env.AAS_BALATRO_PORT = String(bridge.port);
   const { default: plugin } = await import(`../plugin.mjs?port=${bridge.port}`);
@@ -127,12 +131,14 @@ test("a set seed is passed to the game and kept by restart", async () => {
   } finally { bal?.close(); await t.close(); }
 });
 
-test("saveState and loadState go through the harness's token", async () => {
+test("saveState copies the game's own save, and loadState puts it back through the harness's token", async () => {
   const t = await setup();
   try {
     await t.plugin.prepareRun({ log() {} });
     const saved = await t.plugin.saveState({ name: "aas_test_001" });
     assert.ok(existsSync(saved.file), saved.file);
+    assert.equal(readSave(saved.file).state, STATES.BLIND_SELECT, "the run's save is the game's file, with the game's state");
+    assert.ok(!t.bot.state.calls.some((c) => c.method === "save"), "balatrobot's own save is not used");
     const bal = await t.plugin.connect();
     await bal.select();
     assert.equal((await bal.state()).state, "SELECTING_HAND");
@@ -141,6 +147,50 @@ test("saveState and loadState go through the harness's token", async () => {
     assert.equal((await bal.state()).state, "BLIND_SELECT");
     assert.ok(logs.some((m) => /save aas_test_001 loaded: BLIND_SELECT, ante 1/.test(m)), logs.join(" | "));
   } finally { await t.close(); }
+});
+
+test("saveState waits for the game's save to describe the reported state, and says so when it took a while", async () => {
+  const t = await setup({ saveLag: 700 });
+  try {
+    await t.plugin.prepareRun({ log() {} });
+    const bal = await t.plugin.connect();
+    await bal.select();
+    await bal.play([0]); // one card: 100 chips, the blind (300) stands, the hand goes on
+    const logs = [];
+    const t0 = Date.now();
+    const saved = await t.plugin.saveState({ name: "aas_test_002", log: (m) => logs.push(m) });
+    assert.ok(Date.now() - t0 >= 600, "waited for the game's file");
+    const d = readSave(saved.file);
+    assert.equal(d.state, STATES.SELECTING_HAND);
+    assert.equal(d.hands_left, 3, "the save holds the hand just played, not the one before");
+    assert.ok(logs.some((m) => /caught up after \d\.\d s/.test(m)), logs.join(" | "));
+  } finally { await t.close(); }
+});
+
+test("the wait for the game's save ends with a refusal that says what each side holds", async () => {
+  const t = await setup({ saveLag: 60000 });
+  try {
+    await t.plugin.prepareRun({ log() {} });
+    const reported = describeGamestate(await (await t.plugin.connect()).state());
+    await assert.rejects(waitForSave(process.env.AAS_BALATRO_SAVE_FILE, reported, { waitMs: 400 }),
+      /has not saved this state after 0\.4 s: balatrobot reports state 7, round 0, ante 1, 4 hands, 3 discards, \$4; there is no save file/);
+  } finally { await t.close(); }
+});
+
+test("the game's save file is read as the game writes it: nested tables, %q strings, numeric keys", () => {
+  const lua = 'return {["BLIND"]={["chip_text"]="300",["disabled"]=false,["dollars"]=3,["name"]="Small Blind",},["STATE"]=8,'
+    + '["GAME"]={["round_resets"]={["blind_tag"]="\\"MANUAL_REPLACE\\"",["ante"]=1,["hands"]=4,},["pool_flags"]={},["round"]=1,'
+    + '["current_round"]={["hands_left"]=2,["discards_left"]=4,["voucher"]={[1]="v_overstock_norm",[2]="v_hone",},},["dollars"]=4,'
+    + '["seeded"]=true,["pseudorandom"]={["seed"]="YLNKMKFJ",["hashed_seed"]=0.71828,},},["VERSION"]="1.0.1o-FULL",}';
+  const t = parseLuaTable(lua);
+  assert.equal(t.GAME.round_resets.blind_tag, '"MANUAL_REPLACE"');
+  assert.deepEqual(t.GAME.current_round.voucher, { 1: "v_overstock_norm", 2: "v_hone" });
+  assert.equal(t.GAME.pseudorandom.hashed_seed, 0.71828);
+  assert.deepEqual(describeSave(t), { state: 8, round: 1, ante: 1, hands_left: 2, discards_left: 4, dollars: 4, blind_dollars: 3 });
+  const reported = describeGamestate({ state: "ROUND_EVAL", round_num: 1, ante_num: 1, money: 4, round: { hands_left: 2, discards_left: 4 } });
+  assert.ok(sameMoment(describeSave(t), reported));
+  assert.ok(!sameMoment(describeSave(t), describeGamestate({ state: "SHOP", round_num: 1, ante_num: 1, money: 9, round: { hands_left: 2, discards_left: 4 } })), "after the cash-out the file still holds the cash-out screen");
+  assert.ok(sameMoment(describeSave(t), describeGamestate({ state: "SMODS_BOOSTER_OPENED", round_num: 1 })), "a state the game's list lacks is not compared");
 });
 
 test("through the sandboxed broker: three tools, the controller works, balatrobot itself is out of reach", async () => {

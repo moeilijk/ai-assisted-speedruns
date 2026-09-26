@@ -7,8 +7,8 @@
 //
 // `npm run e2e:real` on the machine the games are installed on (Windows programs, the harness in WSL), with
 // Playwright installed (`npm i -g playwright`, then `npx playwright install chromium`) and the Archive's e2e account in
-// .local/e2e-archive.mjs. AAS_E2E_GAMES chooses the games (default: every game that has a scripted player and is set
-// up here). Not part of `npm test`: it takes minutes per game and needs the programs.
+// .local/e2e-archive.mjs. AAS_E2E_GAMES chooses the games ("all" for every game); without it, the games whose
+// plugin changed since the last release tag, or one game when only shared code changed. Not part of `npm test`: it takes minutes per game and needs the programs.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -74,9 +74,22 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
     log(`sign in: ${await msg("archivemsg")}`);
 
     const offered = await page.$$eval("#game option", (o) => o.map((x) => x.value));
-    const wanted = (process.env.AAS_E2E_GAMES ?? "").split(",").filter(Boolean);
+    // What is run is what changed: the games whose plugin changed since the last release tag (committed or not), and
+    // one game for everything they share. AAS_E2E_GAMES names games explicitly ("all" for every game).
+    const changedSince = (() => {
+      try {
+        const tag = execFileSync("git", ["describe", "--tags", "--abbrev=0"], { cwd: root, encoding: "utf8" }).trim();
+        return execFileSync("git", ["diff", "--name-only", tag], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+      } catch { return null; }
+    })();
+    const env = process.env.AAS_E2E_GAMES ?? "";
+    const pluginChanged = (id) => changedSince?.some((f) => f.startsWith(`games/${id.replace(/_/g, "-")}/`));
+    const sharedChanged = changedSince === null || changedSince.some((f) => !f.startsWith("games/"));
+    let wanted = env === "all" ? offered : env ? env.split(",").filter(Boolean) : offered.filter(pluginChanged);
+    if (!env && sharedChanged && !wanted.length) wanted = offered.slice(0, 1);
+    log(`games: ${wanted.join(", ") || "none changed"}${env ? "" : ` (changed since the last tag${sharedChanged ? ", plus one for the shared code" : ""})`}`);
     const list = [];
-    for (const id of wanted.length ? wanted : offered) {
+    for (const id of wanted) {
       const p = (await import(path.join(root, "games", id.replace(/_/g, "-"), "plugin.mjs"))).default;
       if (!p.setup?.bot) { log(`${id}: no scripted player, skipped`); continue; }
       list.push({ id, exe: p.processName, name: p.name });

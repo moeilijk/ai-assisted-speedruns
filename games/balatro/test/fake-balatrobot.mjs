@@ -3,12 +3,38 @@
 // Every played card scores `chipsPerCard`. Enough to drive the bridge and the plugin without the game.
 import http from "node:http";
 import { readFileSync, writeFileSync } from "node:fs";
+import { deflateRawSync, inflateRawSync } from "node:zlib";
 
 const PNG1x1 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 const BLINDS = ["SMALL", "BIG", "BOSS"];
 
-export async function startFakeBalatrobot({ winAnte = 2, blindScore = 300, chipsPerCard = 100, hands = 4 } = {}) {
+const STATE_NUMBERS = { SELECTING_HAND: 1, GAME_OVER: 4, SHOP: 5, BLIND_SELECT: 7, ROUND_EVAL: 8, MENU: 11 };
+const luaString = (s) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\\n")}"`; // like Lua's %q
+
+/**
+ * The fake keeps the game's own save file the way the game does (`saveFile`, deflate-compressed Lua with the fields
+ * the plugin reads), written after every action, `saveLag` ms later: the plugin waits for it, as it must with the game.
+ */
+export async function startFakeBalatrobot({ winAnte = 2, blindScore = 300, chipsPerCard = 100, hands = 4, saveFile = process.env.AAS_BALATRO_SAVE_FILE ?? null, saveLag = 0 } = {}) {
   const st = { state: "MENU", ante: 0, round: 0, blind: 0, chips: 0, hands, won: false, money: 4, deck: null, stake: null, seed: null, calls: [] };
+  const luaSave = () => `return {["BLIND"]={["dollars"]=${st.state === "ROUND_EVAL" ? 3 : 0},["name"]="Small Blind",},["STATE"]=${STATE_NUMBERS[st.state] ?? 0},`
+    + `["GAME"]={["round"]=${st.round},["dollars"]=${st.money},["round_resets"]={["ante"]=${st.ante},["blind_tag"]="\\"MANUAL_REPLACE\\"",},`
+    + `["current_round"]={["hands_left"]=${st.hands},["discards_left"]=3,},},["AAS_FAKE"]=${luaString(JSON.stringify({ ...st, calls: undefined }))},}`;
+  const persist = () => {
+    if (!saveFile) return;
+    const write = () => writeFileSync(saveFile, deflateRawSync(Buffer.from(luaSave(), "latin1")));
+    if (saveLag > 0) setTimeout(write, saveLag).unref(); else write();
+  };
+  const restore = (file) => {
+    const raw = readFileSync(file);
+    let saved;
+    try { saved = JSON.parse(raw.toString("utf8")); } catch {
+      const lua = inflateRawSync(raw).toString("latin1");
+      const m = lua.match(/\["AAS_FAKE"\]="((?:[^"\\]|\\[\s\S])*)"/);
+      saved = JSON.parse(m[1].replace(/\\\n/g, "\n").replace(/\\"/g, '"').replace(/\\\\/g, "\\"));
+    }
+    Object.assign(st, saved, { calls: st.calls });
+  };
   const card = (i) => ({ id: i, key: `H_${"23456789TJQKA"[i % 13]}`, set: "DEFAULT", label: `Card ${i}`, value: { suit: "H", rank: "23456789TJQKA"[i % 13], effect: "" }, modifier: {}, state: {}, cost: { sell: 1, buy: 0 } });
   const view = () => {
     if (st.state === "MENU") return { state: "MENU", round_num: 0, ante_num: 0, money: 0 };
@@ -53,7 +79,7 @@ export async function startFakeBalatrobot({ winAnte = 2, blindScore = 300, chips
     set: (p) => { if (p?.money !== undefined) st.money = p.money; return view(); },
     add: () => view(),
     save: (p) => (writeFileSync(p.path, JSON.stringify({ ...st, calls: undefined })), { success: true, path: p.path }),
-    load: (p) => { const saved = JSON.parse(readFileSync(p.path, "utf8")); Object.assign(st, saved, { calls: st.calls }); return { success: true, path: p.path }; },
+    load: (p) => { restore(p.path); return { success: true, path: p.path }; },
     screenshot: (p) => (writeFileSync(p.path, Buffer.from(PNG1x1, "base64")), { success: true, path: p.path }),
   };
   const server = http.createServer((req, res) => {
@@ -64,6 +90,7 @@ export async function startFakeBalatrobot({ winAnte = 2, blindScore = 300, chips
       st.calls.push({ method: body.method, params: body.params ?? null });
       const h = handlers[body.method];
       const out = h ? h(body.params) : err("BAD_REQUEST", `unknown method ${body.method}`);
+      if (h && !["health", "gamestate", "screenshot", "save"].includes(body.method)) persist();
       const msg = out && typeof out === "object" && "error" in out && out.error?.data ? { jsonrpc: "2.0", id: body.id, error: out.error } : { jsonrpc: "2.0", id: body.id, result: out };
       const text = JSON.stringify(msg);
       res.writeHead(200, { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(text), Connection: "close" });

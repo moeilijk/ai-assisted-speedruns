@@ -11,7 +11,7 @@ import { chainThroughHarness } from "../../../packages/core/test/chain.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-chain-balatro-"));
-Object.assign(process.env, { AAS_BALATRO_BRIDGE_STATE: path.join(dir, "bridge.json"), AAS_BALATRO_PATHS: "native", AAS_BALATRO_TOOLS_DIR: path.join(dir, "tools"), AAS_BALATRO_DECK: "blue", AAS_BALATRO_STAKE: "white" });
+Object.assign(process.env, { AAS_BALATRO_BRIDGE_STATE: path.join(dir, "bridge.json"), AAS_BALATRO_PATHS: "native", AAS_BALATRO_TOOLS_DIR: path.join(dir, "tools"), AAS_BALATRO_DECK: "blue", AAS_BALATRO_STAKE: "white", AAS_BALATRO_SAVE_FILE: path.join(dir, "save.jkr") });
 const { startBridge } = await import("../bridge.mjs");
 
 test("Balatro: run to ante1, resume to ante2, publish, check", { timeout: 180000 }, async () => {

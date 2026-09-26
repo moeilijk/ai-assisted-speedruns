@@ -12,6 +12,38 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.33.9 — 2026-09-26
+
+- **A resumed Balatro run keeps its blind reward.** A run stopped in the cash-out screen and continued got the money
+  for its hands left ($2) but not the blind's reward ($3): the plugin took its save through balatrobot's `save`,
+  which rebuilds the save at that moment, and by then the game has cleared the blind (`Blind:defeat` after the
+  dissolve). The run's save is now a copy of the game's own save file, the one the Continue button loads, taken once
+  it describes the state balatrobot reports; the game writes it a moment after each change (up to about two seconds,
+  measured), so the plugin waits for it and refuses, saying what each side holds, when it does not come. Loaded back,
+  such a save pays $4 → $9, as an uninterrupted run does. The stand-in for balatrobot in the tests keeps the game's
+  save file the same way, so `npm test` covers the wait and the refusal.
+- **A running screensaver no longer stops a run from starting.** Windows starts its screensaver after the idle time
+  set there (fifteen minutes on the test machine), on a desktop of its own; while it runs, OBS's window capture of the
+  game shows black, so the recorder's picture check refused the run ("shows nothing: black for 20 s") while the game
+  itself rendered (measured 2026-09-26, `e2e:real` after an hour without input). The recorder now ends a running
+  screensaver before the recording starts, the way Windows documents it (closing the windows on the `Screen-saver`
+  desktop), and says so in the log; `keep-display-awake` does the same when it starts, since the mouse move it sent
+  did not end one that was already running.
+- **Balatro's Play button is there when the run starts.** The game reads where the mouse cursor rests, also when
+  nobody moved it: with the game borderless on the display to the left, a cursor to the right of it counted as
+  resting on the deck, the deck preview opened and the game made no Play and Discard buttons, so balatrobot refused
+  every play ("attempt to index field 'buttons'"; three launches out of nine on 2026-09-26, one of them 1450 refusals
+  in 70 s). The launcher now parks the cursor at the top of the game window, where nothing reacts to it, and says
+  from where (`packages/core/src/windows/park-cursor.mjs`).
+- **The scripted Balatro player gives up on an action the game keeps refusing.** It read the state and tried again
+  at once and without end (1450 times in 70 s, until the step budget); now it waits 300 ms before it reads the state
+  again (a step may ask the scripted runtime for a pause, `delayMs`), and after five refusals in a row it stops with
+  the reason.
+- **`npm run e2e:real` runs what the change touches.** It chooses the games itself: the games whose plugin changed
+  since the last release tag, committed or not, and one game for the code every game shares; before, it ran every
+  game that has a scripted player. The log says which games and why. `AAS_E2E_GAMES` still names games explicitly,
+  and `all` runs every game. One game for the shared code, a run per changed plugin, never all of them by default.
+
 ## 0.33.8 — 2026-09-26
 
 - **A run started from the GUI makes its bundle again.** Since 0.33.5 the GUI still called the separate timeline

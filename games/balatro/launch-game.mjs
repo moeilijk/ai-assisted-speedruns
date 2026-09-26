@@ -18,6 +18,7 @@ import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs
 import { BOT_PORT, BRIDGE_PORT, gamePath, readBridgeState } from "./bridge.mjs";
 import { toolsDir } from "./plugin.mjs";
 import { listDisplays } from "../../packages/core/src/windows/displays.mjs";
+import { parkCursor } from "../../packages/core/src/windows/park-cursor.mjs";
 import { loadSettings } from "../../packages/core/src/settings.mjs";
 
 // This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
@@ -121,6 +122,9 @@ while (Date.now() < deadline) {
 quiet.restore();
 if (!up) throw new Error(`Balatro started but balatrobot did not answer on ${botPort} within 120 s (see ${path.join(tools, "Mods", "lovely", "log")})`);
 console.log(`Balatro is up; balatrobot on ${botPort}.`);
+// The game reads where the cursor rests: to the right of a window on the left display it counts as resting on the
+// deck, the deck preview opens and the Play and Discard buttons are never made (measured 2026-09-26).
+console.log(parkCursor({ processName: "Balatro" }) ?? "cursor: not moved (no Balatro window found)");
 console.log(`bridge: ${await ensureBridge()}`);
 const token = readBridgeState()?.token;
 if (!(await health(port, { "X-AAS-Token": token }))) throw new Error(`the bridge on ${port} does not reach balatrobot`);

@@ -39,7 +39,7 @@ export default {
   exercise: [{ label: "state", code: "return await game.observe()", verify: (v) => { if (!v) throw new Error("no state"); } }],
   async connect() { /* ... */ return controller; },
   async prepareRun({ runDir, log, resume, save }) { /* new game; resolves when the agent may act */ return { readyAt: new Date(), seed }; },
-  async saveState({ name }) { /* copy the game's save under this name */ return { file }; },
+  async saveState({ name, log }) { /* copy the game's save under this name */ return { file }; },
   async loadState({ name, log, runDir }) { /* restore it; the game paused or waiting */ },
   async endRun({ runDir }) { /* stop in-game recording, copy ground truth */ },
   async close({ log }) { /* close the game the way a user would; undo what the launcher set up */ return "closed"; },

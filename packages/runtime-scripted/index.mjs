@@ -18,7 +18,7 @@ export default {
   /** a script plays, not a model: every run of this runtime is a mock. */
   ai: false,
   name: "Scripted bot",
-  version: "0.33.8",
+  version: "0.33.9",
   interrupt(reason) { interrupted = reason; },
   async configure(runDir, broker, brief) {
     const bot = brief.bot ?? process.env.AAS_BOT ?? null;
@@ -56,6 +56,7 @@ export default {
       while (steps < maxSteps && !interrupted) {
         const step = bot.next(result);
         if (!step) { notes = bot.broken ? bot.broken : "bot done"; break; }
+        if (step.delayMs > 0) await new Promise((r) => setTimeout(r, step.delayMs)); // the bot asks for a pause first (a game that is not ready yet)
         steps += 1;
         const id = `toolu_${String(steps).padStart(6, "0")}`;
         rec("assistant", { role: "assistant", model: brief.model ?? "scripted", content: [{ type: "text", text: step.note ?? "" }, { type: "tool_use", id, name: `mcp__${brief.game.id}__${brief.game.id}_exec`, input: { code: step.code } }], usage: { input_tokens: 0, output_tokens: 0 } }, { requestId: `req_${steps}` });

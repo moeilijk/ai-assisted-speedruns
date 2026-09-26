@@ -9,6 +9,17 @@ import { run } from "../../core/src/run.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+test("scripted runtime: a step that asks for a pause (delayMs) is sent after it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-scripted-"));
+  const bot = join(dir, "bot.mjs");
+  writeFileSync(bot, `export function createBot() { let n = 0; return { next() { n += 1; if (n === 1) return { code: "return await game.observe()", note: "look" }; if (n === 2) return { code: "return await game.observe()", note: "look again, later", delayMs: 400 }; return null; } }; }`);
+  writeFileSync(join(dir, "AGENTS.md"), "Play the fake game.\n");
+  const t0 = Date.now();
+  const r = await run({ runtime: join(here, "..", "index.mjs"), game: join(here, "..", "..", "core", "test", "fake-game.mjs"), recorder: "null", "run-dir": join(dir, "run-01"), bot, instructions: join(dir, "AGENTS.md") }, { log() {} });
+  assert.match(r.outcome.notes, /2 steps; bot done/);
+  assert.ok(Date.now() - t0 >= 400, "the second step waited 400 ms");
+});
+
 test("scripted runtime: the bot's decisions become tool calls until it is done", async () => {
   const dir = mkdtempSync(join(tmpdir(), "aas-scripted-"));
   const bot = join(dir, "bot.mjs");

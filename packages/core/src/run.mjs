@@ -39,7 +39,7 @@ export function createAutosave({ plugin, runDir, brief, events, log, autosaveMin
       // too, from the broker.
       const index = countSaves(runDir) + 1;
       const name = `aas_${brief.id.replace(/[^A-Za-z0-9]/g, "_")}_${String(index).padStart(3, "0")}`;
-      const r = await plugin.saveState({ name });
+      const r = await plugin.saveState({ name, log });
       let copy = null;
       if (r?.file && fs.existsSync(r.file)) {
         fs.mkdirSync(path.join(runDir, "saves"), { recursive: true });

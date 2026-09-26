@@ -10,6 +10,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { endScreensaver } from "./screensaver.mjs";
 
 const winTemp = execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", cwd: "/mnt/c", stdio: ["ignore", "pipe", "ignore"] }).trim();
 const flagWin = `${winTemp}\\aas-keep-awake.flag`;
@@ -32,6 +33,10 @@ while ((Test-Path '${flagWin}') -and ((Get-Content '${flagWin}' -Raw -ErrorActio
 if (cmd === "start") {
   const token = `${new Date().toISOString()} ${process.pid}`;
   fs.writeFileSync(flag, token);
+  // ES_DISPLAY_REQUIRED keeps the screensaver from starting; one that already runs is ended here (the mouse move
+  // below does not end it, measured).
+  const screensaver = endScreensaver();
+  if (screensaver) console.log(`keep-awake: ${screensaver}`);
   const child = spawn("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", helper(token)], { detached: true, stdio: "ignore" });
   child.unref();
   console.log(`keep-awake: started (display wake sent; ES_DISPLAY_REQUIRED held while ${flagWin} carries this token)`);

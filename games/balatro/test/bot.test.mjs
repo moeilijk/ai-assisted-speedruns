@@ -63,6 +63,33 @@ test("the bot walks a round: blind, play, cash out, shop, next round", () => {
   assert.match(bot.next({ state: "SMODS_BOOSTER_OPENED" }).code, /bal\.pack\(\{ skip: true \}\)/);
 });
 
+test("an action refused five times in a row ends the bot with the reason; a refusal that is answered does not count", () => {
+  const logs = [];
+  const bot = createBot({ log: (m) => logs.push(m) });
+  const handState = { state: "SELECTING_HAND", round: { hands_left: 4, discards_left: 4 }, hand: { cards: hand("H_T", "S_T", "C_T", "D_2", "H_3", "S_4", "C_5", "D_6") } };
+  bot.next(null);
+  assert.match(bot.next(handState).code, /bal\.play\(/);
+  for (let i = 0; i < 4; i += 1) {
+    const again = bot.next({ error: "Balatro refused play: attempt to index field 'buttons' (a nil value)" });
+    assert.match(again.code, /bal\.state\(\)/, "after a refusal the state is read again");
+    assert.equal(again.delayMs, 300, "300 ms later: the game may still be busy");
+    const play = bot.next(handState);
+    assert.match(play.code, /bal\.play\(/);
+    assert.equal(play.delayMs, undefined, "a plain step waits for nothing");
+  }
+  assert.equal(bot.broken, null);
+  assert.equal(bot.next({ error: "Balatro refused play: attempt to index field 'buttons' (a nil value)" }), null, "the fifth refusal ends the bot");
+  assert.match(bot.broken, /refused the bot's action 5 times in a row; last: Balatro refused play/);
+  assert.ok(logs.some((m) => /stopping/.test(m)));
+  const fresh = createBot();
+  fresh.next(null);
+  fresh.next(handState);
+  fresh.next({ error: "refused once" });
+  assert.match(fresh.next(handState).code, /bal\.play\(/);
+  assert.match(fresh.next({ state: "ROUND_EVAL" }).code, /bal\.cashOut\(\)/, "an action that went through resets the count");
+  assert.equal(fresh.broken, null);
+});
+
 test("a Planet card is used before anything else, and a won run ends the bot", () => {
   const bot = createBot();
   const s = { state: "SELECTING_HAND", consumables: { cards: [{ set: "Planet" }] }, round: { hands_left: 4, discards_left: 4 }, hand: { cards: hand("H_T", "S_T") } };

@@ -8,6 +8,7 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { jsonRpcClient } from "../../packages/core/src/json-rpc-http.mjs";
+import { describeGamestate, profileSaveFile, waitForSave } from "./save-file.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const HOST = process.env.AAS_BALATRO_HOST || "127.0.0.1";
@@ -59,7 +60,7 @@ const toMenu = async (rpc, log) => {
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.33.8",
+  version: "0.33.9",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",
@@ -210,18 +211,25 @@ export default {
     log(`run started: ${s.deck ?? DECK} deck, ${s.stake ?? STAKE} stake, seed ${s.seed ?? "?"}${seed ? " (set)" : " (random)"}`);
     return { readyAt: new Date(), seed: s.seed ?? null, seed_code: s.seed ?? null };
   },
-  /** balatrobot's `save` writes the running game to a file next to the game; the harness copies it into the run. */
-  async saveState({ name }) {
+  /** The run's save is a copy of the game's own save (the file the Continue button loads), taken once it describes the
+   *  state balatrobot reports: the game writes it a moment after each change. balatrobot's `save` is not used, because
+   *  it rebuilds the save at a moment the game never saves at; in the cash-out screen the blind is already cleared, and
+   *  a run resumed from such a save got the hands money but not the blind reward. See save-file.mjs. */
+  async saveState({ name, log = () => {} }) {
     const dir = toolsDir();
     if (!dir) return { name, file: null };
-    const { gamePath } = await import("./bridge.mjs");
+    const rpc = await harnessClient();
+    const s = await rpc.call("gamestate");
+    if (s.state === "GAME_OVER") { log(`save ${name}: game over, there is no run to save`); return { name, file: null }; }
+    const src = profileSaveFile();
+    const { waited } = await waitForSave(src, describeGamestate(s));
     mkdirSync(join(dir, "saves"), { recursive: true });
     const file = join(dir, "saves", `${name}.jkr`);
-    const rpc = await harnessClient();
-    await rpc.call("save", { path: gamePath(file) });
+    copyFileSync(src, file);
+    if (waited >= 500) log(`save ${name}: the game's own save caught up after ${(waited / 1000).toFixed(1)} s`);
     return { name, file };
   },
-  /** Resume: the named save (from <run>/saves/ or next to the game) is loaded into the running game. */
+  /** Resume: the named save (from <run>/saves/ or next to the game) is loaded into the running game through balatrobot's `load`. */
   async loadState({ name = null, log = () => {}, runDir = null, seed = null } = {}) {
     const dir = toolsDir();
     const candidates = [runDir && name ? join(runDir, "saves", `${name}.jkr`) : null, dir && name ? join(dir, "saves", `${name}.jkr`) : null].filter(Boolean);

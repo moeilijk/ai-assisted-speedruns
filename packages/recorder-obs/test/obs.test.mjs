@@ -6,7 +6,23 @@ import { connectObs } from "../obs-ws.mjs";
 
 const game = { id: "portal", name: "Portal", processName: "hl2.exe" };
 const brief = { id: "portal-01", category: { game: "portal", goal: "credits" }, model: "claude-fable-5-1" };
-const quiet = { outroSeconds: 0.05, log: () => {} };
+const quiet = { outroSeconds: 0.05, log: () => {}, endScreensaver: () => null }; // no Windows side asked in tests
+
+test("recorder-obs: a running screensaver is ended before the recording, and the log says so", async () => {
+  const obs = await startFakeObs();
+  try {
+    const lines = [];
+    let asked = 0;
+    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, writingSeconds: 0.5, log: (t) => lines.push(t), endScreensaver: () => (asked += 1, "screensaver: was running (it starts after Windows's idle time and hides the game from the window capture); ended") });
+    await rec.preflight(brief, game);
+    await rec.start(brief, { runDir: "/tmp/not-a-mnt-path" });
+    assert.equal(asked, 1, "asked once, before the picture check");
+    assert.ok(lines.some((l) => /^screensaver: was running .*; ended$/.test(l)), lines.join("\n"));
+    assert.ok(lines.findIndex((l) => /^screensaver/.test(l)) < lines.findIndex((l) => /picture check/.test(l)), "ended before the picture is checked");
+  } finally {
+    await obs.close();
+  }
+});
 
 test("obs-ws: authenticates and rejects a wrong password", async () => {
   const obs = await startFakeObs({ password: "pw" });

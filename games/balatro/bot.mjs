@@ -115,13 +115,28 @@ export function shopChoice(s) {
 
 export function createBot({ log = () => {} } = {}) {
   const maxAttempts = Number(process.env.AAS_BOT_BALATRO_ATTEMPTS || 1);
+  const maxRefusals = 5; // the same action refused this often in a row ends the bot: the game is not where it should be
   let overs = 0;
+  let refusals = 0;
+  let broken = null;
   let pending = null; // what the last exec was
   return {
+    /** Why the bot gave up, once it has. */
+    get broken() { return broken; },
     next(result) {
-      if (result?.error) { log(`error: ${result.error}`); if (pending === "state") return null; }
+      if (result?.error) {
+        log(`error: ${result.error}`);
+        if (pending === "state") return null;
+        refusals += 1;
+        if (refusals >= maxRefusals) {
+          broken = `the game refused the bot's action ${refusals} times in a row; last: ${String(result.error).split("\n")[0]}`;
+          log(`${broken}; stopping`);
+          return null;
+        }
+      } else if (pending === "act") refusals = 0;
       const s = result && !result.error ? result : null;
-      if (!s) { pending = "state"; return one("return await bal.state();", "read the state"); }
+      // After a refusal the state is read again 300 ms later: the game may not have finished its animation yet.
+      if (!s) { const refused = pending === "act"; pending = "state"; return { ...one("return await bal.state();", "read the state"), ...(refused ? { delayMs: 300 } : {}) }; }
       if (s.won) return null;
       pending = "act";
       switch (s.state) {

@@ -19,6 +19,7 @@ import net from "node:net";
 import { fileURLToPath } from "node:url";
 import { connectObs } from "./obs-ws.mjs";
 import { pngMeanLuma } from "./png-luma.mjs";
+import { endScreensaver } from "../core/src/windows/screensaver.mjs";
 
 const MIC_KINDS = new Set(["wasapi_input_capture", "coreaudio_input_capture", "pulse_input_capture", "alsa_input_capture"]);
 
@@ -231,7 +232,7 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.33.8",
+    version: "0.33.9",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
     async doctor() {
@@ -308,6 +309,10 @@ export function createObsRecorder(options = {}) {
       // Open on the game scene: at t0 the game sits on its own title/main-menu screen, and the run starts from there
       // (prepareRun dwells on it, then begins), so the recording shows a genuine run from the beginning.
       await o.call("SetCurrentProgramScene", { sceneName: names.game });
+      // The screensaver starts after Windows's idle time and runs on a desktop of its own; while it runs, the window
+      // capture of the game shows black (measured: a run refused for a black picture while the game rendered).
+      const screensaver = (options.endScreensaver ?? endScreensaver)();
+      if (screensaver) log(screensaver);
       // The overlay is a browser source set to shut down when it is not visible and to restart when the
       // scene becomes active. The recording now opens on the game scene, so that activation may never
       // happen and the source would stay blank: refresh it explicitly.
