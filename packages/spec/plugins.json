@@ -68,7 +68,7 @@
       "name": "Balatro",
       "version": "0.34.0",
       "stub": false,
-      "sha256": "60fd44a38cf771e3166049938587d44d854904cb5859deba086e9547fb7babf8"
+      "sha256": "e0cb56ca9c255b6c2a983497c70d37ceaac50789a8fb2d56337bbe56e6ed5866"
     },
     {
       "kind": "game",
@@ -131,7 +131,7 @@
       "name": "Portal",
       "version": "0.34.0",
       "stub": false,
-      "sha256": "8c4c342a23a009c38f5dc0f59f3ab8f0853b2e0735892eda1598d6a7a22b6f10"
+      "sha256": "6d48af44d10c7b22509483ffc72ba614f96c354b39d48498ec5e2a28c0ba71d1"
     },
     {
       "kind": "game",
