@@ -27,6 +27,11 @@ const log = (t) => process.stderr.write(`# ${new Date().toTimeString().slice(0, 
 
 test("aas login walks the Archive's real sign-in and Allow pages in a browser; the tokens then serve aas tickets and aas upload", { skip, timeout: 300000 }, async () => {
   const creds = JSON.parse(fs.readFileSync(loginFile, "utf8"));
+  // The archive under test: AAS_PROOF_URL when set (another archive, such as a dev one, with its keys in
+  // AAS_PROOF_KEYS), else the one the login file names. The account is the same on both.
+  const { proofUrl } = await import(pathToFileURL(path.join(root, "packages", "core", "src", "proof.mjs")).href);
+  creds.archive = process.env.AAS_PROOF_URL ? proofUrl() : creds.archive;
+  log(`archive under test: ${creds.archive}`);
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "aas-login-e2e-"));
   const saved = process.env.XDG_CONFIG_HOME;
   process.env.XDG_CONFIG_HOME = path.join(work, "config");
