@@ -30,6 +30,10 @@ them carries `harness.version` 0.1.0.
   Archive's own script, never in the repository), receives the code on the loopback, exchanges it for tokens in a
   temporary config dir, and then runs `aas tickets`, `aas upload` (the mock fixture, taken in for review and wiped)
   and `aas logout` from the command line with those tokens; signed out, `aas upload` refuses and names `aas login`.
+  The page the browser lands on afterwards, served by the tooling on the loopback, now looks like the Archive's
+  pages (its colours in light and dark, its header with the clock mark) and says what happened and what to do:
+  signed in to which Archive, close the tab, what the account now does, `aas logout`; or, when the answer did not
+  come from this sign-in, that nothing was stored and how to start again.
 - **The documentation says what the code does.** Every README and document was read against the code (the
   maintainer's order): the CLI's usage text now lists `aas login`, `aas logout`, `aas tickets`, `aas stop`,
   `aas upload` and `aas publish --upload`, and every flag the commands read; `--attempt last` is accepted (the

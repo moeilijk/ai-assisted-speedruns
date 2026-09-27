@@ -6,7 +6,7 @@ import fs from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { startFakeSite } from "./fake-site.mjs";
-import { accessToken, credentialsFile, loggedIn, login, logout, readCredentials } from "../src/auth.mjs";
+import { accessToken, callbackPage, credentialsFile, loggedIn, login, logout, readCredentials } from "../src/auth.mjs";
 import { checkProof, proofClient, publicProof, readState, readTicketIndex, segmentProof } from "../src/proof.mjs";
 import { startSegmentProof } from "../src/proof-run.mjs";
 
@@ -27,6 +27,21 @@ async function setup(t) {
 }
 // The browser, in a test: follow the archive's redirect to the loopback like a browser would.
 const browser = (url) => { fetch(url).catch(() => {}); };
+
+test("the page the browser lands on says what happened and what to do, in the Archive's look", () => {
+  const ok = callbackPage({ ok: true, baseUrl: "https://archive.example" });
+  assert.match(ok, /<h1 class="ok">Signed in<\/h1>/);
+  assert.match(ok, /signed in to the Archive at <b>archive\.example<\/b>/);
+  assert.match(ok, /close this tab/);
+  assert.match(ok, /aas logout/);
+  assert.match(ok, /prefers-color-scheme: dark/, "dark and light, like the site");
+  assert.match(ok, /class="brand-mark"/, "the site's clock mark");
+  const bad = callbackPage({ ok: false, baseUrl: "https://archive.example" });
+  assert.match(bad, /<h1 class="bad">Not signed in<\/h1>/);
+  assert.match(bad, /nothing was stored/);
+  assert.match(bad, /aas login/);
+  assert.ok(!/<script/.test(ok + bad), "no script on the loopback page");
+});
 
 test("signing in is the authorization code with PKCE, and the refresh token rotates", async (t) => {
   const { site } = await setup(t);
