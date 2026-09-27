@@ -108,6 +108,25 @@ test("no ticket, no start: a run that wants proof does not start without it", as
   await assert.rejects(startSegmentProof({ runDir, segment: 1, runtime, events }), /no ticket from the Archive .*Not starting/);
 });
 
+test("a ticket request that gets no connection is tried again a few times; an answer, also a refusal, is final at once", async (t) => {
+  const { site } = await setup(t);
+  // The archive restarting at the moment of the request: the first two connections fail, the third gets through.
+  let calls = 0;
+  const flaky = (url, init) => { calls += 1; if (calls < 3) return Promise.reject(new TypeError("fetch failed")); return fetch(url, init); };
+  const ticket = await proofClient({ baseUrl: site.url, fetchImpl: flaky, retryWaits: [10, 10, 10] }).ticket();
+  assert.ok(ticket.ticket, "the third attempt got the ticket");
+  assert.equal(calls, 3);
+  // Never a connection: the error says how often it was tried.
+  calls = 0;
+  await assert.rejects(proofClient({ baseUrl: site.url, fetchImpl: () => (calls += 1, Promise.reject(new TypeError("fetch failed"))), retryWaits: [10, 10, 10] }).ticket(), /fetch failed \(4 attempts over 0\.03 s\)/);
+  assert.equal(calls, 4);
+  // An answer is final: a refusal is not tried again.
+  calls = 0;
+  const refusing = (url, init) => { calls += 1; return fetch(url, { ...init, headers: { ...init.headers, Authorization: "Bearer not-a-token" } }); };
+  await assert.rejects(proofClient({ baseUrl: site.url, fetchImpl: refusing, retryWaits: [10, 10, 10] }).ticket(), /answered 401/);
+  assert.equal(calls, 1, "a 401 is the archive's answer, not a missing connection");
+});
+
 test("without an account or a yes, a run is unsigned and says so; --proof off overrides both", async (t) => {
   const { runDir, runtime, events, site } = await setup(t);
   const lines = [];

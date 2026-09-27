@@ -46,7 +46,7 @@ function soundOf(exe) {
   } catch { return null; }
 }
 
-test("every game's mock through the real GUI: silent, bundled, uploaded, everything closed, settings unchanged", { skip, timeout: 4 * 3600000 }, async () => {
+test("every game's mock through the real GUI: silent, bundled, uploaded, everything closed, settings unchanged", { skip, timeout: 4 * 3600000 }, async (t) => {
   const work = fs.mkdtempSync(path.join(os.tmpdir(), "aas-e2e-real-"));
   // The machine's settings, copied before anything runs and compared at the end.
   const keep = [".env", ".local/gui-checks.json"].filter((f) => fs.existsSync(path.join(root, f)));
@@ -94,6 +94,8 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       if (!p.setup?.bot) { log(`${id}: no scripted player, skipped`); continue; }
       list.push({ id, exe: p.processName, name: p.name });
     }
+    // No game to run is not a pass: say so, and skip (AAS_E2E_GAMES=all or a list runs games regardless).
+    if (!list.length) { t.skip("no plugin changed since the last tag and no shared code did, so no game was run; AAS_E2E_GAMES=all or a list runs games"); return; }
 
     for (const g of list) {
       log(`${g.name}: start`);
@@ -117,6 +119,9 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       const lines = (await page.$$eval("#log > div", (d) => d.map((x) => `[${x.className}] ${x.textContent}`))).slice(logLen);
       const errors = lines.filter((l) => l.startsWith("[err]"));
       log(`${g.name}: ${result.slice(0, 140)}; sound on: ${[...sounds].join(", ") || "no session seen"}`);
+      // A session that did not complete: the GUI's log holds the reason (the run's own lines); it goes into this log,
+      // so a failure can be read afterwards without the page.
+      if (!/completed|stopped/.test(result)) for (const l of lines.slice(-12)) log(`${g.name}: log: ${l.slice(0, 200)}`);
       const onSpeakers = [...sounds].filter((s) => !s.startsWith("none") && !(quiet && s.includes(quiet)));
       if (onSpeakers.length) failures.push(`${g.name}: sound on ${onSpeakers.join(", ")}`);
       if (errors.length) failures.push(`${g.name}: ${errors.length} error line(s): ${errors.slice(0, 3).join(" | ")}`);

@@ -12,6 +12,15 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.34.2 — 2026-09-27
+
+- **A ticket request that gets no connection is tried again.** The Archive was restarting for a deploy at the
+  moment a run asked for its ticket (measured 2026-09-27 22:15: connection refused, the run refused), so the
+  request is now made up to four times over ten seconds; an answer, also a refusal, is final at once.
+- **`e2e:real` writes the GUI's log when a session did not complete**, so the reason can be read afterwards
+  without the page; and when no plugin changed since the last tag and no shared code did, it skips with that
+  reason instead of passing with no game run (`AAS_E2E_GAMES=all` or a list still runs games).
+
 ## 0.34.1 — 2026-09-27
 
 - **The Archive's API and its OpenAPI document are part of `e2e:chain`** (the maintainer's order). A third test
