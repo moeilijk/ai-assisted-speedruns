@@ -149,3 +149,72 @@ test("the live Archive and the tooling agree on every fixture, the proof and the
   assert.ok(r.json.removed.submissions >= Object.keys(accepted).length, "the fixtures' submissions were wiped");
   for (const id of Object.values(accepted)) assert.equal((await call("GET", `/api/v1/e2e/submissions/${id}`)).status, 404, "nothing to read back after the wipe");
 });
+
+// The Archive's read API and its OpenAPI document (the maintainer's order, 2026-09-27: "swagger and the API are part
+// of the e2e"). The read side takes an API token made on the account page; the e2e account's token is kept next to
+// its password in ~/.config/aas/e2e-login.json (`api_token`). A run the account accepted is read back through
+// /api/v1/runs/<id> with the token and refused without one; the OpenAPI document lists the paths the tooling uses.
+const loginFile = path.join(os.homedir(), ".config", "aas", "e2e-login.json");
+const apiToken = (() => { try { return JSON.parse(fs.readFileSync(loginFile, "utf8")).api_token ?? null; } catch { return null; } })();
+const skipApi = skip || (!apiToken ? "no api_token in ~/.config/aas/e2e-login.json: the e2e account's API token is not on this machine" : false);
+
+test("the read API answers the token on runs, games and stats, refuses without one, keeps a hidden run 404 for everyone; the OpenAPI document lists the tooling's paths", { skip: skipApi, timeout: 300000 }, async () => {
+  const { archiveFetch } = await import(pathToFileURL(hook).href);
+  const { proofUrl } = await import("../src/proof.mjs");
+  const base = proofUrl();
+  const call = async (method, p, { body = null, headers = {}, plain = false } = {}) => {
+    const res = await (plain ? fetch : archiveFetch)(`${base}${p}`, { method, headers: { Accept: "application/json", ...headers }, body, signal: AbortSignal.timeout(120000) });
+    let json = null;
+    try { json = await res.json(); } catch { /* not JSON */ }
+    return { status: res.status, json, headers: res.headers };
+  };
+  let r = await call("DELETE", "/api/v1/e2e/");
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  try {
+    // A run the account accepted: the mock fixture, taken in for review and accepted (hidden, as every e2e run is).
+    r = await call("POST", "/api/v1/bundles", { body: fs.readFileSync(path.join(fixtures, "mock.zip")), headers: { "Content-Type": "application/zip", "X-Filename": "mock.zip" } });
+    assert.equal(r.status, 200, `upload: ${JSON.stringify(r.json)}`);
+    const acc = await call("POST", `/api/v1/e2e/submissions/${r.json.submission}/accept`);
+    assert.equal(acc.status, 200, `accept: ${JSON.stringify(acc.json)}`);
+    const run = acc.json.run;
+    log(`accepted as ${run}`);
+
+    // The read API: with the token, the run; without one, 401 and the way to a token.
+    const noToken = await call("GET", `/api/v1/runs/${encodeURIComponent(run)}`, { plain: true });
+    assert.equal(noToken.status, 401, "the read API wants a token");
+    assert.match(noToken.headers.get("www-authenticate") ?? "", /Bearer/, "WWW-Authenticate: Bearer");
+    // With the token: the API shares only what the site shows everyone (the maintainer, 2026-09-27: "the API is for
+    // outside queries; reviewer or owner makes no difference"). A hidden run, which every e2e run is, is 404 with the
+    // token as without a session on the page; its own account reads it through the e2e endpoint.
+    const withToken = await call("GET", `/api/v1/runs/${encodeURIComponent(run)}`, { plain: true, headers: { Authorization: `Bearer ${apiToken}` } });
+    assert.equal(withToken.status, 404, `a hidden run with the token: ${JSON.stringify(withToken.json).slice(0, 200)}`);
+    assert.match(withToken.json?.error?.message ?? "", /not published|No run is published/, "the 404 says the run is not published");
+    const own = await call("GET", `/api/v1/e2e/runs/${encodeURIComponent(run)}`);
+    assert.equal(own.status, 200);
+    assert.equal(own.json.hidden, true);
+    log(`the hidden run is 404 through the API, with the token too (the API shares only what is public); read back through the e2e endpoint`);
+    for (const p of ["/api/v1/runs", "/api/v1/games", "/api/v1/stats"]) {
+      const r2 = await call("GET", p, { plain: true, headers: { Authorization: `Bearer ${apiToken}` } });
+      assert.equal(r2.status, 200, `${p} answers the token: ${JSON.stringify(r2.json).slice(0, 120)}`);
+      const r3 = await call("GET", p, { plain: true });
+      assert.equal(r3.status, 401, `${p} without a token`);
+    }
+    log("the read API answers the token on runs, games and stats, and refuses without one");
+
+    // The OpenAPI document: every path the tooling calls is in it, with the method the tooling uses.
+    const spec = await call("GET", "/api/openapi.json", { plain: true });
+    assert.equal(spec.status, 200);
+    assert.match(String(spec.json?.openapi ?? ""), /^3\./, "an OpenAPI 3 document");
+    for (const [p, method] of [["/api/v1/tickets", "post"], ["/api/v1/tickets/{ticket}/heads", "post"], ["/api/v1/bundles", "post"], ["/api/v1/runs/{run}", "get"]]) {
+      assert.ok(spec.json.paths?.[p], `${p} is in the OpenAPI document`);
+      assert.ok(spec.json.paths[p][method], `${method.toUpperCase()} ${p} is in the OpenAPI document`);
+    }
+    log(`openapi ${spec.json.openapi}: ${Object.keys(spec.json.paths).length} paths, the tooling's four among them`);
+    const docs = await fetch(`${base}/api/docs/`, { signal: AbortSignal.timeout(60000) });
+    assert.equal(docs.status, 200, "Swagger UI answers");
+    assert.match(await docs.text(), /swagger|openapi/i, "Swagger UI is the page at /api/docs/");
+  } finally {
+    r = await call("DELETE", "/api/v1/e2e/");
+    log(`wiped ${JSON.stringify(r.json?.removed)}`);
+  }
+});

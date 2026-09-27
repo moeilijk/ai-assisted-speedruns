@@ -12,6 +12,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.34.1 — 2026-09-27
+
+- **The Archive's API and its OpenAPI document are part of `e2e:chain`** (the maintainer's order). A third test
+  uploads and accepts a fixture, then asks the read API for it with the e2e account's API token (kept next to its
+  password in `~/.config/aas/e2e-login.json`, never in the repository): a hidden run is 404 with the token as it is
+  for everyone, because the API shares only what the site shows everyone (the maintainer's rule); its own account
+  reads it through the e2e endpoint. The run list, the games and the stats
+  answer the token and refuse without one (401, `WWW-Authenticate: Bearer`); `/api/openapi.json` is an OpenAPI 3
+  document that lists the four paths the tooling calls with their methods, and Swagger UI answers at `/api/docs/`.
+  The tooling itself calls only the write side (tickets, heads, bundles), so nothing else changes.
+
 ## 0.34.0 — 2026-09-27
 
 - **Two zips, each saying what it is (SPEC draft 0.44).** The upload zip carries the run's logs as they are, under
