@@ -41,10 +41,16 @@ test("packBundle leaves the recording out, keeps its hashes in the manifest, and
   assert.equal(manifest.run_id, "sts-01");
   assert.ok(files.some((f) => f.path === "recording/run.mp4" && f.sha256), "the linked recording keeps its hash in the manifest");
   const zip = packBundle(out);
-  assert.equal(zip.file, `${out}.zip`);
-  assert.ok(existsSync(zip.file));
-  const list = execFileSync("unzip", ["-Z", "-1", zip.file], { encoding: "utf8" }).split("\n").filter(Boolean).sort();
-  assert.deepEqual(list, ["sts-01/manifest.json", "sts-01/runtime-config/mcp.template.json", "sts-01/summary.json"]);
+  assert.equal(zip.file, `${out}-upload.zip`, "the upload zip is what callers get as `file`");
+  assert.equal(zip.public.file, `${out}-public.zip`);
+  assert.ok(existsSync(zip.file) && existsSync(zip.public.file));
+  const listOf = (f) => execFileSync("unzip", ["-Z", "-1", f], { encoding: "utf8" }).split("\n").filter(Boolean).sort();
+  assert.deepEqual(listOf(zip.public.file), ["sts-01/manifest.json", "sts-01/runtime-config/mcp.template.json", "sts-01/summary.json"], "the public zip is the bundle and nothing else");
+  assert.deepEqual(listOf(zip.file), ["sts-01/UPLOAD-ONLY.txt", "sts-01/manifest.json", "sts-01/runtime-config/mcp.template.json", "sts-01/summary.json"], "the upload zip carries the note");
+  const note = execFileSync("unzip", ["-p", zip.file, "sts-01/UPLOAD-ONLY.txt"], { encoding: "utf8" });
+  assert.match(note, /^UPLOAD ONLY\./);
+  assert.match(note, /sts-01-public\.zip/, "the note names the zip to share");
+  assert.match(note, /no private part/, "without proof it says there is no private part");
 });
 
 test("aas check gives the upload zip the same verdict as the bundle directory it was packed from", () => {

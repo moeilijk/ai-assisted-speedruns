@@ -5,9 +5,9 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.32.0",
+      "version": "0.34.0",
       "ai": true,
-      "sha256": "da3e5fd6a9b6678650c73f0d62b8a347ff99639c4f66f3e9eaf755be6930358c"
+      "sha256": "a231f8d216e989011d31c89b854393528d8c75f0d2dd8a614b194fbfe78bff90"
     },
     {
       "id": "codex",

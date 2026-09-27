@@ -9,6 +9,15 @@ export async function uploadBundle(zipFile, { fetchImpl = currentArchiveFetch(),
   // What is uploaded first: a bundle's zip that is there, before anything is asked of the account or the network.
   if (!fs.existsSync(zipFile) || !fs.statSync(zipFile).isFile()) throw new Error(`${zipFile} is not there: upload the .zip that aas publish made`);
   if (!/\.zip$/i.test(zipFile)) throw new Error(`${zipFile} is not a bundle's .zip`);
+  // Only the upload zip goes to the Archive: the one with the marker and the private part. The public zip is the
+  // bundle to share; sent instead, a run with proof would arrive without the logs the proof covers.
+  const { readZipEntries } = await import("./zip-read.mjs");
+  const { isUploadZip } = await import("./publish.mjs");
+  const entries = readZipEntries(zipFile);
+  if (!isUploadZip(entries)) {
+    const top = entries[0]?.name.split("/")[0] ?? path.basename(zipFile, ".zip").replace(/-public$/, "");
+    throw new Error(`${path.basename(zipFile)} is the public bundle (or a zip from before 0.34.0), not the upload: send ${top}-upload.zip, the zip with UPLOAD-ONLY.txt and the private part the Archive checks`);
+  }
   const token = await accessToken();
   // Without an account only a caller that authenticates its own requests can upload (useArchiveFetch).
   if (!token && fetchImpl === fetch) throw new Error("uploading needs an account: sign in with `aas login` first");

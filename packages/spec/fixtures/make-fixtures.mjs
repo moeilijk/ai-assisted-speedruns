@@ -51,7 +51,7 @@ async function baseBundle(work) {
   const runDir = path.join(work, "fixture-01");
   await run({ runtime: path.join(REPO, "packages", "runtime-scripted", "index.mjs"), game: path.join(fake, "plugin.mjs"), "run-dir": runDir, bot: path.join(fake, "bot.mjs"), recorder: "null", "keep-open": true, proof: "off" }, { log() {} });
   await publish(runDir, path.join(work, "public", "fixture-01"), { log() {} });
-  return readZipEntries(path.join(work, "public", "fixture-01.zip")).map((e) => ({ name: e.name, data: e.data }));
+  return readZipEntries(path.join(work, "public", "fixture-01-upload.zip")).map((e) => ({ name: e.name, data: e.data }));
 }
 
 const clone = (entries) => entries.map((e) => ({ ...e, data: Buffer.from(e.data) }));
@@ -103,6 +103,11 @@ function hostile(b) {
 export const CLASSES = [
   // The Archive takes a mock in only from its e2e account, as a test; from any other account it is refused.
   { class: "mock", make: (b) => b, archive: { http: 200, status: "review", mock: true, ordinary_account: { http: 422, status: "rejected", code: "bundle.mock" } }, tooling: { requirement: "a model played", status: "unmet", match: "mock" } },
+  // The public zip offered instead of the upload zip: the same bundle without UPLOAD-ONLY.txt (SPEC §7a). The Archive
+  // names the zip to send; the tooling's check reads it as the bundle it is.
+  { class: "public-zip", make: (b) => b.filter((e) => !/\/UPLOAD-ONLY\.txt$/.test(e.name)), archive: { http: 422, status: "rejected", code: "upload.public" }, tooling: { requirement: "a model played", status: "unmet", match: "mock" } },
+  // A zip without the note that carries private/: neither the public nor the upload zip; refused.
+  { class: "private-in-public", make: (b) => [...b.filter((e) => !/\/UPLOAD-ONLY\.txt$/.test(e.name)), { name: `${top(b)}/private/run.jsonl`, data: Buffer.from('{"kind":"event","event":"run.started"}\n') }], archive: { http: 422, status: "rejected", code: "bundle.private" }, tooling: { requirement: "a model played", status: "unmet", match: "mock" } },
   { class: "tampered-log", make: (b) => { const e = get(b, "session.sanitized.jsonl"); e.data = Buffer.concat([e.data, Buffer.from('{"type":"assistant","note":"added after the run"}\n')]); return b; }, archive: { http: 200, status: "review", unmet: ["Every file matches its hash"] }, tooling: { requirement: "manifest.json", status: "invalid", match: "session.sanitized.jsonl: sha256 mismatch" } },
   { class: "tampered-timeline", make: (b) => { const t = json(b, "timeline.json"); t.edited_after_the_run = true; put(b, "timeline.json", t); return b; }, archive: { http: 200, status: "review", unmet: ["Every file matches its hash"] }, tooling: { requirement: "manifest.json", status: "invalid", match: "timeline.json: sha256 mismatch" } },
   { class: "zip-slip", make: (b) => [...b, { name: `${top(b)}/../../escape.txt`, data: Buffer.from("x") }], archive: { http: 422, status: "rejected", code: "zip.unsafe-path" }, tooling: { throws: "outside" } },

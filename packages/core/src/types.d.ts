@@ -100,7 +100,22 @@ export interface GameSetup {
   folder: string;
   /** Machine settings the game needs, written to .env. `expect` names a file the folder must contain; `find` says where
    *  the GUI looks for it first (a Steam app id, an Epic display name, a GOG game id). */
-  settings: { env: string; label: string; kind: "dir" | "file"; expect?: string; find?: { steam?: number; epic?: string; gog?: string } }[];
+  settings: {
+    env: string;
+    label: string;
+    /** The plain answer to "which folder?" (or file), shown in the empty box and under the heading. */
+    what?: string;
+    kind: "dir" | "file" | "select";
+    expect?: string;
+    find?: { steam?: number; epic?: string; gog?: string };
+    /** `kind: "select"`: the choices (a list, or a function that makes it) and the default. */
+    options?: { value: string; label: string }[] | (() => { value: string; label: string }[]);
+    value?: string;
+  }[];
+  /** The recorders this game fits, in the order the GUI offers them (default ["obs"]; the GUI adds `null`). */
+  recorders?: string[];
+  /** Per check id, a script of the plugin's own that puts that step of the set-up right, with the label its button carries. */
+  fixes?: Record<string, { script: string; label: string }>;
   /** Installs what the plugin adds to the game (mods, config); may be run again. */
   install?: string;
   /** Starts the game and whatever bridge it needs; leaves a game that is already up alone. */
@@ -111,6 +126,8 @@ export interface GameSetup {
   splits?: Record<string, string>;
   /** A bot module for the `scripted` runtime (a mock run). */
   bot?: string;
+  /** Only for a game whose run has a seed: the GUI then asks for one, with this placeholder. */
+  seed?: { placeholder?: string };
   /** The variable the launcher reads for the display to play on ("X,Y"), and for the window size ("WxH"). */
   displayEnv?: string;
   resolutionEnv?: string;
@@ -122,6 +139,10 @@ export interface GamePlugin {
   name?: string;
   version?: string;
   capabilities: GameCapabilities;
+  /** Variable names whose values the run keeps (`brief.gameEnv`): `aas resume` and `aas publish` apply them again. */
+  runEnv?: string[];
+  /** The plugin saves at its own milestones (in the broker, right after the playback) and writes `game.saved` itself. */
+  savesAtMilestones?: boolean;
   /** Process name for the recorder (window match, application audio capture). */
   processName?: string;
   /** The only network destinations the broker may reach. */
@@ -166,7 +187,7 @@ export interface GamePlugin {
   /** `aas run`: start the game side (new game, in-game recording, pause) after the recorder started; resolves when the game is ready for the agent. */
   prepareRun?(ctx: { runDir: string; log?: (text: string) => void; seed?: string | null; goal?: string | null; resume?: boolean; save?: string }): Promise<{ readyAt: Date } | void>;
   /** `aas run`: copy the game's save under this name (autosave every ten minutes, at chapter milestones, at the end). */
-  saveState?(ctx: { name: string }): Promise<unknown>;
+  saveState?(ctx: { name: string; log?: (text: string) => void }): Promise<{ name?: string; file?: string | null } | unknown>;
   /** `aas resume`: restore the game to that save; `seed` when a new game has to be started instead. */
   loadState?(ctx: { name: string; log?: (text: string) => void; runDir?: string | null; seed?: string | null }): Promise<unknown>;
   /** End of a run: close the game the way a user would and undo what the launcher set up. */
@@ -192,6 +213,10 @@ export interface BrokerSpec {
   envNames?: string[];
   runDir: string;
   timeZone?: string;
+  /** The `node --permission ...` command line that starts the broker. */
+  nodeArgs?: string[];
+  /** The broker's environment: the harness's variables plus the ones `envNames` names. */
+  env?: Record<string, string>;
 }
 
 export interface RunOutcome {
@@ -200,6 +225,8 @@ export interface RunOutcome {
   endedAt: string;
   /** Path to the runtime's private log (e.g. a Codex rollout), if any. */
   privateLog?: string;
+  /** The runtime's own session id, for a resume. */
+  sessionId?: string;
   notes?: string;
 }
 
@@ -213,14 +240,18 @@ export interface RuntimePlugin {
   /** The name people know the runtime by ("Claude Code"); required, a bundle carries it next to the id. */
   name: string;
   version?: string;
+  /** Whether a model plays through this runtime. A bundle carries it with the plugin's sha256; a runtime without it makes mocks. */
+  ai?: boolean;
+  /** `aas check-agent`: does the agent's CLI reach the broker (no model call). */
+  connectCheck?(runDir: string, ctx: { gameId: string }): Promise<unknown>;
   /** Write the hardened configuration into the run directory. Must refuse to overwrite. */
   configure(runDir: string, broker: BrokerSpec, brief: RunBrief): Promise<void>;
   /** Rewrite the configuration after the run directory moved (a resume). */
   reconfigure?(runDir: string, broker: BrokerSpec, brief: RunBrief): Promise<void>;
   /** The published copy of the configuration (paths and the game's variables as placeholders); `aas publish` calls it. */
   writePublicConfig?(runDir: string, broker: BrokerSpec): Promise<void>;
-  /** Start the agent and wait until it stops. */
-  start(runDir: string, brief: RunBrief): Promise<RunOutcome>;
+  /** Start the agent and wait until it stops. `checkpoint()` after every step lets a goal or a stop reached by that step end the session. */
+  start(runDir: string, brief: RunBrief, ctx?: { checkpoint?: () => Promise<void> }): Promise<RunOutcome>;
   /** The harness asks the session to end (game over, a budget). */
   interrupt?(reason: string): void;
   /** The plan's stand: `aas run`/`resume` refuse to start when `ok` is false; `aas budget` and `aas doctor` show it. */
@@ -262,7 +293,8 @@ export interface TimerPlugin {
   /** Close the program the way a user would; the end of a run calls it. */
   close?(): Promise<string | void>;
   preflight?(brief: RunBrief, game: GamePlugin): Promise<void>;
-  start(brief: RunBrief): Promise<void>;
+  /** `igt`: the game time a resumed run continues from. */
+  start(brief: RunBrief, ctx?: { igt?: number }): Promise<void>;
   onEvent(event: RunEvent): Promise<void>;
   stop(): Promise<{ igt?: number; times?: unknown }>;
 }
@@ -288,9 +320,13 @@ export interface RecorderPlugin {
   doctor?(ctx: { runDir?: string | null }): Promise<DoctorRow[]>;
   /** Close the program the way a user would; the end of a run calls it. */
   close?(): Promise<string | void>;
+  /** The name people know the program by, and the script that starts it (the GUI's launch step). */
+  name?: string;
+  launch?: string;
   /** Throw to abort the run before it starts. */
   preflight(brief: RunBrief, game: GamePlugin): Promise<void>;
-  start(brief: RunBrief): Promise<{ t0: Date }>;
+  /** `runDir` for the recording folder; `overlayUrl` when the run has an overlay page. */
+  start(brief: RunBrief, ctx?: { runDir?: string; overlayUrl?: string | null }): Promise<{ t0: Date }>;
   onEvent(event: RunEvent): Promise<void>;
   screenshot?(): Promise<Image>;
   stop(): Promise<RecordingResult>;

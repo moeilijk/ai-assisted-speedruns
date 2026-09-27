@@ -1,6 +1,6 @@
 # Slay the Spire 2 (stub)
 
-A stub: the plugin loads and declares its ends, and does nothing else. `aas configure` refuses it. Work on it is planned after 2026-09-16.
+A stub: the plugin loads and declares its ends, and does nothing else. `aas configure` refuses it. A game that is not here is researched and added on request (see the README at the root).
 
 | | |
 |---|---|
@@ -16,4 +16,4 @@ Known risks:
 - Early Access; the mod was tested on v0.103.2.
 - A POST answers at once, so the controller has to poll.
 - No seeded single-player start through the API.
-- HTTP bridge: needs the core's HTTP client (see Balatro).
+- HTTP bridge: the core's JSON-RPC-over-HTTP client (`packages/core/src/json-rpc-http.mjs`, as Balatro uses it).

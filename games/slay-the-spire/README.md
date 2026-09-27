@@ -1,6 +1,7 @@
 # Slay the Spire
 
-Second game plugin: turn-based, so the agent's thinking costs no game time, and every command is measurable. 
+Turn-based: the agent's thinking costs no game time, and every command is measurable.
+
 ## How it works
 
 - **Communication Mod** (ForgottenArbiter, 1.2.1, pinned in [UPSTREAM.json](UPSTREAM.json)) runs inside the game through ModTheSpire + BaseMod. It starts an external process, writes the full game state as one JSON line to that process after every change, and reads commands (`START`, `PLAY`, `END`, `CHOOSE`, `PROCEED`, `POTION`, `KEY`, `CLICK`, `WAIT`, `STATE`) from its stdout.
@@ -23,4 +24,4 @@ npm run sts:stop                          # manual close of the same set (-- --s
 
 ## Why Slay the Spire (and not Zero Company)
 
-Offline, no anti-cheat, deterministic seeds, a bot API that already exists, runs of one to two hours, and speedrun categories to compare against. Kerbal Space Program (kRPC, Mun landing) is the next candidate.
+Offline, no anti-cheat, deterministic seeds, a bot API that already exists, runs of one to two hours, and speedrun categories to compare against. Kerbal Space Program (kRPC, Mun Landing) is a stub, see [games/kerbal-space-program](../kerbal-space-program/README.md).

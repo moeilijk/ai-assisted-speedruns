@@ -453,7 +453,8 @@ export function checkRun(runDir, { core: _ignoredCore = false, privateDir = null
       for (const p of walk(runDir)) {
         // signature.json signs the manifest, so the manifest cannot list it.
         // private/ is the upload's private part: bound through proof.json, never listed or published.
-        if (["manifest.json", "run.jsonl", "signature.json"].includes(p) || p.startsWith("private/")) continue;
+        // UPLOAD-ONLY.txt is the upload zip's own note (SPEC §7a): not a file of the bundle, so not listed either.
+        if (["manifest.json", "run.jsonl", "signature.json", "UPLOAD-ONLY.txt"].includes(p) || p.startsWith("private/")) continue;
         // A bundle has no hidden files: the publisher writes none, and a reader might not show one.
         if (p.split("/").some((x) => x.startsWith("."))) { problems.push(`${p}: a hidden file, which a bundle does not have`); continue; }
         if (!listed.has(p)) problems.push(`${p}: not in manifest`);

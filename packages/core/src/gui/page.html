@@ -115,7 +115,7 @@
     <li>Start it again: double-click <code>AAS.cmd</code> in the repository folder, or run <code>npm run gui</code> in WSL from that folder.</li>
     <li>This page reconnects by itself as soon as the GUI is back. <b>Reload</b> forces it.</li>
     <li>Does it say the port is in use by something else? Start it on another port: <code>aas gui --port 8771</code>, and open that address.</li>
-    <li>Is something still open from a run? The game's own stop script closes it and what it started: <code>npm run portal:stop</code>, <code>npm run sts:stop</code>, <code>npm run balatro:stop</code> or <code>npm run fceux:stop</code>.</li>
+    <li>Is something still open from a run? The game's own stop script closes it and what it started: <code>npm run portal:stop</code>, <code>npm run portal2:stop</code>, <code>npm run sts:stop</code>, <code>npm run balatro:stop</code>, <code>npm run bizhawk:stop</code> or <code>npm run fceux:stop</code>.</li>
   </ol>
   <div class="row-actions">
     <button class="b primary" id="off-reload">Reload</button>
@@ -366,7 +366,7 @@ function showState(s) {
     const link = (p, t) => (p ? `<button class="b" data-open="${esc(p)}">${esc(t)}</button>` : "");
     const upload = r.bundle && proof.signedIn ? `<button class="b" data-upload="${esc(r.bundle)}">Upload to the Archive</button>` : "";
     const cont = r.status === "stopped" && r.runDir ? `<button class="b" data-continue="${esc(r.runDir)}">Continue this run</button>` : "";
-    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "Open run folder"), link(r.recording, "Show recording"), link(r.bundle, "Show bundle (zip)"), upload, cont].filter(Boolean).join("")}`;
+    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "Open run folder"), link(r.recording, "Show recording"), link(r.publicBundle, "Show public zip (to share)"), link(r.bundle, "Show upload zip (Archive only)"), upload, cont].filter(Boolean).join("")}`;
   }
   if (s.phase === "idle") { loadGames(); loadProof(); }
 }
@@ -379,7 +379,7 @@ $("result").onclick = (e) => {
     act("runmsg", "Continuing the run…", async () => { await api("/api/continue", { runDir: cr }); return { message: "Continued; each step follows in the log below." }; });
   }
   const z = e.target.dataset?.upload;
-  if (z && !confirm("Upload this bundle to the Archive under your account? The zip carries the run's logs in a private part, which the Archive uses to check the proof and deletes after its decision.")) feedback("runmsg", "busy", "Cancelled; nothing was uploaded.");
+  if (z && !confirm("Upload this bundle to the Archive under your account? This is the upload zip: it carries the run's logs in a private part, which the Archive uses to check the proof and deletes after its decision. The public zip next to it is the one to share.")) feedback("runmsg", "busy", "Cancelled; nothing was uploaded.");
   else if (z) act("runmsg", "Uploading to the Archive…", () => api("/api/archive", { action: "upload", arg: z }), "Upload sent; the Archive's answer stands in the log below.");
 };
 // The archive: signed in or not, how runs record their proof, and the tickets of this machine's runs.

@@ -46,7 +46,7 @@ const readPublishedTimeline = (outDir) => {
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.43";
+export const SPEC_VERSION = "0.44";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -345,7 +345,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   // The upload carries the private part next to the bundle: the logs the proof covers, for the archive to check
   // and never to publish (SPEC §4). The bundle directory itself never holds them.
   const zip = packBundle(outDir, { privateFiles: privateEntries(runDir) });
-  log(`${path.basename(zip.file)}: ${zip.files} files, ${Math.round(zip.bytes / 1024)} kB (the recording is published separately, not packed)`);
+  log(`${path.basename(zip.public.file)}: ${zip.public.files} files, ${Math.round(zip.public.bytes / 1024)} kB, the bundle to share (the recording is published separately, not packed)`);
+  log(`${path.basename(zip.upload.file)}: ${zip.upload.files} files, ${Math.round(zip.upload.bytes / 1024)} kB, for the Archive only (${zip.upload.files - zip.public.files - 1 > 0 ? "its private part holds the logs the proof covers" : "no private part: the run recorded no proof"})`);
   // The videos the runner uploads (the cut, the full recording per segment, or both) and the code each one's description
   // must contain are in one file next to the videos, in the private run directory.
   const { writeUploadSheet } = await import("./upload-sheet.mjs");
@@ -354,7 +355,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log("");
     log(`Every video you upload needs this code in its description: ${descriptionLine(summary)}`);
     log(`The videos, their code and their chapters: ${uploadSheet}`);
-    log(`Submit ${path.basename(zip.file)} at ${ARCHIVE_URL}/submit/.`);
+    log(`Submit ${path.basename(zip.upload.file)} with \`aas upload\` or at ${ARCHIVE_URL}/submit/; share ${path.basename(zip.public.file)}.`);
     log("");
   }
   log(formatReport(outDir, check));
@@ -367,7 +368,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
  * submission form, not carried in the bundle, and its sha256 stays in `manifest.json` so the linked file can
  * still be checked. Returns `{ file, bytes, files }`.
  */
-export function packBundle(outDir, { zipFile = `${outDir}.zip`, privateFiles = [] } = {}) {
+export function packBundle(outDir, { privateFiles = [] } = {}) {
   const walk = (d, prefix = "") =>
     fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(d, e.name), `${prefix}${e.name}/`) : [`${prefix}${e.name}`]));
   const name = path.basename(outDir).replace(/-public$/, "");
@@ -375,12 +376,35 @@ export function packBundle(outDir, { zipFile = `${outDir}.zip`, privateFiles = [
     .filter((p) => !p.startsWith("recording/") && !p.startsWith("."))
     .sort()
     .map((p) => ({ name: `${name}/${p}`, data: fs.readFileSync(path.join(outDir, p)), mtime: fs.statSync(path.join(outDir, p)).mtime }));
-  // Under private/, which manifest.json does not list and the signature does not cover: the archive takes it out
-  // before it keeps the zip, and binds it only through the (length, sha256) pairs in proof.json.
-  for (const f of privateFiles) entries.push({ name: `${name}/private/${f.name}`, data: fs.readFileSync(f.file), mtime: fs.statSync(f.file).mtime });
-  const buf = zipBuffer(entries);
-  fs.writeFileSync(zipFile, buf);
-  return { file: zipFile, bytes: buf.length, files: entries.length };
+  const write = (zipFile, list) => { const buf = zipBuffer(list); fs.writeFileSync(zipFile, buf); return { file: zipFile, bytes: buf.length, files: list.length }; };
+  // Two zips, each saying what it is (SPEC §7a). The public zip is the bundle and nothing else: safe to share
+  // anywhere. The upload zip is for the Archive only: the bundle, the marker file that says so, and under private/
+  // the logs the proof covers, which manifest.json does not list and the signature does not cover; the archive
+  // takes them out before it keeps the zip and binds them only through the (length, sha256) pairs in proof.json.
+  const publicZip = write(`${outDir}-public.zip`, entries);
+  const marker = { name: `${name}/${UPLOAD_MARKER}`, data: Buffer.from(uploadMarkerText(name, privateFiles.length > 0)), mtime: new Date() };
+  const priv = privateFiles.map((f) => ({ name: `${name}/private/${f.name}`, data: fs.readFileSync(f.file), mtime: fs.statSync(f.file).mtime }));
+  const uploadZip = write(`${outDir}-upload.zip`, [...entries, marker, ...priv]);
+  return { ...uploadZip, upload: uploadZip, public: publicZip };
+}
+
+/** The file at the top of an upload zip that says what the zip is; the public zip has none. */
+export const UPLOAD_MARKER = "UPLOAD-ONLY.txt";
+
+export function uploadMarkerText(runId, withPrivate) {
+  return [
+    "UPLOAD ONLY. This zip is for the Archive's check, not for publishing.",
+    withPrivate
+      ? "Under private/ it carries the logs of the run as they are, which the proof covers: they can hold what the public bundle leaves out (paths, names, everything the sanitiser removes)."
+      : "This run recorded no proof, so there is no private part; the zip still exists only to be sent to the Archive.",
+    `The bundle to share with anyone is ${runId}-public.zip, or the folder ${runId}/: the same files without this note and without private/.`,
+    "",
+  ].join("\n");
+}
+
+/** Whether a zip is an upload zip: it carries the marker at the top of its single directory. */
+export function isUploadZip(entries) {
+  return entries.some((e) => /^[^/]+\/UPLOAD-ONLY\.txt$/.test(e.name));
 }
 
 /**

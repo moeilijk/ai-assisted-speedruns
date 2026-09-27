@@ -11,7 +11,7 @@ Runtime plugin for Claude Code. `configure` writes:
 
 `start` runs `claude --tools "" --mcp-config .mcp.json --strict-mcp-config --settings .claude/settings.json [--model m]` in the run directory. `--tools ""` removes every built-in tool from the session (shell, web, files, subagents), so the agent is offered the broker's three tools and nothing else; the deny rules stay as a second line.
 
-## Workspace trust (Claude Code 2.1.207 and later)
+## Workspace trust (Claude Code 2.1.207 and later; measured with 2.1.270)
 
 Claude Code applies the `permissions.allow` rules of a directory's `.claude/settings.json` only in a directory it trusts: one whose trust dialog was accepted in an interactive session. For a directory inside a git repository the entry it checks is the repository's root, not the directory (measured with 2.1.270), so a run directory inside a checkout, such as the smoke test's `runs/claude-smoke`, trusts that checkout. Every run directory is new, and a headless run (`claude -p`) shows no dialog, so without further action every run starts with `Ignoring 3 permissions.allow entries from .claude/settings.json: this workspace has not been trusted` on stderr. The documented way to trust a directory without the dialog is the flag `projects["<absolute run dir>"].hasTrustDialogAccepted: true` in Claude Code's config file, and that is what `configure` (`aas run`) and `reconfigure` (`aas resume`) write ([trust.mjs](trust.mjs)); nothing else in that file is changed.
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // `aas`: the command-line entry point.
 //
-//   aas configure --runtime <codex|claude-code> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--instructions file]
+//   aas configure --runtime <codex|claude-code|scripted> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--seed s] [--id name] [--build b] [--bot script]
 //   aas start --runtime <id> --run-dir <dir>
 //   aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]
 //   aas check [--strict] [--core] <bundle-dir | bundle.zip>   (--core: accepted and ignored)
@@ -53,7 +53,7 @@ export function parse(argv) {
       else opts[key] = value;
     } else opts._.push(a);
   }
-  for (const [k, rule] of Object.entries(NUMBERS)) if (k in opts) checkNumber(`--${k}`, opts[k], rule);
+  for (const [k, rule] of Object.entries(NUMBERS)) if (k in opts && !(k === "attempt" && opts[k] === "last")) checkNumber(`--${k}`, opts[k], rule); // --attempt last: the last attempt
   return opts;
 }
 
@@ -330,21 +330,25 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "Usage:",
             "  aas check-agent --runtime <claude-code|codex> --game <plugin.mjs> [--run-dir <dir>] [--keep]   does the agent's CLI reach the broker? (no model call, no tokens)",
             "  aas gui [--port 8770] [--no-open]           a web page to set up tools and games and to start runs; shows the commands it runs",
-            "  aas configure --runtime <codex|claude-code> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file]",
-            "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [configure options]",
+            "  aas configure --runtime <codex|claude-code|scripted> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--seed s] [--id name] [--build b] [--bot script]",
+            "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--autosave-minutes 10 | --no-autosave] [--ignore-budget] [--keep-open] [--proof off|anonymous|account] [configure options]",
             "                                           when the run ends the game, the timer, the recorder and a Steam the launcher started are closed; --keep-open leaves them",
-            "  aas budget [--max <percent>]             the Claude plan usage; runs stay under AAS_BUDGET_WEEKLY_MAX (default 50%)",
-            "  aas resume --run-dir <dir> [--save name] [--allow-breaking] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M]",
+            "  aas budget [--max <percent>]             each agent's plan usage; runs stay under AAS_BUDGET_WEEKLY_MAX (Claude Code, default 50%; --max sets it) and AAS_CODEX_BUDGET_MAX (Codex)",
+            "  aas resume --run-dir <dir> [--save name] [--goal <later end>] [--prompt text] [--allow-breaking] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [--proof off|anonymous|account]",
+            "  aas stop --run-dir <dir>                 stops the session in that directory the way Ctrl-C does (saved, recording kept, everything closed)",
             "  aas start --runtime <id> --run-dir <dir>",
-            "  aas doctor --game <plugin.mjs> [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]   read-only checks before a run",
+            "  aas doctor [--game <plugin.mjs>] [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]   read-only checks before a run",
             "  aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]",
-            "  aas timeline <run-dir>                       timers, sections, cut list, timers.srt, inputs.srt",
-            "  aas render <run-dir> [--burn timers,inputs]  ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",
+            "  aas timeline <run-dir> [--attempt last|N] [--margin-before s] [--margin-after s]   timers, sections, cut list, timers.srt, inputs.srt",
+            "  aas render <run-dir> [--video f] [--out f] [--burn timers,inputs] [--no-cut] [--crf 18] [--attempt last|N]   ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",
+            "  aas login | aas logout                   sign in to the Archive (its page opens in the browser); runs record their proof under that account",
+            "  aas tickets [extend|revoke|delete <ticket>]   the tickets of this machine's runs: what they are and until when; extend, revoke or delete one",
             "  aas key [file]                           the publisher's signing key: makes one if there is none, prints the public line to register",
             "  aas key --claim --identity <uri> [--out f]   a signed statement that this key is yours, to publish anywhere",
             "  aas key --verify <file|->                a claim as published: does it verify, and which identities does it name",
-            "  aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>]",
-            "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one",
+            "  aas publish <run-dir> <out-dir> [--sign [key]] [--session <log>] [--completion-marker <text>] [--upload]",
+            "                                           --sign without a path uses the key of `aas key`, or an SSH key if you already have one; --upload sends the zip as `aas upload` does",
+            "  aas upload <run>-upload.zip              sends the upload zip to the Archive under the account you signed in with (the -public.zip is the one to share)",
             "  aas upload-sheet <run-dir> [--bundle <public-dir>] [--note <text>]",
             "                                           <run-dir>/recording/UPLOAD.txt: the cut and the full recording per segment, each with its line and chapters",
             "  aas check [--strict] <bundle-dir | bundle.zip>",

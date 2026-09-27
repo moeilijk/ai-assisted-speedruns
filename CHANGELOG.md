@@ -12,6 +12,36 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.34.0 — 2026-09-27
+
+- **Two zips, each saying what it is (SPEC draft 0.44).** The upload zip carries the run's logs as they are, under
+  `private/`, for the Archive's check; they can hold what the public bundle leaves out. It was named like the bundle
+  and looked like something to share. `aas publish` now writes `<run>-public.zip`, the bundle and nothing else, to
+  share anywhere, and `<run>-upload.zip`, for the Archive only, with `UPLOAD-ONLY.txt` at its top that says so and
+  names the public zip, and the private part when the run recorded proof. `aas upload` and the GUI send only the
+  upload zip and, given the public one, name the file to send; the GUI shows both. An archive takes only the upload
+  zip and refuses the public one, or a zip without the note that carries `private/`; two fixtures (`public-zip`,
+  `private-in-public`) assert those verdicts on both sides.
+- **`aas login` is tested the way a person does it.** Until now the browser step had never been walked by anyone on
+  the tooling's side: the unit test's "browser" followed the redirect itself, and the end-to-end tests signed in
+  with the e2e account's key. The maintainer hit the Archive's refusal of its own Allow form (`Origin: null` under
+  Firefox; fixed on the Archive's side). `npm run e2e:chain` now runs `aas login` with headless Chromium through the
+  Archive's real sign-in and Allow pages (the e2e account's password, kept in `~/.config/aas/e2e-login.json` by the
+  Archive's own script, never in the repository), receives the code on the loopback, exchanges it for tokens in a
+  temporary config dir, and then runs `aas tickets`, `aas upload` (the mock fixture, taken in for review and wiped)
+  and `aas logout` from the command line with those tokens; signed out, `aas upload` refuses and names `aas login`.
+- **The documentation says what the code does.** Every README and document was read against the code (the
+  maintainer's order): the CLI's usage text now lists `aas login`, `aas logout`, `aas tickets`, `aas stop`,
+  `aas upload` and `aas publish --upload`, and every flag the commands read; `--attempt last` is accepted (the
+  timeline took it, the parser refused it); the README's upload step is `aas upload <bundle.zip>`; docs/install.md
+  has Portal 2 and BizHawk, the ticket step of a run, the sign-in and upload from the command line, the game
+  settings file and the recorder's timing as it is; docs/reference.md has `aas stop`, `aas upload`, `run.pid`, the
+  full list of `aas check`'s points, `proof.json` and the private part of the upload zip, and a settings table that
+  renders; docs/plugins.md and docs/design.md carry the signatures and the four plugin kinds as they are, the
+  runtime list `runtimes.json`, and no event table of September 9; the game and package READMEs lost machine paths,
+  a planning date, an old OBS source name and stale versions; the GUI's log words match its page and its stop
+  scripts list every game.
+
 ## 0.33.10 — 2026-09-26
 
 - **A game that is not here is researched and added on request.** The README says so, next to the four kinds of

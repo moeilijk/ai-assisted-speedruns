@@ -43,7 +43,7 @@ There are four kinds of plugin: game, runtime (starts the model), recorder and t
 1. `aas run` starts the recorder, the timer and the model against a game you started with its launch script. Everything that happens goes into one log in the run directory, which stays on your machine. At the end it makes the timeline and the cut: the video without the model's thinking pauses, next to the full recording.
 2. `aas publish` makes a bundle from the run directory: the sanitised log, times, the model's instructions and tools, the configuration, and a hash per file. It stops if the privacy scan finds anything, and packs the bundle into a zip. The video is not included.
 3. Upload the cut, the full recording or both. The files are in `<run-dir>/recording/`, with `UPLOAD.txt` next to them. That file lists each video with its length, its chapters and the verification text its description must contain. That text links the video to the bundle. The title and description in `UPLOAD.txt` are only suggestions.
-4. Submit the zip: `aas publish --upload` sends it under the account you signed in with, or submit it at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). You can check the zip first at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/).
+4. Submit the upload zip: `aas upload <run>-upload.zip` sends it under the account you signed in with (`aas login`), or submit it at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). You can check the zip first at [ai-assisted-speedruns.org/verify](https://ai-assisted-speedruns.org/verify/).
 
 After `aas resume`, or after a tooling update that changes the bundle, you publish again as a new revision. See [docs/reference.md](docs/reference.md#a-new-revision).
 
@@ -109,7 +109,7 @@ Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal]
 **Test the machine first with a mock run.** A mock run is the game played by its own scripted player: no model, no
 tokens. It tests everything an AI run needs — the agents that are installed reaching the game's tools, the game with
 its mods and bridge, OBS, LiveSplit, in-game time and milestones, the timeline and the bundle — except the model's own
-playing. Start it in the GUI (Run type: mock run) or from a shell; when it goes through, an AI run of the same game
+playing. Start it in the GUI (Played by: the game's script) or from a shell; when it goes through, an AI run of the same game
 and goal starts on the same tools. Its bundle is a complete bundle and never an entry: an archive reads which runtime
 drove the run and what the timeline holds, and publishes nothing a script
 played (SPEC §3). Then do a first AI run:

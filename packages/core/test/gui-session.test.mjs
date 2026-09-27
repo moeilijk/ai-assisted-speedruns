@@ -51,7 +51,7 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
     assert.equal(first.status, "stopped", "the scripted player was done without reaching the end, so the run can go on");
     assert.ok(first.bundle, "the session made a bundle");
     const localRun = path.join(output, "GuiFake", s.state.run);
-    const zip = path.join(output, "GuiFake", "public", `${s.state.run}.zip`);
+    const zip = path.join(output, "GuiFake", "public", `${s.state.run}-upload.zip`);
     assert.ok(fs.existsSync(zip), `${zip} exists`);
     assert.ok(fs.existsSync(path.join(localRun, "run.jsonl")));
 

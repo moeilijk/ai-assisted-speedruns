@@ -19,7 +19,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 // Only one GUI at a time: it starts games, OBS and runs, so a second one would fight the first over the same run
 // directory. The note below points at the page that is already up; a second start opens that page instead of failing.
 // How a check's outcome reads in the log: the same words as the row's status on the page.
-const CHECK_WORDS = { ok: "ready", warn: "not ready", fail: "not ready", missing: "not installed", absent: "not built yet", pending: "checking" };
+const CHECK_WORDS = { ok: "ready", warn: "not ready", fail: "not ready", missing: "not set up", absent: "no plugin yet", pending: "checking" };
 // Settings whose value is a secret: the log names them, never their value.
 const SECRET = /PASSWORD|TOKEN|SECRET|KEY$/;
 const NOTE_FILE = process.env.AAS_GUI_NOTE || path.join(here, "..", "..", "..", "..", ".local", "gui.json");

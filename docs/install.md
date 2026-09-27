@@ -84,7 +84,8 @@ cp .env.example .env
 
 Fill in what applies to your machine; everything optional is off when unset. The CLI and every `npm run`
 script load `.env` themselves, so the same command works from any shell; a variable already set in your
-shell wins. The complete list of variables is in [reference.md](reference.md#settings). The minimum for a
+shell wins. The GUI keeps a game's own settings in `.local/games/<game>.env`; a value there wins over `.env`, and
+both stay on your machine. The complete list of variables is in [reference.md](reference.md#settings). The minimum for a
 recorded run:
 
 | Variable | Where to get it |
@@ -117,8 +118,8 @@ rules are ignored is not a valid run.
 npm run claude:smoke     # a real headless session against a fake game
 ```
 
-It costs a little of your plan (one short session). PASS means: the trust flag works, the agent got exactly
-the three broker tools, and shell and file access were refused. A run in which Claude Code reports
+It costs a little of your plan (one short session). PASS means: the trust flag works, all three broker tools were
+used through the generated configuration, every permission rule was applied, and no other tool was offered. A run in which Claude Code reports
 `Ignoring N permissions.allow entries …` is stopped and ends `failed`. Details: [packages/runtime-claude-code/README.md](../packages/runtime-claude-code/README.md).
 
 ### Codex
@@ -151,8 +152,12 @@ Each game has its own install: the mod or the in-game tooling, the bridge, and i
   (Lovely, Steamodded, balatrobot) and `npm run balatro:launch`.
 - **Portal** — [games/portal/README.md](../games/portal/README.md): Source Unpack, SourcePauseTool built with
   portal-agent's scripts, then `npm run portal:install -- --game-root <dir>` and `npm run portal:launch`.
+- **Portal 2** — [games/portal-2/README.md](../games/portal-2/README.md): Steam, then `npm run portal2:install`
+  (SourceAutoRecord, pinned) and `npm run portal2:launch`.
 - **FCEUX (NES)** — [games/fceux/README.md](../games/fceux/README.md): `npm run fceux:install` (FCEUX 2.6.6 and
   fceux-mcp's bridge, pinned), your own ROM in `.local/roms`, then `npm run fceux:launch`.
+- **BizHawk (NES and other consoles)** — [games/bizhawk/README.md](../games/bizhawk/README.md): `npm run bizhawk:install`
+  (BizHawk 2.11.1 and bizhawk-mcp-native, pinned), your own ROM in `.local/roms`, then `npm run bizhawk:launch`.
 - **Another game** — write a plugin: [plugins.md](plugins.md). Nothing in the core has to change, and a game
   plugin may live outside this repository.
 
@@ -166,8 +171,10 @@ Each game has its own install: the mod or the in-game tooling, the bridge, and i
 
 The recorder checks the recording instead of assuming it, at the start of the run, while a failed recording can
 still stop it: right after the recording starts it confirms that OBS is writing the file (its size grows), and it
-asks OBS for its own rendering of the game source every two seconds. A recording that is not written, or a capture
-that stays black or cannot be rendered after one rebind, aborts the run. See [packages/recorder-obs/README.md](../packages/recorder-obs/README.md).
+asks OBS for its own rendering of the game source every two seconds for the first ten seconds, and once more for
+ten seconds after a rebind. A recording that is not written within ten seconds, or a capture that stays black or
+cannot be rendered after the rebind, aborts the run. A running screensaver is ended first: while it runs, the window
+capture shows black. See [packages/recorder-obs/README.md](../packages/recorder-obs/README.md).
 
 ## 7. LiveSplit (optional)
 
@@ -202,7 +209,9 @@ aas run --runtime claude-code --game games/<game>/plugin.mjs --run-dir <runs>/<g
         --goal <an early end> --headless --max-turns 40 --max-minutes 60
 ```
 
-`aas run` configures the directory, checks the budget, starts the recorder (t0), prepares the game, starts
+`aas run` configures the directory, checks the budget, asks the Archive for the segment's ticket when the run
+records proof (signed in with `aas login`, or `AAS_PROOF=anonymous` in `.env`; otherwise the run is recorded
+unsigned, says so before it starts, and the Archive marks it so), starts the recorder (t0), prepares the game, starts
 the timer and the agent, and when it is over saves, stops the timer and the recorder, copies the recording
 into the run directory, writes `outcome.json` and closes the game, the timer, OBS and a Steam it started
 itself. `--keep-open` leaves them open. A stopped run continues with `aas resume --run-dir <dir>`.
@@ -225,7 +234,12 @@ Publish the video where video is published, and bind the two:
    title where there is none. The video is in the private run directory (`<run-dir>/recording/`, the cut is the
    `.cut.mp4`), not in the public folder; `<run-dir>/recording/UPLOAD.txt` lists the cut and the full recording (one
    video per segment): upload either or both, each with the code.
-3. Submit the zip at [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). The bundle carries no links.
+3. Submit the upload zip: `aas login` once (the Archive's page opens in your browser), then
+   `aas upload <public-dir>-upload.zip`; or `aas publish … --upload` does both steps in one go; or attach it at
+   [ai-assisted-speedruns.org/submit](https://ai-assisted-speedruns.org/submit/). The bundle carries no links.
+   `aas publish` writes two zips next to the bundle folder: `<run>-public.zip` is the bundle and nothing else, safe to
+   share anywhere; `<run>-upload.zip` is for the Archive only, because under `private/` it carries the run's logs as
+   they are (the proof covers them), and it says so in its `UPLOAD-ONLY.txt`.
 
 Anyone can then check that the video belongs to this bundle: the fingerprint in the description, the
 video's length against the lengths the bundle states, and a few tool calls spot-checked at their `elapsed_seconds`.
@@ -306,6 +320,7 @@ No file has to be edited by hand beyond `.env`.
 | `doctor`: `game endpoint 127.0.0.1:<port> ECONNREFUSED` | the game is not running, or its mod/IPC is not enabled. Launch it with the game's own launch script. |
 | `doctor`: OBS reachable but not authenticated | `AAS_OBS_PASSWORD` does not match OBS's WebSocket settings. |
 | The run aborts with a black capture | OBS's game capture bound to a window that is gone. The recorder rebinds once and then stops the run: start the game before the run, and do not restart it during one. |
+| `aas run` refuses: no ticket from the Archive | The run records proof and the Archive did not answer. Try again, or run with `--proof off` for an unsigned run. |
 | `aas run` refuses: the run has already started | A run directory with a run log is continued, never started again. Continue it with `aas resume --run-dir <dir>` (in the GUI: Continue), or use a new run name. |
 | `aas budget` says STOP | your plan is at or above the configured share. Wait for the window to reset, raise `AAS_BUDGET_WEEKLY_MAX` / `AAS_CODEX_BUDGET_MAX`, or use `--ignore-budget` deliberately. |
 | `aas render`: `ffmpeg failed` / no duration in the bundle | ffmpeg or ffprobe is not on the PATH. |

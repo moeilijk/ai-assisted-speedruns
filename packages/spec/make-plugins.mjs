@@ -63,13 +63,14 @@ export const readPublished = () => {
 
 /**
  * The rows whose files changed while their version stayed the same: what this file exists to catch. A row that is
- * new here has nothing to compare against, so it is not one of them.
+ * new here has nothing to compare against, so it is not one of them; nor is a stub, which stays at 0.0.0 until it
+ * is built, whatever its README says meanwhile.
  */
 export function staleVersions(rows, published = readPublished()) {
   const before = new Map((published?.plugins ?? []).map((p) => [`${p.kind}/${p.dir}`, p]));
   return rows.filter((r) => {
     const was = before.get(`${r.kind}/${r.dir}`);
-    return was && was.sha256 !== r.sha256 && was.version === r.version;
+    return !r.stub && was && was.sha256 !== r.sha256 && was.version === r.version;
   });
 }
 

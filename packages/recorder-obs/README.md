@@ -8,7 +8,7 @@ Scene collection `AAS-<game>` with scenes `<Game>-Game` and `<Game>-Game-Clean` 
 
 | Input | Kind | Scenes |
 |---|---|---|
-| `<Game> Game Capture` | `game_capture`, window match `::<processName>`, audio off | Game, Game-Clean |
+| `<Game> Game Window` | `window_capture` (Windows Graphics Capture) of `<processName>`, client area, cursor off; an old `game_capture` input is removed | Game, Game-Clean |
 | `<Game> Game Audio` | `wasapi_process_output_capture` of `<processName>` (only the game is heard) | Game, Game-Clean |
 | `<Game> LiveSplit` | `window_capture` of the LiveSplit window | Game |
 | `<Game> Overlay` | `browser_source` with the `aas run --overlay-port` page (timers, keys, agent action) | Game |
@@ -20,7 +20,7 @@ Scene collection `AAS-<game>` with scenes `<Game>-Game` and `<Game>-Game-Clean` 
 | Event | Call |
 |---|---|
 | preflight | `GetVersion`, build/verify the collection, no mic, not already recording |
-| start | `SetRecordDirectory` (the run's `recording/` when it is on a Windows drive), `FilenameFormatting AAS_<run>_…`, Game scene, `StartRecord`, t0 = `RecordStateChanged STARTED`, `StartReplayBuffer`, Game scene after `introSeconds` |
+| start | `SetRecordDirectory` (the run's `recording/` when it is on a Windows drive), `FilenameFormatting AAS_<run>_…`, Game scene, `StartRecord`, t0 = `RecordStateChanged STARTED`, `StartReplayBuffer` |
 | `game.phase` cinematic/loading | Game-Clean scene; otherwise Game |
 | `game.playback` start | Game scene |
 | `game.milestone` (chapter) / `game.attempt` | `CreateRecordChapter` + chapter list |

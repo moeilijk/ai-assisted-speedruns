@@ -141,7 +141,7 @@ export function createSession() {
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
       { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end, then makes the timeline and the cut (the video without the thinking pauses)`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
-      { id: "publish", title: "The bundle for the Archive (a folder and a zip)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+      { id: "publish", title: "The bundle (a folder, a public zip to share and an upload zip for the Archive)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
     ];
     return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
@@ -179,7 +179,8 @@ export function createSession() {
         if (!outcome && p.stop) { log("The run did not start; closing what was started.", "note"); await node(p.stop.args, p.stop.shown); }
         if (fs.existsSync(path.join(runDir, "run.jsonl")) && outcome) {
           const code = await node(byId.publish.args, byId.publish.shown);
-          if (fs.existsSync(`${pub}.zip`)) result.bundle = toWindows(`${pub}.zip`);
+          if (fs.existsSync(`${pub}-upload.zip`)) result.bundle = toWindows(`${pub}-upload.zip`);
+          if (fs.existsSync(`${pub}-public.zip`)) result.publicBundle = toWindows(`${pub}-public.zip`);
           if (code !== 0) log("The bundle does not meet every rule yet; see the check above.", "note");
         }
         set({ phase: "idle", step: null, result });
@@ -277,9 +278,9 @@ export function createSession() {
       delete: [["tickets", "delete", arg], `tickets delete ${arg}`],
       upload: [["upload", toLocal(arg ?? "")], `upload ${q(toLocal(arg ?? ""))}`],
     };
-    // Upload sends a file to the Archive: only a bundle (a .zip) from the output location.
+    // Upload sends a file to the Archive: only the upload zip of a bundle (<run>-upload.zip) from the output location.
     if (action === "upload") {
-      if (!/\.zip$/i.test(String(arg ?? ""))) throw new Error("Only a bundle (.zip) can be uploaded.");
+      if (!/-upload\.zip$/i.test(String(arg ?? ""))) throw new Error("Only the upload zip (<run>-upload.zip) goes to the Archive; the public zip is the bundle to share.");
       await checkInside("Bundle", toLocal(arg), toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
     }
     const c = cmds[action];

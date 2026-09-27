@@ -68,7 +68,7 @@ test("the commands that work on files do their work and say so in words", { time
   const out = path.join(dir, "public", "cli-run");
   r = await aas("publish", runDir, out);
   // The bundle is made, and publish says it is not conforming (a mock, no recording) and exits 1 for that reason.
-  assert.ok(fs.existsSync(`${out}.zip`), r.err);
+  assert.ok(fs.existsSync(`${out}-upload.zip`) && fs.existsSync(`${out}-public.zip`), r.err);
   assert.equal(r.code, 1);
   assert.match(r.out, /Result: .* Not conforming\./);
 
@@ -80,7 +80,7 @@ test("the commands that work on files do their work and say so in words", { time
   assert.equal(r.code, 1);
   assert.match(r.out, /1 file in .* may not be published:\n  notes\.txt: private Unix home path/);
 
-  r = await aas("check", `${out}.zip`);
+  r = await aas("check", `${out}-upload.zip`);
   assert.equal(r.code, 1, "a mock without a recording is not a valid entry, and check says why");
   assert.match(r.out, /a model played|recording/);
 

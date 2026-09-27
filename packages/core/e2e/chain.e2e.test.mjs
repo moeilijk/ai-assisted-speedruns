@@ -96,7 +96,7 @@ test("the live Archive and the tooling agree on every fixture, the proof and the
     await publish(runDir, path.join(work, "public", "proof-01"), { log() {} });
     const state = readState(runDir);
     assert.ok(state.tickets.length === 1 && state.heads.length >= 2, "one ticket, a start and an end head");
-    r = await upload(path.join(work, "public", "proof-01.zip"));
+    r = await upload(path.join(work, "public", "proof-01-upload.zip"));
     log(`signed: ${r.status} ${r.json?.status} proof ${r.json?.proof}`);
     assert.equal(r.status, 200, JSON.stringify(r.json));
     assert.equal(r.json.proof, "signed", "the Archive checked the proof as signed");
@@ -107,7 +107,7 @@ test("the live Archive and the tooling agree on every fixture, the proof and the
     const acc = await call("POST", `/api/v1/e2e/submissions/${r.json.submission}/accept`);
     assert.equal(acc.status, 200, `accept the signed run: ${JSON.stringify(acc.json)}`);
     await publish(runDir, path.join(work, "public", "proof-01-r2"), { log() {} });
-    const again = await upload(path.join(work, "public", "proof-01-r2.zip"), "proof-01-r2.zip");
+    const again = await upload(path.join(work, "public", "proof-01-r2-upload.zip"), "proof-01-r2-upload.zip");
     log(`new revision, same run: ${again.status} ${again.json?.status} proof ${again.json?.proof}`);
     assert.equal(again.status, 200, JSON.stringify(again.json));
     assert.equal(again.json.proof, "signed", "a new revision of the same run keeps its signed proof");
@@ -115,7 +115,7 @@ test("the live Archive and the tooling agree on every fixture, the proof and the
     // run shows up in a second one, and the proof goes to a reviewer with the reason.
     const { readZipEntries } = await import("../src/zip-read.mjs");
     const { asOwnRun, writeZip } = await import("../../spec/fixtures/make-fixtures.mjs");
-    const other = asOwnRun(readZipEntries(path.join(work, "public", "proof-01.zip")).map((e) => ({ name: e.name, data: e.data })), "proof-02", "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
+    const other = asOwnRun(readZipEntries(path.join(work, "public", "proof-01-upload.zip")).map((e) => ({ name: e.name, data: e.data })), "proof-02", "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
     fs.writeFileSync(path.join(work, "proof-02.zip"), writeZip(other));
     const foreign = await upload(path.join(work, "proof-02.zip"));
     const back = foreign.json?.submission ? await call("GET", `/api/v1/e2e/submissions/${foreign.json.submission}`) : null;

@@ -22,6 +22,34 @@
       }
     },
     {
+      "class": "public-zip",
+      "fixture": "public-zip.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "upload.public"
+      },
+      "tooling": {
+        "requirement": "a model played",
+        "status": "unmet",
+        "match": "mock"
+      }
+    },
+    {
+      "class": "private-in-public",
+      "fixture": "private-in-public.zip",
+      "archive": {
+        "http": 422,
+        "status": "rejected",
+        "code": "bundle.private"
+      },
+      "tooling": {
+        "requirement": "a model played",
+        "status": "unmet",
+        "match": "mock"
+      }
+    },
+    {
       "class": "tampered-log",
       "fixture": "tampered-log.zip",
       "archive": {

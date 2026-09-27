@@ -232,7 +232,7 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.33.9",
+    version: "0.34.0",
     processName: "obs64",
     /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
     async doctor() {

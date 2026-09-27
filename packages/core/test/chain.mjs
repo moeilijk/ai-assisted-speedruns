@@ -43,7 +43,7 @@ export async function chainThroughHarness({ game, dir, goal, resumeGoal, bot = n
 
   const outDir = path.join(dir, "public", "chain-01");
   const pub = await publish(runDir, outDir, { log: quiet });
-  const zip = `${outDir}.zip`;
+  const zip = `${outDir}-upload.zip`;
   assert.ok(fs.existsSync(zip), "the bundle's zip was made");
   const report = checkBundle(zip);
   // Without a recording the bundle is not a valid AI Assisted Speedrun (recorder null says so); everything else is.

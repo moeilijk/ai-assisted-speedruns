@@ -134,7 +134,7 @@ test("the GUI refuses settings it does not show, values over more than one line,
       assert.match(r.json.error, reason);
     }
 
-    const outside = path.join(dir, "outside.zip");
+    const outside = path.join(dir, "outside-upload.zip");
     fs.writeFileSync(outside, "not a bundle");
     const notZip = path.join(output, "notes.txt");
     fs.writeFileSync(notZip, "x");
@@ -142,7 +142,7 @@ test("the GUI refuses settings it does not show, values over more than one line,
       ["/api/open", { path: os.homedir() }, /Path .* is not allowed: a path inside/],
       ["/api/open", { path: path.join(output, "..", "..") }, /Path .* is not allowed: a path inside/],
       ["/api/archive", { action: "upload", arg: outside }, /Bundle .* is not allowed: a path inside/],
-      ["/api/archive", { action: "upload", arg: notZip }, /Only a bundle \(\.zip\) can be uploaded/],
+      ["/api/archive", { action: "upload", arg: notZip }, /Only the upload zip/],
       ["/api/archive", { action: "extend", arg: "zz" }, /Not a ticket/],
       ["/api/archive", { action: "format-disk" }, /Unknown action/],
       ["/api/continue", { runDir: dir }, /Run folder .* is not allowed: a path inside/],

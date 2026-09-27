@@ -23,7 +23,7 @@ export default {
   stub: false,                   // true for a planned plugin that is not implemented: it loads, and `aas configure` refuses it
   setup: {                       // optional: what `aas gui` needs to offer the game (see below)
     folder: "MyGame",            // runs go to <output>/MyGame/<run>/
-    settings: [{ env: "AAS_MY_GAME_ROOT", label: "My Game folder", kind: "dir", expect: "mygame.exe", find: { steam: 123450 } }],
+    settings: [{ env: "AAS_MY_GAME_ROOT", label: "My Game folder", what: "Where My Game is: the folder with mygame.exe in it.", kind: "dir", expect: "mygame.exe", find: { steam: 123450 } }],
     install: join(here, "install-mod.mjs"), launch: join(here, "launch-game.mjs"), stop: join(here, "stop-all.mjs"),
     splits: { end: join(here, "splits", "mygame.lss") }, bot: join(here, "bot.mjs"), displayEnv: "AAS_MY_GAME_WINDOW_POS",
     recorders: ["obs"],          // the recorders this game fits, in the order the GUI offers them (default: ["obs"])
@@ -38,9 +38,9 @@ export default {
   gameConfig: [join(here, "UPSTREAM.json")],         // published as game-config/
   exercise: [{ label: "state", code: "return await game.observe()", verify: (v) => { if (!v) throw new Error("no state"); } }],
   async connect() { /* ... */ return controller; },
-  async prepareRun({ runDir, log, resume, save }) { /* new game; resolves when the agent may act */ return { readyAt: new Date(), seed }; },
+  async prepareRun({ runDir, log, seed, goal, resume, save }) { /* new game (the seed and the goal when the run has them); at a resume `resume` is true and `save` the save's name; resolves when the agent may act */ return { readyAt: new Date(), seed }; },
   async saveState({ name, log }) { /* copy the game's save under this name */ return { file }; },
-  async loadState({ name, log, runDir }) { /* restore it; the game paused or waiting */ },
+  async loadState({ name, log, runDir, seed }) { /* restore it; the game paused or waiting (seed: when a new game has to be started instead) */ },
   async endRun({ runDir }) { /* stop in-game recording, copy ground truth */ },
   async close({ log }) { /* close the game the way a user would; undo what the launcher set up */ return "closed"; },
 };
@@ -54,7 +54,7 @@ export default {
 
 **The game side.** `prepareRun` runs after the recorder started and before the agent starts (t0 is the recording start); it starts the new game and resolves when the agent may act, returning the seed when the game has one. `saveState`/`loadState` make `aas resume` possible: the harness calls `saveState` every ten minutes, at chapter milestones and at the end of the session, and `loadState` with the chosen save at a resume. The harness reads a milestone from the run log up to half a second after the plugin emitted it, and the agent's next move may reach the game first; a plugin that can save from inside the broker sets `savesAtMilestones: true`, saves right after the playback that reached a milestone (into `<run>/saves/`) and emits `game.saved` itself with `{ name, index, reason, file }`, and the harness then leaves those milestones to it (FCEUX). `endRun` runs after the agent stopped and before the recorder stops. `close` runs at the end of `aas run` and `aas resume` (and from the manual stop command) and closes the game the way a user would; nothing is killed, what does not close is reported. Launch is a script of your own (`launch-game.mjs`) wired as an npm script; the doctor checks the endpoints it leaves behind. On Windows, [`packages/core/src/windows/`](../packages/core/src/windows/) has what every launcher needs: `ensureSteam()`, `listDisplays()`/`displayAt()`, and `beforeGameStart()`/`afterGameClose()` for the per-machine options (quiet audio device, displays kept awake).
 
-**The GUI.** A game with `setup` appears in `aas gui`. `settings` are the machine settings the game needs; `what` is the plain answer to "which folder?", shown in the empty box and under the heading in the Setup tab (a box that says only `folder` asks the question instead of answering it), and it names the file a person recognises the folder by; `find` names where the GUI looks for the folder first (a Steam app id, an Epic display name, a GOG game id); `expect` is a file the folder must contain; `default` is a function that returns the folder or file the plugin uses when the setting is empty (BizHawk and FCEUX install into `%LOCALAPPDATA%\aas\<emulator>` and find the profile's ROM in `.local/roms`); the Setup tab shows it in the empty box and checks it, and the game counts as set up when the first setting's default holds the `expect` file. `install`, `launch` and `stop` are the game's own scripts, run as they are, and `installs` is the one sentence the Setup tab's button carries, saying what `install` puts where ("Install" on its own can mean the game, the mod, the tooling or the harness; the command it runs is shown under the button); `splits` maps an end id to a LiveSplit file; `bot` makes a mock run possible with the `scripted` runtime; `displayEnv` (and `resolutionEnv`) is the variable the launcher reads for the display to play on, set from the GUI's display choice.
+**The GUI.** A game with `setup` appears in `aas gui`. `settings` are the machine settings the game needs; `what` is the plain answer to "which folder?", shown in the empty box and under the heading in the Setup tab (a box that says only `folder` asks the question instead of answering it), and it names the file a person recognises the folder by; `find` names where the GUI looks for the folder first (a Steam app id, an Epic display name, a GOG game id); `expect` is a file the folder must contain; `default` is a function that returns the folder or file the plugin uses when the setting is empty (BizHawk and FCEUX install into `%LOCALAPPDATA%\aas\<emulator>` and find the profile's ROM in `.local/roms`); the Setup tab shows it in the empty box and checks it, and the game counts as set up when the first setting's default holds the `expect` file. `install`, `launch` and `stop` are the game's own scripts, run as they are, and `installs` is the one sentence the Setup tab's button carries, saying what `install` puts where ("Install" on its own can mean the game, the mod, the tooling or the harness; the command it runs is shown under the button); `splits` maps an end id to a LiveSplit file; `bot` makes a mock run possible with the `scripted` runtime; `displayEnv` (and `resolutionEnv`) is the variable the launcher reads for the display to play on, set from the GUI's display choice. A setting with `kind: "select"` offers `options` (`{ value, label }`, a list or a function) and a `value` as its default; `fixes` names, per check id, a script of the plugin's own with the label its button carries, for a step of the set-up that is not the install.
 
 **Ground truth.** Keep the game's own records (save files, run history, demo files) in the run directory under a folder that is never published, and provide a way to read them next to the harness's timeline (Slay the Spire: `save-track.mjs`, Portal: `demo-track.mjs`). That is what the splits are checked against.
 
@@ -75,7 +75,7 @@ export default {
                                  // runtime this was instead of believing the flag.
   async configure(runDir, broker, brief) { /* write the config; refuse to overwrite; return { files, hint } */ },
   async reconfigure(runDir, broker, brief) { /* rewrite machine paths after a move (resume) */ },
-  async start(runDir, brief) { /* start the agent, wait; return { status, endedAt, notes, sessionId, privateLog } */ },
+  async start(runDir, brief, { checkpoint }) { /* start the agent, wait; call checkpoint() after every step so a goal or a stop reached by that step ends the session; return { status, endedAt, notes, sessionId, privateLog } */ },
   interrupt(reason) { /* the harness asks the session to end (game over, budget) */ },
   async budget() { /* the plan's stand: { ok, percent, max, detail }; aas run refuses when ok is false */ },
   async connectCheck(runDir, { gameId }) { /* does the agent's CLI reach the broker, without asking the model? aas check-agent */ },
@@ -86,11 +86,13 @@ export default {
 };
 ```
 
-`broker` (`BrokerSpec`) tells the runtime how to start the broker: `nodeArgs` (the `node --permission ...` command line), `env`, `gameId`, `runDir`. The configuration must give the agent exactly the three tools `mcp__<game>__<game>_documentation|screenshot|exec` (or the runtime's equivalent naming) and deny everything else: shell, web, file reads and writes outside the run directory, sub-agents. Write a second copy of the configuration with machine paths replaced (`publicPath`) into `runtime-config/`; that copy is published.
+`broker` (`BrokerSpec`) tells the runtime how to start the broker: `nodeArgs` (the `node --permission ...` command line), `env` (the broker's environment: the harness's variables plus the names in `envNames`), `gameId`, `gameModule`, `allowedEndpoints`, `readable`, `runDir`. The configuration must give the agent exactly the three tools `mcp__<game>__<game>_documentation|screenshot|exec` (or the runtime's equivalent naming) and deny everything else: shell, web, file reads and writes outside the run directory, sub-agents. Write a second copy of the configuration with machine paths replaced (`publicPath`) into `runtime-config/`; that copy is published.
 
 `start` returns a `RunOutcome`: `completed` (the agent finished), `stopped` (a budget, a limit, or an interrupt; resumable), `failed`. In headless mode (`brief.headless`, with `brief.budget.toolCalls` and `brief.budget.minutes`) the runtime runs the agent non-interactively with `brief.goalPrompt`, or with `brief.resume.prompt` and `brief.resume.sessionId` at a resume. The runtime's private log is what `aas publish` exports: say where it is (`privateLog`), or write it as `session.jsonl` in the run directory, and provide an exporter (`export-claude-session.mjs`, `runtime-codex/export-rollout.mjs` are the two so far) that turns it into the timeline format of the spec.
 
 `ai` is the one thing about a runtime that an archive does not take on trust. It is a property of the runtime, not of a run — a runtime either drives a model or it does not — so the harness writes it into every bundle together with `sha256`, the plugin as it ran (`pluginDigest`: every `.mjs`, `.json` and `.md` of the package directory, `test/` left out). A runtime whose hash an archive cannot place is read as a mock.
+
+A runtime in this repository is listed with its digest in `packages/spec/runtimes.json` (`node packages/spec/make-runtimes.mjs --write`, next to `plugins.json` from `make-plugins.mjs`); that list is what an archive places a bundle's `sha256` against.
 
 `connectCheck` is the cheap half of that verification: it has the agent's own CLI list and health-check the MCP server of a configured run directory (`claude mcp list`, `codex mcp list`), which asks the model nothing and so costs no tokens. `aas check-agent` and the GUI's mock run use it.
 
@@ -98,7 +100,7 @@ Verify a runtime the way `smoke.mjs` does for Claude Code: a real headless sessi
 
 ## Recorder plugin
 
-A recorder records the run and reacts to events. Examples: [`packages/recorder-obs`](../packages/recorder-obs/index.mjs) (OBS through obs-websocket: the game window and its audio only, LiveSplit and the overlay page as sources, scenes per phase, chapter marks), [`packages/recorder-source-demo`](../packages/recorder-source-demo/index.mjs) (the in-game demo of a Source game), [`packages/recorder-null`](../packages/recorder-null/index.mjs) (nothing; never a valid run). A game plugin's `setup.recorders` says which of them fit it, and the GUI offers exactly those; the run is recorded with the one chosen.
+A recorder records the run and reacts to events. Examples: [`packages/recorder-obs`](../packages/recorder-obs/index.mjs) (OBS through obs-websocket: the game window and its audio only, LiveSplit and the overlay page as sources, two scenes (the game with LiveSplit and the overlay, and a clean one for cinematics and loading), chapter marks), [`packages/recorder-source-demo`](../packages/recorder-source-demo/index.mjs) (the in-game demo of a Source game), [`packages/recorder-null`](../packages/recorder-null/index.mjs) (nothing; never a valid run). A game plugin's `setup.recorders` says which of them fit it, and the GUI offers exactly those; the run is recorded with the one chosen.
 
 ```js
 export default {
@@ -127,7 +129,7 @@ export default {
   id: "my-timer",
   version: "0.1.0",
   async preflight(brief, game) {},
-  async start(brief) { /* reset, start real time, pause game time */ },
+  async start(brief, { igt } = {}) { /* reset, start real time, pause game time; igt = the game time a resumed run continues from */ },
   async onEvent(event) { /* game.playback start/end: game time runs/pauses; chapter milestone: split; game.attempt: reset */ },
   async stop() { /* return { igt, times } */ },
   async doctor() { /* [{ ok, what, detail }]: the timer's server reachable */ },
