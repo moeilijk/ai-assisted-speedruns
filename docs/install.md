@@ -19,7 +19,7 @@ Three levels, and you only install what your level needs:
 | Node.js | 22 or newer (24 recommended) | everything; the broker runs under `node --permission` | [nodejs.org/en/download](https://nodejs.org/en/download) | `node -v` |
 | git | any | cloning this repository and the pinned upstreams | your package manager | `git --version` |
 | WSL 2 | current | **on Windows**: the harness itself runs in a Linux shell (see §1a) | [learn.microsoft.com — `wsl --install`](https://learn.microsoft.com/en-us/windows/wsl/install) | `wsl -l -v` |
-| An agent CLI | Claude Code 2.1.207+ **or** Codex, logged in | a run with an agent | [Claude Code setup](https://code.claude.com/docs/en/setup) · [Codex CLI](https://github.com/openai/codex) | `claude --version`, `codex --version` |
+| An agent CLI | Claude Code 2.1.207+, Codex **or** Mistral Vibe, logged in | a run with an agent | [Claude Code setup](https://code.claude.com/docs/en/setup) · [Codex CLI](https://github.com/openai/codex) · [Mistral Vibe](https://github.com/mistralai/mistral-vibe) | `claude --version`, `codex --version`, `vibe --version` |
 | ffmpeg (with ffprobe) | 6+ | `aas render`, and at `aas publish` the recording's length | [ffmpeg.org/download](https://ffmpeg.org/download.html) | `ffmpeg -version` |
 | OBS Studio | 30+ (tested on 32.2.2), obs-websocket v5 enabled | the recording; **a run without a recording is not a valid run** | [obsproject.com/download](https://obsproject.com/download) | OBS → Tools → WebSocket Server Settings |
 | LiveSplit | 1.8.37 with the Server component | optional: the timer on screen and the splits | [livesplit.org/downloads](https://livesplit.org/downloads/) | its `settings.cfg` has `ServerStartup=1` |
@@ -100,9 +100,10 @@ the variables the game plugin declares in its `env` list.
 
 ## 4. The agent runtime
 
-You need one of the two, and it must be **logged in and started once as yourself** before a run can use it.
-Both runtimes refuse to start a run directory their CLI does not trust, because an agent whose permission
-rules are ignored is not a valid run.
+You need one of them, and it must be **logged in and started once as yourself** before a run can use it.
+Each runtime refuses to start a run directory whose configuration its CLI would not load, because an agent whose
+permission rules are ignored is not a valid run. The GUI offers every runtime whose CLI is on the PATH, and its Setup
+tab has a row for each with that runtime's own checks.
 
 ### Claude Code
 
@@ -132,6 +133,18 @@ used through the generated configuration, every permission rule was applied, and
 3. Verify: `aas doctor --runtime codex` (and `--run-dir <an existing run>` to see the trust row).
 
 Details: [packages/runtime-codex/README.md](../packages/runtime-codex/README.md).
+
+### Mistral Vibe
+
+1. Install Vibe with Mistral's installer (`curl -LsSf https://mistral.ai/vibe/install.sh | bash`: it installs uv,
+   pinned and checked by sha256, then `uv tool install mistral-vibe`), or the GUI's Install button on the Setup tab,
+   and sign in once (`vibe --setup`).
+2. Set `AAS_VIBE_MAX_PRICE` in `.env`: the most one session may cost, in dollars as Vibe counts it. Vibe keeps no plan
+   budget the tooling can read, so a Vibe run does not start without it.
+3. Verify: `aas doctor --runtime mistral-vibe`, then `npm run vibe:smoke`, a real headless session against the GUI's
+   fake game that proves Vibe offered the agent the three broker tools and nothing else (a few API calls).
+
+Details: [packages/runtime-mistral-vibe/README.md](../packages/runtime-mistral-vibe/README.md).
 
 ### The plan budget
 

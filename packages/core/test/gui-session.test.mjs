@@ -40,7 +40,7 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
   try {
     const games = await (await fetch(`${base}/api/games`)).json();
     assert.deepEqual(games.games.map((g) => g.id), ["gui_fake"], "the GUI offers the tests' game");
-    const start = await post("/api/start", { game: "gui_fake", runtime: "scripted", recorder: "null" });
+    const start = await post("/api/start", { game: "gui_fake", runtime: "scripted", recorder: "null", timer: "none" });
     assert.equal(start.status, 200, JSON.stringify(start.json));
     let s = await untilIdle();
     const lines = s.lines.map((l) => `${l.kind} ${l.text}`);
@@ -110,7 +110,7 @@ test("the tools around a run, Continue's choices and the checks before a run, ea
     assert.equal((await post("/api/key", { action: "claim", identities: ["ftp://x"] })).status, 400, "an identity is https or mailto");
 
     // The checks before a run: aas doctor for the choices, and the connection with the game started and closed.
-    const doc = await post("/api/tool", { action: "doctor", game: "gui_fake", recorder: "null", runtime: "scripted" });
+    const doc = await post("/api/tool", { action: "doctor", game: "gui_fake", recorder: "null", timer: "none", runtime: "scripted" });
     assert.equal(doc.status, 200, JSON.stringify(doc.json));
     assert.match(doc.json.message, /^Checks done: All checks passed\.$/);
     assert.ok(doc.json.lines.some((l) => /PASS\s+game plugin gui_fake/.test(l)), doc.json.lines.join("\n"));
@@ -123,7 +123,7 @@ test("the tools around a run, Continue's choices and the checks before a run, ea
     assert.match(conLog, /close: GUI Fake closed/, "the game was closed again");
 
     // The autosave every 5 minutes: a run without autosave (autosave "off", --no-autosave) has no save to go on from.
-    const start = await post("/api/start", { game: "gui_fake", runtime: "scripted", recorder: "null", maxTurns: "5", autosave: "5" });
+    const start = await post("/api/start", { game: "gui_fake", runtime: "scripted", recorder: "null", timer: "none", maxTurns: "5", autosave: "5" });
     assert.equal(start.status, 200, JSON.stringify(start.json));
     let s = await untilIdle();
     const joined = s.lines.map((l) => `${l.kind} ${l.text}`).join("\n");

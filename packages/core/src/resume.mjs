@@ -15,7 +15,7 @@ import { createEventLog, followEvents, readRunLog, inOrder } from "./events.mjs"
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
-import { createAutosave, earlyStop, writeRecordingSegment } from "./run.mjs";
+import { AUTOSAVE_MINUTES, createAutosave, earlyStop, writeRecordingSegment } from "./run.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
@@ -144,7 +144,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
   await proof.start();
-  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
+  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || AUTOSAVE_MINUTES });
   let over = null;
   let deaths = 0;
   const goal = resolveGoal(plugin, brief.category?.goal);

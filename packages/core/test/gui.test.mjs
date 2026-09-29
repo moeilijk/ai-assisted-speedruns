@@ -83,6 +83,31 @@ test("a second start opens the GUI that is already running instead of failing on
   }
 });
 
+test("a runtime's, recorder's or timer's row without a result is checked once at the start, and kept after that", { timeout: 180000 }, async () => {
+  // After an update their rows have new ids, and a row that waits for the button looks broken (2026-09-29).
+  const { startGui } = await import("../src/gui/server.mjs");
+  fs.rmSync(process.env.AAS_GUI_CHECKS, { force: true });
+  const rows = async (port) => (await (await fetch(`http://127.0.0.1:${port}/api/setup`)).json()).items.filter((i) => i.id.startsWith("plugin:") && i.check !== false);
+  const open = async () => startGui({ port: 0, open: false, log() {} });
+  const close = (g) => { g.server.close(); process.removeAllListeners("SIGINT"); process.removeAllListeners("SIGTERM"); };
+  let first = await open();
+  let seen;
+  try {
+    const port = first.server.address().port;
+    for (let t = Date.now(); Date.now() - t < 150000; await new Promise((r) => setTimeout(r, 500))) {
+      seen = await rows(port);
+      if (seen.every((i) => i.status !== "unchecked" && i.status !== "pending")) break;
+    }
+    assert.ok(seen.some((i) => i.id.startsWith("plugin:runtime:")) && seen.some((i) => i.id.startsWith("plugin:timer:")), "the plugins' rows are there");
+    assert.deepEqual(seen.filter((i) => i.status === "unchecked" || i.status === "pending").map((i) => i.id), [], "each has a result without the button");
+  } finally { close(first); }
+  first = await open();
+  try {
+    const again = await rows(first.server.address().port);
+    assert.deepEqual(again.map((i) => [i.id, i.at, i.status]), seen.map((i) => [i.id, i.at, i.status]), "the next start keeps those results instead of checking again");
+  } finally { close(first); }
+});
+
 test("the game check reads the game's own settings, not only the machine's", async () => {
   // Since 0.22.0 a game's folder lives in .local/games/<game>.env. The GUI's game row asks `aas doctor --game --json`
   // in a process of its own, and a process that loads only .env reports a game that is set up as one that is not.
@@ -99,10 +124,10 @@ test("the game check reads the game's own settings, not only the machine's", asy
   const cli = path.join(process.cwd(), "packages", "core", "src", "cli.mjs");
   // The exit code says whether every row passed (the fake plugin fails some on purpose); the rows are the answer.
   const run = (env) => JSON.parse(spawnSync(process.execPath, [cli, "doctor", "--game", path.join(plugin, "plugin.mjs"), "--json"], { encoding: "utf8", env: { ...process.env, ...env } }).stdout.trim().split("\n").at(-1)).filter((r) => r.what === "its folder");
-  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: true, what: "its folder", detail: "/somewhere" }]);
+  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: true, what: "its folder", detail: "/somewhere", source: "game" }]);
   // And without that file the plugin says so itself, instead of the check inventing a reason.
   fs.rmSync(path.join(games, "make-believe.env"));
-  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: false, what: "its folder", detail: "not set" }]);
+  assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: false, what: "its folder", detail: "not set", source: "game" }]);
 });
 
 test("Portal's check covers the controller it runs on, not only the game's own files", async () => {
@@ -276,6 +301,40 @@ test("the models and efforts come from the AI's own CLI: claude --help and codex
   -n, --name <name>                     Set a display name for this session
 `;
   assert.deepEqual(parseClaudeHelp(help), { efforts: ["low", "medium", "high", "xhigh", "max"], aliases: ["fable", "opus", "sonnet"], example: "claude-fable-5" });
+  // The client's own answers in print mode (no turn, no tokens), as 2.1.284 gives them.
+  const { parseModelUsage, parseEffortUsage } = await import("../../runtime-claude-code/index.mjs");
+  assert.deepEqual(parseModelUsage("Current model: `Fable 5.1` (effort: high)\nUsage: /model <name>. Available: sonnet, opus, haiku, fable, best, sonnet[1m], opus[1m], fable[1m], opusplan, default, or a full model ID."),
+    { current: { model: "Fable 5.1", effort: "high" }, aliases: ["sonnet", "opus", "haiku", "fable", "best", "sonnet[1m]", "opus[1m]", "fable[1m]", "opusplan", "default"], fullId: true });
+  assert.deepEqual(parseModelUsage("Current model: `Opus 5.5`\nUsage: /model <name>. Available: opus, or a full model ID.").current, { model: "Opus 5.5", effort: null }, "no effort set: no effort in the answer");
+  assert.deepEqual(parseEffortUsage("Usage: /effort <low|medium|high|xhigh|max|auto|ultracode [on|off]>"), ["low", "medium", "high", "xhigh", "max", "auto", "ultracode"]);
+  // The exact ids: the catalog Claude Code itself fetched for the account (its /model menu), read from its folder.
+  const { readClaudeCatalog } = await import("../../runtime-claude-code/index.mjs");
+  const cfg = fs.mkdtempSync(path.join(os.tmpdir(), "aas-claude-"));
+  assert.equal(readClaudeCatalog({ env: { CLAUDE_CONFIG_DIR: cfg } }), null, "no catalog until the client fetched one");
+  fs.mkdirSync(path.join(cfg, "cache", "model-catalog"), { recursive: true });
+  const effort = (def) => ({ type: "effort", effort_options: [{ id: "low" }, { id: "medium", ...(def === "medium" ? { badge: { message: "Recommended" } } : {}) }, { id: "high", ...(def === "high" ? { badge: { message: "Recommended" } } : {}) }] });
+  fs.writeFileSync(path.join(cfg, "cache", "model-catalog", "a.json"), JSON.stringify({ version: 2, fetchedAt: 1000, staleAt: 2000, catalog: { config: { models: [
+    { id: "claude-new-9", name: "New 9", section: "main", min_claude_code_version: "9.9.9", thinking: effort("medium") },
+    { id: "claude-now-5", name: "Now 5", section: "main", thinking: effort("high") },
+    { id: "claude-small-4", name: "Small 4", section: "overflow", thinking: { type: "none" } },
+  ] }, state: { model: "claude-now-5", thinking_by_model: [{ id: "claude-new-9", thinking: { type: "effort", effort: "high" } }] } } }));
+  fs.writeFileSync(path.join(cfg, "cache", "model-catalog", "old.json"), JSON.stringify({ version: 2, fetchedAt: 1, catalog: { config: { models: [{ id: "claude-gone-1", thinking: effort("high") }] }, state: {} } }));
+  const c = readClaudeCatalog({ env: { CLAUDE_CONFIG_DIR: cfg }, installed: "2.1.270" });
+  assert.deepEqual(c.models.map((m) => [m.id, m.efforts.join("/"), m.defaultEffort, m.thinking, m.needs ?? null]), [
+    ["claude-new-9", "low/medium/high", "high", "effort", "9.9.9"],
+    ["claude-now-5", "low/medium/high", "high", "effort", null],
+    ["claude-small-4", "", null, "none", null],
+  ], "the newest catalog, in its order, with what each model takes (the person's own effort for it first) and the version it needs");
+  assert.equal(c.defaultModel, "claude-now-5", "the model the client has in use");
+  // A setting the installed client cannot run is not the default: which model the client takes instead is its own choice.
+  const older = readClaudeCatalog({ env: { CLAUDE_CONFIG_DIR: cfg }, installed: "2.1.270" });
+  fs.writeFileSync(path.join(cfg, "cache", "model-catalog", "a.json"), fs.readFileSync(path.join(cfg, "cache", "model-catalog", "a.json"), "utf8").replace('"model":"claude-now-5"', '"model":"claude-new-9"'));
+  const unusable = readClaudeCatalog({ env: { CLAUDE_CONFIG_DIR: cfg }, installed: "2.1.270" });
+  assert.equal(unusable.defaultModel, null);
+  assert.equal(unusable.defaultNote, "its setting claude-new-9 needs Claude Code 9.9.9, so the client chooses");
+  assert.equal(older.defaultNote, null);
+  assert.equal(c.stale, true, "past staleAt: the client refreshes it at its next start");
+  assert.match(c.models[0].label, /needs Claude Code 9\.9\.9/);
   const { parseCodexCatalog } = await import("../../runtime-codex/index.mjs");
   const catalog = JSON.stringify({ models: [
     { slug: "gpt-hidden", display_name: "Hidden", visibility: "hide", supported_reasoning_levels: [{ effort: "low" }] },
@@ -346,20 +405,38 @@ test("the bundle is signed when this machine has a key, and the page is told whi
   }
 });
 
-test("who plays is one list: the game's script when it has one, and every AI whose CLI is here", async () => {
+test("who plays is one list, built from the runtime plugins: a new one appears without a change to the GUI", async () => {
+  // A runtime plugin the GUI has never seen, in a folder of its own: a mock, and an AI whose CLI is this Node.
+  const extra = fs.mkdtempSync(path.join(os.tmpdir(), "aas-plugins-"));
+  const write = (dir, body) => { fs.mkdirSync(path.join(extra, dir)); fs.writeFileSync(path.join(extra, dir, "index.mjs"), body); };
+  write("runtime-zz-new-ai", `export default { id: "zz-new-ai", name: "New AI", ai: true, cli: ${JSON.stringify(path.basename(process.execPath))}, setup: { group: "Agents" }, async doctor() { return [{ ok: true, what: "New AI on PATH", detail: "" }]; } };`);
+  write("runtime-zz-absent", `export default { id: "zz-absent", name: "Absent AI", ai: true, cli: "no-such-cli-anywhere" };`);
+  write("timer-zz-clock", `export default { id: "zz-clock", name: "Test Clock", setup: { settings: [{ env: "AAS_ZZ_CLOCK", label: "Test Clock", kind: "file" }] } };`);
+  const previous = process.env.AAS_PLUGIN_DIRS;
+  process.env.AAS_PLUGIN_DIRS = extra;
   const { startGui } = await import("../src/gui/server.mjs");
   const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
   try {
-    const j = await (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/games`)).json();
-    assert.deepEqual(j.runtimes.map((r) => r.id), ["scripted", "claude-code", "codex"], "the run types aas run --runtime knows, in that order");
-    assert.equal(j.runtimes[0].present, true, "the script is always here");
-    for (const r of j.runtimes.slice(1)) assert.equal(r.present, j.agents.some((a) => a.id === r.id), `${r.id} is offered exactly when its CLI is on the PATH`);
+    const base = `http://127.0.0.1:${gui.server.address().port}`;
+    const j = await (await fetch(`${base}/api/games`)).json();
+    const ids = j.runtimes.map((r) => r.id);
+    assert.equal(j.runtimes[0].ai, false, "the mock first");
+    assert.ok(ids.includes("claude-code") && ids.includes("codex"), "the runtimes of the repository");
+    const newAi = j.runtimes.find((r) => r.id === "zz-new-ai");
+    assert.deepEqual({ ai: newAi.ai, present: newAi.present, label: newAi.label }, { ai: true, present: true, label: "New AI (AI run)" }, "a new runtime plugin is offered as soon as its CLI is here");
+    assert.equal(j.runtimes.find((r) => r.id === "zz-absent").present, false, "one whose CLI is not here is not offered");
+    assert.ok(!j.timers.some((t) => t.id === "zz-clock"), "a timer that is not set up is not offered");
+    const setup = await (await fetch(`${base}/api/setup`)).json();
+    assert.ok(setup.items.some((i) => i.id === "plugin:runtime:zz-new-ai" && i.label === "New AI" && i.group === "Agents"), "and it has its own Setup row");
+    assert.ok(setup.items.some((i) => i.id === "plugin:timer:zz-clock" && i.env === "AAS_ZZ_CLOCK"), "a timer's setting is a row of the Setup tab");
     const page = fs.readFileSync(new URL("../src/gui/page.html", import.meta.url), "utf8");
-    assert.doesNotMatch(page, /id="ai"/, "no second list for the AI");
-    assert.match(page, /list="models"/, "the model is typed or picked from what the CLI lists");
+    assert.doesNotMatch(page, /"scripted"|claude-code|\bcodex\b|LiveSplit|\bOBS\b/, "the page names no runtime, recorder or timer");
+    const plan = await (await fetch(`${base}/api/plan?game=balatro&runtime=zz-new-ai&timer=none`)).json();
+    assert.match(plan.steps.find((x) => x.id === "run").shown, /--runtime zz-new-ai/);
   } finally {
     gui.server.close();
     process.removeAllListeners("SIGINT");
     process.removeAllListeners("SIGTERM");
+    if (previous === undefined) delete process.env.AAS_PLUGIN_DIRS; else process.env.AAS_PLUGIN_DIRS = previous;
   }
 });

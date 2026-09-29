@@ -78,7 +78,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.33.8",
+  version: "0.34.4",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",
@@ -93,6 +93,7 @@ export default {
   profile: PROFILE,
   setup: {
     folder: "BizHawk",
+    recorders: ["obs"],
     settings: [
       { env: "AAS_BIZHAWK_DIR", label: "BizHawk folder", kind: "dir", expect: "EmuHawk.exe", default: bizhawkDir, what: "Where BizHawk is: the folder with EmuHawk.exe in it. The install puts it in %LOCALAPPDATA%\\aas\\BizHawk." },
       { env: "AAS_BIZHAWK_PROFILE", label: "Game", kind: "select", options: () => Object.values(PROFILES).map((p) => ({ value: p.id, label: p.name })), value: "nes15", what: "Which game BizHawk plays: one of the profiles in games/bizhawk/profiles, each naming its ROM, its ends and its splits." },

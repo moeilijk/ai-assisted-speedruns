@@ -55,6 +55,9 @@ es.onmessage=(m)=>{const r=JSON.parse(m.data);const d=r.data||{};const st=docume
 };
 </script>`;
 
+/** The port `aas gui` runs the overlay page on (`aas run --overlay-port`); the recorder shows that page. */
+export const OVERLAY_PORT = 8765;
+
 export function startOverlayServer(runDir, { port = 0, host = "127.0.0.1" } = {}) {
   const clients = new Set();
   const write = (record) => {

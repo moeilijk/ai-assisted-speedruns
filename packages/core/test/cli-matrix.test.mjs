@@ -45,8 +45,8 @@ test("every command without what it needs says what is missing and exits 1", asy
   }
 });
 
-test("aas without a command, and aas help, show the help and exit 0", async () => {
-  for (const args of [[], ["help"]]) {
+test("aas without a command, aas help and --help after any command show the help and exit 0", async () => {
+  for (const args of [[], ["help"], ["gui", "--help"], ["run", "--help"], ["doctor", "--help"]]) {
     const r = await aas(...args);
     assert.equal(r.code, 0, `aas ${args.join(" ")}`);
     assert.match(`${r.out}${r.err}`, /Usage:/);

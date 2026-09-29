@@ -38,7 +38,7 @@ export const ENDS = [
 export default {
   id: "portal_2",
   name: "Portal 2",
-  version: "0.33.8",
+  version: "0.34.4",
   scopeName: "portal2",
   segments: SEGMENTS,
   ends: ENDS,
@@ -49,6 +49,7 @@ export default {
   readable: [here, ...(GAME_ROOT ? [GAME_ROOT] : [])],
   setup: {
     folder: "Portal2",
+    steam: true,
     settings: [{ env: "AAS_PORTAL2_GAME_ROOT", label: "Portal 2 folder", kind: "dir", expect: "portal2.exe", find: { steam: 620 }, what: "Where Steam installed Portal 2: the folder with portal2.exe in it, usually steamapps\\common\\Portal 2." }],
     install: join(here, "install-mod.mjs"),
     installs: "Download SourceAutoRecord (pinned, sha256 checked) and write its config next to the game",

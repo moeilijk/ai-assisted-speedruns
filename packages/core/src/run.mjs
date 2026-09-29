@@ -19,7 +19,10 @@ import { COST_TEXT } from "./cost-text.mjs";
  * `autosaveMinutes` while no playback is running. Returns a handler for the
  * event follower plus stop(). Saves are copied into <run>/saves/.
  */
-export function createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes = 10 }) {
+/** Minutes between autosaves when `--autosave-minutes` is not given. */
+export const AUTOSAVE_MINUTES = 10;
+
+export function createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes = AUTOSAVE_MINUTES }) {
   let playing = false;
   let pendingInterval = false;
   let busy = false;
@@ -200,7 +203,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const goal = resolveGoal(plugin, brief.category?.goal);
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
   await proof.start();
-  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || 10 });
+  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || AUTOSAVE_MINUTES });
   // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
   // agent session is interrupted; the run's status becomes completed or defeat, not stopped.
   let over = null;

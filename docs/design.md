@@ -6,7 +6,7 @@ Inspired by cozyblaze's Portal run; the design and the code this builds on are h
 
 A generic framework with plugins for four kinds of communication, plus a standard:
 
-1. **Runtime** (the agent: Codex via MCP, Claude Code via MCP, and `scripted`, a bot module through the same broker)
+1. **Runtime** (the agent: Codex, Claude Code and Mistral Vibe via MCP, and `scripted`, a bot module through the same broker)
 2. **Game** (the bridge into the game: SourcePauseTool for Portal, Communication Mod for Slay the Spire, balatrobot for Balatro, SourceAutoRecord for Portal 2, bizhawk-mcp-native and fceux-mcp for the emulators, ...)
 3. **Recorder** (OBS via obs-websocket, in-game demo, none)
 4. **Timer** (LiveSplit through LiveSplit Server)
@@ -22,6 +22,8 @@ The **standard** ([packages/spec/SPEC.md](../packages/spec/SPEC.md)) says what a
 | First runtimes | Codex and Claude Code | both are only a config generator plus launcher around the same broker |
 | First games | Portal (adapter around portal-agent, validates the model against the original run) and Slay the Spire (turn-based, through Communication Mod). Zero Company was dropped before the first release; its research is not published. Balatro (turn-based, through balatrobot) followed on 2026-09-17 as the first game with an HTTP bridge |
 | Language of the repository | English everywhere | a standard others can adopt |
+| Mistral Vibe as a third runtime (2026-09-29) | `runtime-mistral-vibe`: the broker as its only MCP server, `vibe -p --output streaming` with `--enabled-tools` for the three tools, the stream kept in the run directory with arrival times, every session held to `--max-price` | the maintainer: every AI that is on a machine is treated the same way; Vibe keeps no time per message in its own session log and no plan budget the tooling can read, so the stream is the log and the price is the limit |
+| What `aas gui` knows about plugins (2026-09-29) | nothing by name: runtime, recorder and timer plugins declare `name`, their program (`cli`, `launch`), `setup` (settings and buttons, as a game's) and `doctor()` rows (with `fix`, `level`, `when`); the GUI lists the plugins it finds and asks them. Games name their recorders (`setup.recorders`) and whether they need Steam (`setup.steam`) | the core already knew no plugin by name, the GUI did (a list of three runtimes, OBS and LiveSplit checks, fixed texts), so a new AI did not appear until the GUI was changed. Not taken: a registry file of plugins for the GUI, which would be one more list to keep in step with the packages |
 | `paused-think` for turn-based games | applies automatically; enemy turns and cinematics keep running but the agent does not act then; wall-clock time is reported separately | |
 
 ## What portal-agent is (the layers we generalise)
@@ -111,6 +113,7 @@ ai-assisted-speedruns/
     timer-livesplit/            LiveSplit Server client + .lss export
     runtime-claude-code/        Claude Code config generator, launcher, plan budget, session export
     runtime-codex/              Codex config generator, launcher, plan budget, rollout export
+    runtime-mistral-vibe/       Mistral Vibe config generator, launcher, price limit, stream export
     runtime-scripted/           a bot module through the same broker, for baselines and chain tests
   games/
     portal/                     adapter around portal-agent's controller

@@ -60,7 +60,7 @@ const toMenu = async (rpc, log) => {
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.34.0",
+  version: "0.34.4",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",
@@ -72,6 +72,8 @@ export default {
   /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
   setup: {
     folder: "Balatro",
+    steam: true,
+    recorders: ["obs"],
     settings: [{ env: "AAS_BALATRO_GAME_ROOT", label: "Balatro folder", kind: "dir", expect: "Balatro.exe", find: { steam: 2379780, epic: "Balatro" }, what: "Where Balatro is installed: the folder with Balatro.exe in it, from Steam or from the Epic Games Store." }],
     install: join(here, "install-mod.mjs"),
     installs: "Install Lovely, Steamodded and balatrobot into the game's own mod folder for this harness",

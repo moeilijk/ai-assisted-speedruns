@@ -93,6 +93,7 @@ export default {
    *  install, so its folder is not looked up. */
   setup: {
     folder: "Portal",
+    steam: true,
     // `what` answers "which folder?" in the Setup tab: it stands in the empty box and under the heading, because
     // a box that says only "folder" asks a question instead of answering one.
     settings: [{ env: "AAS_PORTAL_GAME_ROOT", label: "Source Unpack folder (Portal)", kind: "dir", expect: "hl2.exe", what: "The Source Unpack of Portal: the folder with hl2.exe in it. Not the Steam copy of Portal — Source Unpack is a separate download." }],
@@ -159,7 +160,7 @@ export default {
     return rows;
   },
   name: "Portal",
-  version: "0.34.0",
+  version: "0.34.4",
   scopeName: "portal",
   capabilities: { turnBased: false, canPause: true, stateAccess: "none", inputRoute: "input", igt: false },
   // Source Unpack runs Portal as hl2.exe; used by the OBS recorder for window match and application audio.

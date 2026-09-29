@@ -112,7 +112,7 @@ export interface GameSetup {
     options?: { value: string; label: string }[] | (() => { value: string; label: string }[]);
     value?: string;
   }[];
-  /** The recorders this game fits, in the order the GUI offers them (default ["obs"]; the GUI adds `null`). */
+  /** The recorders this game fits, in the order the GUI offers them (the GUI adds `null`, no recording, last). */
   recorders?: string[];
   /** Per check id, a script of the plugin's own that puts that step of the set-up right, with the label its button carries. */
   fixes?: Record<string, { script: string; label: string }>;
@@ -126,6 +126,8 @@ export interface GameSetup {
   splits?: Record<string, string>;
   /** A bot module for the `scripted` runtime (a mock run). */
   bot?: string;
+  /** The game's launcher starts Steam (windows/steam.mjs): the Setup tab then lists the Steam setting. */
+  steam?: boolean;
   /** Only for a game whose run has a seed: the GUI then asks for one, with this placeholder. */
   seed?: { placeholder?: string };
   /** The variable the launcher reads for the display to play on ("X,Y"), and for the window size ("WxH"). */
@@ -233,7 +235,48 @@ export interface RunOutcome {
 /** A plan's stand, from the runtime that runs on it. */
 export interface BudgetVerdict { ok: boolean; percent: number | null; max: number; detail: string; data?: Record<string, unknown> }
 /** One row of `aas doctor`. */
-export interface DoctorRow { ok: boolean; what: string; detail?: string }
+/**
+ * One row of `aas doctor`. `fix` names the plugin's own action that puts it right (`setup.fixes`); `level: "missing"`
+ * says the thing is not installed, which is not a fault (a timer or an AI one does not use); `when: "run"` marks a
+ * condition only a running program establishes (an endpoint, a server), so the Setup tab lists it without judging it.
+ */
+export interface DoctorRow { ok: boolean; what: string; detail?: string; fix?: string; level?: "missing" | "warn"; when?: "run" }
+
+/** A machine setting a plugin needs, as the GUI's Setup tab shows and saves it (in `.env`). */
+export interface PluginSetting {
+  env: string;
+  label: string;
+  /** The plain answer to "which folder?" (or file), shown in the empty box and under the heading. */
+  what?: string;
+  kind: "dir" | "file" | "select" | "text";
+  expect?: string;
+  find?: { steam?: number; epic?: string; gog?: string };
+  /** The folder or file the plugin uses when the setting is empty. */
+  default?: () => string | null;
+  options?: { value: string; label: string }[] | (() => { value: string; label: string }[]);
+  value?: string;
+}
+
+/**
+ * A button of the Setup tab that one of the plugin's checks names (`DoctorRow.fix`): a script of the plugin's own
+ * (run with node) or a program of the machine (`command`), with the label the button carries. `args` gives the
+ * script its arguments; `sets` the settings the GUI saves once it succeeded (an install that put a program somewhere).
+ */
+export interface PluginAction {
+  label: string;
+  script?: string;
+  command?: string[];
+  args?: () => string[];
+  sets?: () => Record<string, string>;
+}
+
+/** What `aas gui` needs from a runtime, recorder or timer: its settings and its buttons. Its checks are its `doctor()`. */
+export interface ToolSetup {
+  /** The group of the Setup tab it is listed in ("Agents", "Windows tools"). */
+  group?: string;
+  settings?: PluginSetting[];
+  fixes?: Record<string, PluginAction>;
+}
 
 /** What an AI's CLI offers (`aas options`): its models, each with the efforts it takes when the CLI says so per model. */
 export interface RuntimeOptions {
@@ -253,6 +296,10 @@ export interface RuntimePlugin {
   version?: string;
   /** Whether a model plays through this runtime. A bundle carries it with the plugin's sha256; a runtime without it makes mocks. */
   ai?: boolean;
+  /** The agent's own command: the GUI offers the runtime when it is on the PATH. None for a runtime that needs no program (scripted). */
+  cli?: string;
+  /** Its settings and buttons in `aas gui` (an install or an update of its CLI). */
+  setup?: ToolSetup;
   /** `aas check-agent`: does the agent's CLI reach the broker (no model call). */
   connectCheck?(runDir: string, ctx: { gameId: string }): Promise<unknown>;
   /** Write the hardened configuration into the run directory. Must refuse to overwrite. */
@@ -298,7 +345,13 @@ export interface BrokerGlobals {
 /** Speedrun timer (LiveSplit, ...): reacts to the same events as the recorder. */
 export interface TimerPlugin {
   id: string;
+  /** The name people know the program by; the GUI's Timing choice. */
+  name?: string;
   version?: string;
+  /** The script that starts the program; the GUI makes it a step of its own and passes the game's splits file for the goal. */
+  launch?: string;
+  /** Its settings and buttons in `aas gui`; the timer is offered once its first setting is set. */
+  setup?: ToolSetup;
   /** Process name of the program, for the close step's measurement. */
   processName?: string;
   /** Read-only checks for `aas doctor`. */
@@ -336,6 +389,8 @@ export interface RecorderPlugin {
   /** The name people know the program by, and the script that starts it (the GUI's launch step). */
   name?: string;
   launch?: string;
+  /** Its settings and buttons in `aas gui`. */
+  setup?: ToolSetup;
   /** Throw to abort the run before it starts. */
   preflight(brief: RunBrief, game: GamePlugin): Promise<void>;
   /** `runDir` for the recording folder; `overlayUrl` when the run has an overlay page. */

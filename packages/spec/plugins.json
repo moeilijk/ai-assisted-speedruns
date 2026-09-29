@@ -7,18 +7,27 @@
       "dir": "packages/runtime-claude-code",
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.34.3",
+      "version": "0.34.4",
       "ai": true,
-      "sha256": "dd286826200ee7dea8c2c13ceea93e4a815887641affa9d18f1f28b842a674dd"
+      "sha256": "82a051dd9579c28980c9a79e0db4d81b478ec211591a964abaaf58953fedc202"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.34.3",
+      "version": "0.34.4",
       "ai": true,
-      "sha256": "e34076d9ded177fb787e866286e7c9697389423ff8c1a0e8bc7f8dedb5e0ec19"
+      "sha256": "028f46cd0fb4cb0278c9f6ff7484aceb0af1ec7a5fae84ec00b26c3f02ef90bf"
+    },
+    {
+      "kind": "runtime",
+      "dir": "packages/runtime-mistral-vibe",
+      "id": "mistral-vibe",
+      "name": "Mistral Vibe",
+      "version": "0.34.4",
+      "ai": true,
+      "sha256": "3f945d1c4a7edd6a6677709d9d04cb70d6991b029b56e8076175851f7bea8c43"
     },
     {
       "kind": "runtime",
@@ -42,8 +51,8 @@
       "dir": "packages/recorder-obs",
       "id": "obs",
       "name": "OBS Studio (video)",
-      "version": "0.34.0",
-      "sha256": "5dd5b64add4b10c7e54c27efbc4300507b2d3672dabc4b998e21e2d1f9d38ba3"
+      "version": "0.34.4",
+      "sha256": "a8ab9808dde92d9d3aeba89e83a7a6a23278b72118de6697b3a422fa9b9c451f"
     },
     {
       "kind": "recorder",
@@ -57,27 +66,27 @@
       "kind": "timer",
       "dir": "packages/timer-livesplit",
       "id": "livesplit",
-      "name": null,
-      "version": "0.34.0",
-      "sha256": "4040bb12305a23bfec2a3ddb9883055b8e60db81566306ef2941eb2571176598"
+      "name": "LiveSplit",
+      "version": "0.34.4",
+      "sha256": "5f37ae1ffb48140fefa9492e4349ec054d62634198aa69e7932cff6fd721798c"
     },
     {
       "kind": "game",
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.34.0",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "e0cb56ca9c255b6c2a983497c70d37ceaac50789a8fb2d56337bbe56e6ed5866"
+      "sha256": "234b7315c7205a4ac32195db0129d26c0bc50ff6282c1cbd0e4af8794d485a92"
     },
     {
       "kind": "game",
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.33.8",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "4758ecdf8b463c7ff9a191157d0cce42d25836cc9399370582256c5cfbf60a70"
+      "sha256": "8a98b2622f60a36a692a8a2f8eb9d158fb5acdaa982ebc02ab71c5699831a216"
     },
     {
       "kind": "game",
@@ -93,9 +102,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "0.33.8",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "873c93df2b88d0a10faa0a312e18a82fbc20e73d6f16e1eaf3a794fe79117a7d"
+      "sha256": "e565a41b81dc645eeb91d64405df7aae61d720042828b1e583dd59793b11b791"
     },
     {
       "kind": "game",
@@ -129,27 +138,27 @@
       "dir": "games/portal",
       "id": "portal",
       "name": "Portal",
-      "version": "0.34.0",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "6d48af44d10c7b22509483ffc72ba614f96c354b39d48498ec5e2a28c0ba71d1"
+      "sha256": "e7621e41c03990b6d9615cc6f01397cbbeb8b788e30f70a1d45b856e01c873ef"
     },
     {
       "kind": "game",
       "dir": "games/portal-2",
       "id": "portal_2",
       "name": "Portal 2",
-      "version": "0.33.8",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "b85ce061b45bc76f01e634b661ebc1e78ef95d88ae1f2719f986458eb3d815cb"
+      "sha256": "fe0076b95eab147ad624f818b4749440b676ddc27f61156737c1c7b075241eb2"
     },
     {
       "kind": "game",
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "0.34.0",
+      "version": "0.34.4",
       "stub": false,
-      "sha256": "27e18a3ef733b04be36f8f2b143106f05051c6a53e018355b6ae8165a31b0334"
+      "sha256": "878dbd1e484529c44eeb77082dcfd583367ba35822db24caaf0261745718ddc5"
     },
     {
       "kind": "game",

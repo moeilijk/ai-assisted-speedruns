@@ -20,35 +20,38 @@ function probe(host, port, ms = 2500) {
 
 export async function doctor({ game, recorder = null, timer = null, runtime = null, runDir = null, log = console.log } = {}) {
   const rows = [];
-  const add = (ok, what, detail = "") => rows.push({ ok, what, detail });
+  // Every row says which plugin it comes from (`source`), so a reader of `--json` (the GUI's Setup tab) takes the
+  // rows of one plugin; `fix`, `level` and `when` are passed on as the plugin gave them (types.d.ts, DoctorRow).
+  const add = (ok, what, detail = "", source = "core", extra = {}) => rows.push({ ok, what, detail, source, ...pick(extra) });
+  const pick = (r) => Object.fromEntries(["fix", "level", "when"].filter((k) => r?.[k] !== undefined).map((k) => [k, r[k]]));
   add(Number(process.versions.node.split(".")[0]) >= 22, "Node 22+", process.version);
   const pluginRows = async (label, loader, id, ctx) => {
     if (!id) return;
     try {
       const p = await loader(id);
-      for (const r of (await p.doctor?.(ctx)) ?? []) add(Boolean(r.ok), r.what, r.detail ?? "");
+      for (const r of (await p.doctor?.(ctx)) ?? []) add(Boolean(r.ok), r.what, r.detail ?? "", label, r);
     } catch (e) {
-      add(false, `${label} ${id}`, e.message);
+      add(false, `${label} ${id}`, e.message, label);
     }
   };
   if (game) {
     try {
       const plugin = await loadGamePlugin(game);
-      add(true, `game plugin ${plugin.id}`, path.resolve(game));
+      add(true, `game plugin ${plugin.id}`, path.resolve(game), "game");
       try {
         const doc = typeof plugin.documentation === "function" ? await plugin.documentation() : plugin.documentation;
-        add(Boolean(doc), "game documentation", `${String(doc ?? "").length} chars`);
+        add(Boolean(doc), "game documentation", `${String(doc ?? "").length} chars`, "game");
       } catch (e) {
-        add(false, "game documentation", e.message);
+        add(false, "game documentation", e.message, "game");
       }
-      for (const dir of plugin.readable ?? []) add(fs.existsSync(dir), "readable dir", dir);
+      for (const dir of plugin.readable ?? []) add(fs.existsSync(dir), "readable dir", dir, "game");
       for (const ep of plugin.endpoints ?? []) {
         const r = await probe(ep.host, ep.port);
-        add(r === "open", `game endpoint ${ep.host}:${ep.port}`, r === "open" ? "reachable" : `${r} (is the game running with its IPC enabled?)`);
+        add(r === "open", `game endpoint ${ep.host}:${ep.port}`, r === "open" ? "reachable" : `${r} (is the game running with its IPC enabled?)`, "game", { when: "run" });
       }
-      for (const r of (await plugin.doctor?.({ runDir })) ?? []) add(Boolean(r.ok), r.what, r.detail ?? "");
+      for (const r of (await plugin.doctor?.({ runDir })) ?? []) add(Boolean(r.ok), r.what, r.detail ?? "", "game", r);
     } catch (e) {
-      add(false, "game plugin", e.message);
+      add(false, "game plugin", e.message, "game");
     }
   }
   await pluginRows("runtime", loadRuntime, runtime, { runDir });

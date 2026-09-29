@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 import { connectObs } from "./obs-ws.mjs";
 import { pngMeanLuma } from "./png-luma.mjs";
 import { endScreensaver } from "../core/src/windows/screensaver.mjs";
+import { setup, setupRows } from "./setup.mjs";
 
 const MIC_KINDS = new Set(["wasapi_input_capture", "coreaudio_input_capture", "pulse_input_capture", "alsa_input_capture"]);
 
@@ -232,24 +233,25 @@ export function createObsRecorder(options = {}) {
     id: "obs",
     name: "OBS Studio (video)",
     launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-obs.mjs"),
-    version: "0.34.0",
+    version: "0.34.4",
     processName: "obs64",
-    /** Read-only checks for `aas doctor`: the websocket reachable and authenticated, OBS not already recording. */
+    setup,
+    /** Read-only checks for `aas doctor`: OBS set up (setup.mjs), then while it runs the websocket reachable and
+     *  authenticated and OBS not already recording (`when: "run"`: only a running OBS establishes those). */
     async doctor() {
-      const rows = [];
+      const rows = setupRows();
       const u = new URL(url);
       const reach = await new Promise((res) => { const s = net.connect(Number(u.port || 4455), u.hostname); s.setTimeout(2500); s.on("connect", () => (s.destroy(), res("open"))); s.on("error", (e) => (s.destroy(), res(e.code ?? "error"))); s.on("timeout", () => (s.destroy(), res("timeout"))); });
-      rows.push({ ok: reach === "open", what: `OBS websocket ${u.host}`, detail: reach === "open" ? "reachable" : `${reach} (start OBS; Tools → WebSocket Server Settings)` });
-      rows.push({ ok: Boolean(password), what: "AAS_OBS_PASSWORD set", detail: "" });
+      rows.push({ ok: reach === "open", what: `OBS websocket ${u.host}`, detail: reach === "open" ? "reachable" : `${reach} (start OBS; Tools → WebSocket Server Settings)`, when: "run" });
       if (reach === "open") {
         try {
           const o = await connectObs({ url, password });
           const v = await o.call("GetVersion");
           const st = await o.call("GetRecordStatus");
           await o.close();
-          rows.push({ ok: true, what: "OBS auth + version", detail: `OBS ${v.obsVersion}, obs-websocket ${v.obsWebSocketVersion}` });
-          rows.push({ ok: !st.outputActive, what: "OBS not already recording", detail: "" });
-        } catch (e) { rows.push({ ok: false, what: "OBS auth", detail: e.message }); }
+          rows.push({ ok: true, what: "OBS auth + version", detail: `OBS ${v.obsVersion}, obs-websocket ${v.obsWebSocketVersion}`, when: "run" });
+          rows.push({ ok: !st.outputActive, what: "OBS not already recording", detail: "", when: "run" });
+        } catch (e) { rows.push({ ok: false, what: "OBS auth", detail: e.message, when: "run" }); }
       }
       return rows;
     },

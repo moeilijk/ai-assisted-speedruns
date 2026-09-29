@@ -12,6 +12,74 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.34.4 — 2026-09-29
+
+- **The model is a list you can see** (the maintainer, 13:0x: "model en effort zie ik niet terug, niets veranderd").
+  0.34.3 put the CLI's models in a datalist behind a text box, which most browsers show only as a text box. Now Model
+  is a list: the AI's own default, every model its CLI names, and "other…", which opens a box for a full name or a
+  slug; Effort follows the model chosen. While another AI's list loads the fields say so instead of showing the
+  previous AI's.
+- **Model and effort for Claude Code come from the client itself** (the maintainer, 13:2x–15:2x: "waarom voor codex
+  precies en voor claude slop?", "je hebt de cli", "je hebt NIETS gedaan met effort"). The client answers `/model` and
+  `/effort` in print mode without a model call (measured with 2.1.284: no turn, no tokens, cost 0): the model it uses
+  now with its effort, every name it takes (sonnet, opus, haiku, fable, best, the `[1m]` names, opusplan), and every
+  level (low to max, and ultracode). Its model menu on disk (`<claude dir>/cache/model-catalog/`, fetched from
+  Anthropic for the account) adds the exact ids, the efforts each takes and the person's own effort for each. Model
+  lists all of these, each name with the model the client points it at (asked of the client: `default` → the
+  recommended model, `best`, `opus`, …); the empty choice is "as the AI is set", the model and effort the client on
+  this machine uses without `--model` and `--effort` (its `~/.claude/settings.json`), which need not be the model
+  `default` names. Effort follows the model (Haiku takes none). `auto` is what leaving Effort empty means: the `--effort` flag ignores the word ("Unknown --effort value
+  'auto'"), as it ignores any word it does not know and plays on with its default, so the runtime refuses such an
+  effort before the start. "other" takes a full model id, as the client does.
+- **The Claude Code the runs use can run what its menu lists.** The `claude` on this machine's PATH was 2.1.270 while
+  the client in use and the newest release were 2.1.284, and Opus 5.5 needs 2.1.280, so it could not be chosen. The
+  Setup row now has the condition "it can run every model its own menu lists", with a button that runs the client's
+  own updater (`claude update`). This machine was updated that way (2026-09-29 15:31).
+- **Mistral Vibe is a runtime** (`runtime-mistral-vibe`; the maintainer, 2026-09-29: "elke nieuwe ai moet, als hij er
+  is, gelijk worden behandeld"). Its run configuration (`.vibe/config.toml`) has the broker as its only MCP server and
+  enables only its three tools; `vibe -p --output streaming` runs with `--enabled-tools` for exactly those three,
+  `--max-turns` and `--max-price`, and `--resume` at a resume. What Vibe streams is kept in the run directory
+  (`vibe-stream.jsonl`) with the time each entry arrived, because Vibe's own session log has no time per message; the
+  export makes the timeline from Vibe's own `createdAt`/`updatedAt` and the summary's model and usage from Vibe's saved
+  session. Models and thinking levels come from Vibe itself (`vibe-acp`, `session/new`, no prompt). Vibe keeps no plan
+  budget the tooling can read, so a Vibe run does not start without `AAS_VIBE_MAX_PRICE`. Vibe runs with its own
+  `--legacy-harness`: the smoke session of 2026-09-29 20:28 showed that the harness 2.25.8 runs by default keeps tools of
+  its own (bash and file tools denied, but `process.*` allowed, and subagents), whatever `--enabled-tools` names; in the
+  legacy harness `--enabled-tools` disables every other tool in `-p` mode, and `aas doctor` checks the flag is there.
+  Measured with it (`npm run vibe:smoke`, 2026-09-29 20:51, Vibe 2.25.8): the session offered the agent
+  `aas_gui_fake_documentation`, `_screenshot` and `_exec` and nothing else, a shell command and a file read answered
+  "Unknown tool", and the export made the timeline and the summary from the real stream ($0.017 as Vibe counted it). `npm run vibe:smoke` is its
+  verification against the GUI's fake game; `aas check-agent --runtime mistral-vibe` starts the configured MCP server and
+  asks it for its tools, without a model.
+- **The GUI names no runtime, recorder or timer.** It finds their plugins as the CLI does and asks them: who plays is
+  every runtime plugin (a mock through one no model plays, an AI once its `cli` is on the PATH), Recording is what the
+  game names (`setup.recorders`, now required, "no recording" last), and a new Timer choice lists every timer that is
+  set up, or none. Their Setup rows are their own settings and `doctor()` rows (`aas doctor --<kind> <id> --json`); a
+  row names its button (`fix`), says when a thing is not installed (`level: "missing"`) or only measured while a program
+  runs (`when: "run"`, such as a plan's stand or OBS's WebSocket), and the buttons are the plugins' own scripts or
+  programs. OBS's checks, its WebSocket button and its recording folder moved into `recorder-obs`, LiveSplit's into
+  `timer-livesplit`, Claude Code's version and update button into its runtime. Steam is listed when a game says its
+  launcher starts it (`setup.steam`). Steps, the Stop button, "leave … open" and the page shown when the GUI has stopped
+  name what the run really starts and the games' own stop scripts. The overlay port and the autosave interval come from
+  the core (`OVERLAY_PORT`, `AUTOSAVE_MINUTES`). `AAS_PLUGIN_DIRS` adds folders to look for plugins in.
+- **A tab left open across a restart reloads itself.** The page carries the hash of its own text and `/api/gui` names
+  the page the GUI serves; when they differ (the GUI was restarted after an update while the tab stayed open) the
+  page replaces itself with the new one, instead of showing old fields over new commands.
+- **A runtime's, recorder's or timer's row is checked when the GUI starts, once** (the maintainer, 2026-09-29: "testen
+  hoort erbij en fouten moet je fixen"). Their rows have new ids in this release, so the kept results did not belong to
+  them and the rows stood empty until "Check again". Such a row without a result is now checked in the background at
+  the start, as a row that shows a standard location already was; a row with a result keeps it. Measured in the page
+  (2026-09-30 00:00, Playwright): the five rows filled in 3 seconds without a click.
+- **The GUI answers while it checks.** Listing the rows asked PowerShell for OBS's install folder four times (0.3 s
+  each), and a check at the start listed the rows once per row: with 30 rows `/api/setup` took 12.5 s and a request
+  in between was reset (`ECONNRESET`). OBS's folder is read from the registry once per process and the rows are listed
+  once per check round; `/api/setup` takes 30–40 ms while the checks run.
+- **`--help` after any command shows the help.** It was accepted and ignored, so `aas gui --help` started a GUI and
+  `aas run --help` would have started a run.
+- **A plugin may change again before its release.** The version guard of `make-plugins.mjs` compared with
+  `plugins.json` in the working tree, which already carried the coming version, and refused a second change to a
+  plugin within the same release. It compares with `plugins.json` of the latest tag.
+
 ## 0.34.3 — 2026-09-29
 
 - **The GUI does what the command line does** (the maintainer, 2026-09-29: "nog lang niet alle functionaliteit zit in

@@ -5,11 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { affectedBy, allGames, configItems, guiGames, settingOwners } from "./checks.mjs";
+import { affectedBy, allGames, configItems, guiGames, settingOwners, shownScript } from "./checks.mjs";
 import { gameEnvFile } from "../settings.mjs";
 import { writeEnv, ENV_FILE } from "./env-file.mjs";
 import { readSettings as readEnv } from "../settings.mjs";
-import { agentsPresent, createSession, recorderOptions, RUNTIMES, signingKey } from "./session.mjs";
+import { createSession, signingKey } from "./session.mjs";
+import { recordersFor, runtimes, timers } from "./tools.mjs";
+import { AUTOSAVE_MINUTES } from "../run.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
 import { AAS_KEY_FILE } from "../publish.mjs";
@@ -17,7 +19,7 @@ import { checkInside } from "../validate.mjs";
 import { createHash } from "node:crypto";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-// Only one GUI at a time: it starts games, OBS and runs, so a second one would fight the first over the same run
+// Only one GUI at a time: it starts games, their recorders and timers, and runs, so a second one would fight the first over the same run
 // directory. The note below points at the page that is already up; a second start opens that page instead of failing.
 // How a check's outcome reads in the log: the same words as the row's status on the page.
 const CHECK_WORDS = { ok: "ready", warn: "not ready", fail: "not ready", missing: "not set up", absent: "no plugin yet", pending: "checking" };
@@ -82,7 +84,9 @@ export function settingReady(setting, env) {
 // changes while the GUI runs (an update, a pull), the page says so and asks for a restart instead of mixing the two.
 const codeHash = () => { const h = createHash("sha256"); for (const f of ["page.html", "server.mjs", "session.mjs", "checks.mjs"]) { try { h.update(fs.readFileSync(path.join(here, f))); } catch { /* */ } } return h.digest("hex"); };
 const STARTED_WITH = codeHash();
-const PAGE = fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION);
+// The page carries the hash of its own text, so a tab left open across a restart sees that the GUI serves another page.
+const PAGE_HASH = createHash("sha256").update(fs.readFileSync(path.join(here, "page.html"))).digest("hex").slice(0, 16);
+const PAGE = fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION).replace("%PAGEHASH%", PAGE_HASH);
 
 export async function startGui({ port = 8770, open = true, checkAtStart = true, log = console.log } = {}) {
   let note = null;
@@ -142,12 +146,14 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
     }
   };
   const startChecks = async (ids) => {
-    const all = (await configItems()).filter((i) => i.check !== false).map((i) => i.id);
-    for (const id of ids ?? all) {
-      if (!all.includes(id) || pending.has(id)) continue;
+    // The rows are listed once: each listing asks the plugins for their defaults, and some of those ask Windows.
+    const items = (await configItems()).filter((i) => i.check !== false);
+    for (const id of ids ?? items.map((i) => i.id)) {
+      const item = items.find((i) => i.id === id);
+      if (!item || pending.has(id)) continue;
       pending.add(id);
       queue.push(id);
-      emitAll("check", withResult((await configItems()).find((i) => i.id === id)));
+      emitAll("check", withResult(item));
     }
     pump();
   };
@@ -169,7 +175,7 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         res.end(PAGE);
       } else if (req.method === "GET" && url.pathname === "/api/gui") {
-        send(res, 200, { gui: "aas", version: FRAMEWORK_VERSION, url: `http://127.0.0.1:${port}/`, pid: process.pid, stale: codeHash() !== STARTED_WITH });
+        send(res, 200, { gui: "aas", version: FRAMEWORK_VERSION, url: `http://127.0.0.1:${port}/`, pid: process.pid, page: PAGE_HASH, stale: codeHash() !== STARTED_WITH });
       } else if (req.method === "GET" && url.pathname === "/api/setup") {
         const items = (await configItems()).map(withResult);
         send(res, 200, { items, envFile: toWindows(ENV_FILE), checked: Object.keys(cache).length > 0, configured: Object.keys(readEnv()).some((k) => k.startsWith("AAS_")) });
@@ -219,25 +225,26 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         send(res, 200, listDir(url.searchParams.get("path") ?? ""));
       } else if (req.method === "GET" && url.pathname === "/api/games") {
         const env = readEnv();
+        // Who can play: every runtime plugin, a mock (no model) always, an AI when its CLI is on this machine.
+        const rts = await runtimes();
         const games = await Promise.all((await guiGames()).map(async ({ plugin }) => ({
           id: plugin.id, name: plugin.name, folder: plugin.setup.folder,
-          recorders: await recorderOptions(plugin.setup),
+          recorders: await recordersFor(plugin.setup),
           seed: plugin.setup.seed ? { placeholder: plugin.setup.seed.placeholder ?? "" } : null,
           ends: plugin.ends.map((e) => ({ id: e.id, label: e.label, final: Boolean(e.final) })),
           mock: Boolean(plugin.setup.bot),
           ready: settingReady(plugin.setup.settings[0], env),
-          next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
+          stop: plugin.setup.stop ? shownScript(plugin.setup.stop) : null,
+          next: Object.fromEntries(rts.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
         })));
-        // Who can play: the game's script when the game has one, and every AI whose CLI is on this machine.
-        const agents = agentsPresent();
-        send(res, 200, { games, runtimes: RUNTIMES.map((r) => ({ id: r.id, label: r.label, ai: Boolean(r.cli), present: !r.cli || agents.includes(r) })), agents: agents.map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
+        send(res, 200, { games, runtimes: rts.map(({ id, label, ai, present }) => ({ id, label, ai, present })), timers: (await timers()).filter((t) => t.ready).map(({ id, name }) => ({ id, name })), autosaveMinutes: AUTOSAVE_MINUTES, output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
       } else if (req.method === "GET" && url.pathname === "/api/options") {
         // The models and efforts an AI's CLI names today: read from the CLI each time, as `aas options` does.
         send(res, 200, await session.options(url.searchParams.get("runtime")));
       } else if (req.method === "GET" && url.pathname === "/api/plan") {
         const o = Object.fromEntries(url.searchParams);
         const p = await session.plan(o);
-        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), recorder: p.recorder, signed: p.signed, steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
+        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), recorder: p.recorder, timer: p.timer, programs: p.programs, signed: p.signed, steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
       } else if (req.method === "GET" && url.pathname === "/api/run-info") {
         send(res, 200, await session.runInfo(url.searchParams.get("runDir")));
       } else if (req.method === "GET" && url.pathname === "/api/key") {
@@ -297,7 +304,8 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         await session.fix(fixId);
         const fixLabel = Object.values(cache).find((c) => c.result?.fix?.id === fixId)?.result.fix.label ?? fixId;
         session.log(`Done: ${fixLabel}; checking the row again`, "ok");
-        const fixed = { "obs-password": ["obs"], "install-livesplit": ["livesplit"], "livesplit-server": ["livesplit"], "livesplit-windows": ["livesplit"], "install-svv": ["svv", "quiet"] }[fixId] ?? (fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : fixId.startsWith("fix:") ? [`game-${fixId.split(":")[1]}`] : []);
+        // The row the button belongs to is checked again: a plugin's own (plugin:<kind>:<id>:<fix>), a game's, or a core one.
+        const fixed = fixId.startsWith("plugin:") ? [fixId.split(":").slice(0, 3).join(":")] : fixId.startsWith("install:") ? [`game-${fixId.slice(8)}`] : fixId.startsWith("fix:") ? [`game-${fixId.split(":")[1]}`] : ({ "install-svv": ["svv", "quiet"] }[fixId] ?? []);
         await startChecks(fixed);
         send(res, 200, { ok: true, message: `Done: ${fixLabel}; checking the row again` });
       } else if (req.method === "POST" && url.pathname === "/api/open") {
@@ -345,9 +353,12 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
   log(`aas gui: ${address}  (Ctrl-C ends the GUI: a running session is stopped first, saved, with its recording)`);
   if (open) openBrowser(address);
   // A row that shows a standard location (the default a tool or plugin uses when .env names none) and has no result
-  // for it yet is checked once, in the background: those places may always be looked at (owner, 2026-09-25). Every
-  // other row keeps its kept result, or waits for the button (owner, 2026-09-17: no full check on every open).
-  if (checkAtStart) startChecks([...new Set((await configItems()).filter((i) => i.check !== false && !i.value && i.placeholder?.startsWith("default:") && withResult(i).status === "unchecked").map((i) => i.id))]).catch(() => {});
+  // for it yet is checked once, in the background: those places may always be looked at (owner, 2026-09-25). So is
+  // a runtime's, recorder's or timer's row without a result: its conditions are its plugin's own read-only doctor(),
+  // and a new plugin or a new version of the GUI would otherwise show it empty until the button. Every other row
+  // keeps its kept result, or waits for the button (owner, 2026-09-17: no full check on every open).
+  const firstLook = (i) => (i.id.startsWith("plugin:") || (!i.value && i.placeholder?.startsWith("default:"))) && withResult(i).status === "unchecked";
+  if (checkAtStart) startChecks([...new Set((await configItems()).filter((i) => i.check !== false && firstLook(i)).map((i) => i.id))]).catch(() => {});
   const shutdown = async () => {
     if (session.state.phase !== "idle") { log("stopping the session first"); await session.stop(); }
     forget();

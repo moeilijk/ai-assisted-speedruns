@@ -3,7 +3,8 @@
 // a changed plugin still carries its old version. Together that is the rule: files change, the version changes.
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PLUGINS_FILE, pluginRows, readPublished, staleVersions } from "../make-plugins.mjs";
+import { spawnSync } from "node:child_process";
+import { PLUGINS_FILE, pluginRows, readPublished, readReleased, staleVersions } from "../make-plugins.mjs";
 
 test("plugins.json holds every plugin in this checkout, as it is on disk", async () => {
   const published = readPublished();
@@ -38,4 +39,12 @@ test("every plugin that is not a stub carries a version, and the stubs are the o
     if (r.kind === "game" && r.stub) assert.equal(r.version, "0.0.0", `${r.dir} is a stub, so it has not been released`);
     else assert.notEqual(r.version, "0.0.0", `${r.dir} is not a stub, so 0.0.0 says nothing`);
   }
+});
+
+test("the guard compares with the last release, so a version that is not out yet may change again", () => {
+  // 0.34.4 changed recorder-obs after plugins.json had been written for 0.34.4; the file here is not a release.
+  const git = (...a) => spawnSync("git", a, { encoding: "utf8" });
+  const tag = git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*").stdout.trim();
+  if (!tag) return;
+  assert.deepEqual(readReleased(), JSON.parse(git("show", `${tag}:packages/spec/plugins.json`).stdout), `the plugins.json of ${tag}`);
 });

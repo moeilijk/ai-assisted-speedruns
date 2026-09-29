@@ -10,6 +10,7 @@
 // run it again. packages/spec/test/plugins.test.mjs fails while plugins.json is out of date, so neither step can
 // be skipped quietly. runtimes.json (SPEC §3, what the archive holds a bundle against) stays its own file with its
 // own shape; the three runtime rows here carry the same numbers.
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
@@ -62,11 +63,23 @@ export const readPublished = () => {
 };
 
 /**
+ * plugins.json as the last release (the latest tag vX.Y.Z) holds it: a version that is not out yet may change again
+ * before its release, and only a release fixes what a version holds. Without git or a tag, the file here.
+ */
+export const readReleased = () => {
+  const git = (...a) => spawnSync("git", a, { cwd: HERE, encoding: "utf8" });
+  const tag = git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*").stdout?.trim();
+  const rel = path.relative(git("rev-parse", "--show-toplevel").stdout?.trim() || "", PLUGINS_FILE).split(path.sep).join("/");
+  if (tag) { const r = git("show", `${tag}:${rel}`); if (r.status === 0) try { return JSON.parse(r.stdout); } catch { /* the file here */ } }
+  return readPublished();
+};
+
+/**
  * The rows whose files changed while their version stayed the same: what this file exists to catch. A row that is
  * new here has nothing to compare against, so it is not one of them; nor is a stub, which stays at 0.0.0 until it
  * is built, whatever its README says meanwhile.
  */
-export function staleVersions(rows, published = readPublished()) {
+export function staleVersions(rows, published = readReleased()) {
   const before = new Map((published?.plugins ?? []).map((p) => [`${p.kind}/${p.dir}`, p]));
   return rows.filter((r) => {
     const was = before.get(`${r.kind}/${r.dir}`);

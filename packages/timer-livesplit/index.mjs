@@ -19,6 +19,8 @@
 import net from "node:net";
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { setup, setupRows } from "./setup.mjs";
 
 export function connectLiveSplit({ host = "127.0.0.1", port = 16834 } = {}, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
@@ -94,10 +96,15 @@ export function createLiveSplitTimer(options = {}) {
   const startCommands = (from) => { send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send(`setgametime ${from.toFixed(3)}`); };
   return {
     processName: "LiveSplit",
-    /** Read-only check for `aas doctor`: the LiveSplit Server reachable. */
+    name: "LiveSplit",
+    launch: path.join(path.dirname(fileURLToPath(import.meta.url)), "launch-livesplit.mjs"),
+    setup,
+    /** Read-only checks for `aas doctor`: LiveSplit set up (setup.mjs), then its server reachable (`when: "run"`). */
     async doctor() {
+      const rows = await setupRows();
       const r = await new Promise((res) => { const s = net.connect(port, host); s.setTimeout(2500); s.on("connect", () => (s.destroy(), res("open"))); s.on("error", (e) => (s.destroy(), res(e.code ?? "error"))); s.on("timeout", () => (s.destroy(), res("timeout"))); });
-      return [{ ok: r === "open", what: `LiveSplit Server ${host}:${port}`, detail: r === "open" ? "reachable" : `${r} (start LiveSplit; Control → Start Server, or ServerStartup=1 in settings.cfg)` }];
+      rows.push({ ok: r === "open", what: `LiveSplit Server ${host}:${port}`, detail: r === "open" ? "reachable" : `${r} (start LiveSplit; Control → Start Server, or ServerStartup=1 in settings.cfg)`, when: "run" });
+      return rows;
     },
     /** Closes LiveSplit the way a user would, answering "Save Splits?" with No. */
     async close() {
@@ -105,7 +112,7 @@ export function createLiveSplitTimer(options = {}) {
       return closeWindows([{ name: "LiveSplit", title: "LiveSplit", seconds: 15, dialogTitle: "Save Splits?", dialogButton: "&No" }], { report: ["LiveSplit"] });
     },
     id: "livesplit",
-    version: "0.34.0",
+    version: "0.34.4",
     sent,
     async preflight() {
       const probe = await connectLiveSplit({ host, port });

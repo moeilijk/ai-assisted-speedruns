@@ -17,6 +17,7 @@ packages/
   spec/                 SPEC.md, the bundle format
   runtime-claude-code/  runs Claude Code against the broker, with its tools locked down
   runtime-codex/        the same for Codex
+  runtime-mistral-vibe/ the same for Mistral Vibe
   runtime-scripted/     runs a bot module instead of a model, for baselines and tests
   recorder-obs/         records with OBS: its own scenes, game audio, no microphone
   recorder-source-demo/ in-game Source demo through SourcePauseTool

@@ -5,12 +5,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { exportClaudeSession } from "./export-claude-session.mjs";
 import { exportRollout } from "../../runtime-codex/export-rollout.mjs";
+import { exportStream } from "../../runtime-mistral-vibe/export-stream.mjs";
 import { goalHistory } from "./goal.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { computeTimeline } from "./timeline.mjs";
 
 /** The exporter of each runtime's own session log; a runtime not named here writes the harness's shape (Claude's). */
-export const EXPORTERS = { "claude-code": exportClaudeSession, codex: exportRollout };
+export const EXPORTERS = { "claude-code": exportClaudeSession, codex: exportRollout, "mistral-vibe": exportStream };
 
 export const readRunEvents = (runDir) => { const f = path.join(runDir, "run.jsonl"); if (!fs.existsSync(f)) return []; return fs.readFileSync(f, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter((r) => r && r.kind === "event"); };
 

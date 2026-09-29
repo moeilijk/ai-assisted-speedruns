@@ -111,7 +111,10 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Codex",
-  version: "0.34.3",
+  /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
+  cli: "codex",
+  setup: { group: "Agents" },
+  version: "0.34.4",
   /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
   async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
@@ -127,10 +130,11 @@ export default {
   async doctor({ runDir = null } = {}) {
     const rows = [];
     const v = spawnSync("codex", ["--version"], { encoding: "utf8" });
-    rows.push({ ok: v.status === 0, what: "Codex on PATH", detail: v.status === 0 ? v.stdout.trim() : "codex not found (npm install -g @openai/codex)" });
+    rows.push({ ok: v.status === 0, what: "Codex on PATH", detail: v.status === 0 ? v.stdout.trim() : "codex not found (npm install -g @openai/codex)", level: "missing" });
+    if (v.status !== 0) return rows;
     if (runDir && fs.existsSync(runDir)) rows.push({ ok: isTrusted(runDir), what: "Codex trusts the run directory", detail: isTrusted(runDir) ? path.resolve(runDir) : `no [projects."${path.resolve(runDir)}"] trust_level = "trusted" in ${codexConfigFile()}; aas resume sets it` });
     const c = checkCodexBudget();
-    rows.push({ ok: c.ok, what: `Codex plan budget for runs (AAS_CODEX_BUDGET_MAX ${c.max}%)`, detail: c.detail });
+    rows.push({ ok: c.ok, what: `Codex plan budget for runs (AAS_CODEX_BUDGET_MAX ${c.max}%)`, detail: c.detail, when: "run" });
     return rows;
   },
   /**

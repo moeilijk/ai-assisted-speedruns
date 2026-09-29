@@ -1,6 +1,6 @@
 {
   "name": "ai-assisted-speedruns",
-  "version": "0.34.3",
+  "version": "0.34.4",
   "private": true,
   "description": "Plugin framework and open standard for AI Assisted Speedruns",
   "license": "MIT",
@@ -29,6 +29,7 @@
     "packages/core",
     "packages/runtime-codex",
     "packages/runtime-claude-code",
+    "packages/runtime-mistral-vibe",
     "packages/recorder-obs",
     "packages/recorder-source-demo",
     "packages/recorder-null",
@@ -42,6 +43,7 @@
     "portal:check": "node packages/core/src/cli.mjs check-connection --game games/portal/plugin.mjs --run-dir runs/portal-check --exercise",
     "portal:install": "node games/portal/install-game-files.mjs",
     "portal:run": "node packages/core/src/cli.mjs run --runtime claude-code --game games/portal/plugin.mjs --recorder obs --timer livesplit --overlay-port 8765 --run-dir",
+    "vibe:smoke": "node --env-file-if-exists=.env packages/runtime-mistral-vibe/smoke.mjs --game packages/core/test/gui-game/fake/plugin.mjs --run-dir runs/vibe-smoke",
     "claude:smoke": "node --env-file-if-exists=.env packages/runtime-claude-code/smoke.mjs --game games/portal/plugin.mjs --run-dir runs/claude-smoke --fake-spt",
     "portal:doctor": "node packages/core/src/cli.mjs doctor --game games/portal/plugin.mjs --recorder obs --timer livesplit --runtime claude-code",
     "portal:launch": "node games/portal/launch-game.mjs",

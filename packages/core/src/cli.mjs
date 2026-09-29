@@ -73,10 +73,12 @@ function runEnded(what, status, files, seconds) {
 }
 
 if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") || process.argv[1]?.endsWith("\\aas")) {
-  const [command, ...rest] = process.argv.slice(2);
+  let [command, ...rest] = process.argv.slice(2);
   let opts = { _: [] };
   try {
     opts = parse(rest);
+    // --help after any command is a request for this help, never the command itself (`aas gui --help` started a GUI).
+    if (opts.help === true) command = "help";
     switch (command) {
       case "configure": {
         const r = await configure(opts);
@@ -161,6 +163,8 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
           console.log(`${rt.name} (${o.source}):`);
           for (const m of o.models) console.log(`  model ${m.id.padEnd(24)} ${m.label && m.label !== m.id ? m.label : ""}${m.efforts?.length ? `  efforts ${m.efforts.join(", ")}${m.defaultEffort ? ` (default ${m.defaultEffort})` : ""}` : ""}`.trimEnd());
           if (o.freeModel) console.log(`  ${o.freeModel}`);
+          if (o.current) console.log(`  without --model: as the client is set (${o.current})`);
+          if (o.currentEffort) console.log(`  without --effort: as the client is set (${o.currentEffort})`);
           console.log(`  efforts: ${o.efforts.join(", ") || "none listed"}`);
         }
         if (opts.json) console.log(JSON.stringify(all));
@@ -335,7 +339,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "check-agent": {
         const { checkAgent } = await import("./check-agent.mjs");
-        if (!opts.runtime || !opts.game) throw new Error("Usage: aas check-agent --runtime <claude-code|codex> --game <plugin.mjs> [--run-dir <dir>] [--keep]");
+        if (!opts.runtime || !opts.game) throw new Error("Usage: aas check-agent --runtime <an AI runtime: claude-code, codex, mistral-vibe> --game <plugin.mjs> [--run-dir <dir>] [--keep]");
         const r = await checkAgent({ runtime: opts.runtime, game: opts.game, runDir: opts["run-dir"] ?? null, keep: opts.keep === true });
         process.exitCode = r.ok ? 0 : 1;
         break;
@@ -353,7 +357,7 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         console.error(
           [
             "Usage:",
-            "  aas check-agent --runtime <claude-code|codex> --game <plugin.mjs> [--run-dir <dir>] [--keep]   does the agent's CLI reach the broker? (no model call, no tokens)",
+            "  aas check-agent --runtime <an AI runtime: claude-code, codex, mistral-vibe> --game <plugin.mjs> [--run-dir <dir>] [--keep]   does the agent's CLI reach the broker? (no model call, no tokens)",
             "  aas gui [--port 8770] [--no-open]           a web page to set up tools and games and to start runs; shows the commands it runs",
             "  aas configure --runtime <codex|claude-code|scripted> --game <plugin.mjs> --run-dir <dir> [--model m] [--effort low|medium|high|xhigh|max] [--goal g] [--prompt text] [--instructions file] [--seed s] [--id name] [--build b] [--bot script]",
             "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--autosave-minutes 10 | --no-autosave] [--ignore-budget] [--keep-open] [--proof off|anonymous|account] [configure options]",

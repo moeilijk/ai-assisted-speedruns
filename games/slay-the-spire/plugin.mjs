@@ -151,7 +151,7 @@ function lastSeed(runDir) {
 export default {
   id: "slay_the_spire",
   name: "Slay the Spire",
-  version: "0.34.0",
+  version: "0.34.4",
   scopeName: "sts",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_STS_PROCESS || "java.exe",
@@ -163,6 +163,8 @@ export default {
   /** What the GUI (`aas gui`) needs to set the game up and start it; see docs/plugins.md. */
   setup: {
     folder: "SlayTheSpire",
+    steam: true,
+    recorders: ["obs"],
     settings: [{ env: "AAS_STS_GAME_ROOT", label: "Slay the Spire folder", kind: "dir", expect: "SlayTheSpire.exe", find: { steam: 646570 }, what: "Where Steam installed Slay the Spire: the folder with SlayTheSpire.exe in it, usually steamapps\\common\\SlayTheSpire." }],
     install: join(here, "install-mod.mjs"),
     installs: "Install Communication Mod next to the game and point it at this harness's bridge",

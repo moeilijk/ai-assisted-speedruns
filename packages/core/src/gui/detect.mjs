@@ -64,31 +64,17 @@ export function findGame(find = {}, steamInfo = null) {
   return null;
 }
 
-/** Where the harness installs tools itself (LiveSplit: install-livesplit.mjs from the GUI). */
+/** Where the harness installs tools itself (a plugin's own install button, SoundVolumeView). */
 export function aasToolsDir() {
   const local = windowsFolders().LOCALAPPDATA;
   return local ? path.join(local, "aas") : null;
 }
 
 /** Portable tools have no installer and no registry entry: only the folder the GUI installs them to is looked at.
- *  Anything elsewhere is chosen by the user; drives are never searched. */
+ *  Anything elsewhere is chosen by the user; drives are never searched. (LiveSplit's own: timer-livesplit/setup.mjs.) */
 export function portableTools() {
   const dir = aasToolsDir();
   return {
-    livesplit: dir && exists(path.join(dir, "LiveSplit", "LiveSplit.exe")) ? path.join(dir, "LiveSplit", "LiveSplit.exe") : null,
     soundvolumeview: dir && exists(path.join(dir, "SoundVolumeView", "SoundVolumeView.exe")) ? path.join(dir, "SoundVolumeView", "SoundVolumeView.exe") : null,
   };
-}
-
-/** OBS Studio: its install folder from the registry, else the default. */
-export function obs() {
-  const reg = powershell("(Get-ItemProperty 'HKLM:\\SOFTWARE\\OBS Studio' -ErrorAction SilentlyContinue).'(default)'");
-  const f = windowsFolders();
-  return first(reg && path.join(toLocal(reg), "bin", "64bit", "obs64.exe"), f.ProgramFiles && path.join(f.ProgramFiles, "obs-studio", "bin", "64bit", "obs64.exe"));
-}
-
-/** obs-websocket's own settings (enabled, port, password), from OBS's config folder. */
-export function obsWebsocketConfig() {
-  const file = path.join(windowsFolders().APPDATA ?? "", "obs-studio", "plugin_config", "obs-websocket", "config.json");
-  try { return { file, ...JSON.parse(fs.readFileSync(file, "utf8")) }; } catch { return null; }
 }

@@ -14,6 +14,7 @@ import { ENV_FILE } from "./env-file.mjs";
 import { gameEnvFile, readSettings as readEnv, readSettingsFile } from "../settings.mjs";
 import { IS_WSL, ON_WINDOWS, powershell, toLocal, toWindows, windowsFolders } from "./windows-paths.mjs";
 import { loadGamePlugin } from "../mcp-client.mjs";
+import { setupPlugins } from "./tools.mjs";
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..");
 const rel = (p) => path.relative(REPO, p) || p;
@@ -96,7 +97,6 @@ export function settingDefault(st) {
 // The paths the harness uses when a setting is not in .env (the launchers' own defaults).
 function defaultPath(key) {
   const f = ON_WINDOWS ? windowsFolders() : {};
-  if (key === "AAS_OBS_EXE") return f.ProgramFiles ? path.join(f.ProgramFiles, "obs-studio", "bin", "64bit", "obs64.exe") : null;
   if (key === "AAS_STEAM_EXE") return f["ProgramFiles(x86)"] ? path.join(f["ProgramFiles(x86)"], "Steam", "steam.exe") : null;
   return null;
 }
@@ -116,11 +116,18 @@ export async function configItems() {
     item(HARNESS, "repo", "Repository", "info", null, { value: toWindows(REPO) }),
     item(HARNESS, "node", "Node.js", "info", null, { value: `${toWindows(process.execPath)} (${process.version})` }),
     item(HARNESS, "ffmpeg", "ffmpeg (video cut, length)", "info", null, { value: which("ffmpeg") }),
-    item(HARNESS, "claude", "Claude Code", "info", null, { value: which("claude") }),
-    item(HARNESS, "codex", "Codex", "info", null, { value: which("codex") }),
-    item("Windows tools", "obs", "OBS Studio (recording)", "file", "AAS_OBS_EXE", { expect: "obs64.exe", placeholder: "default: C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe" }),
-    item("Windows tools", "livesplit", "LiveSplit (timer)", "file", "AAS_LIVESPLIT_EXE", { expect: "LiveSplit.exe", what: "LiveSplit.exe itself, wherever you unpacked it: the timer that is shown in the recording and takes the splits." }),
-    item("Windows tools", "steam", "Steam", "file", "AAS_STEAM_EXE", { expect: "steam.exe", placeholder: "default: C:\\Program Files (x86)\\Steam\\steam.exe" }),
+    // Every runtime, recorder and timer with a `setup` of its own: its settings, or one row named after it; the
+    // conditions are its own `doctor()` (checkItem, "plugin:<kind>:<id>"). None of them is named here.
+    ...(await setupPlugins()).flatMap(({ kind, id, name, setup, plugin }) => {
+      const rowId = `plugin:${kind}:${id}`;
+      const settings = setup.settings ?? [];
+      if (!settings.length) return [item(setup.group ?? "Plugins", rowId, name, "info", null, { value: plugin?.cli ? which(plugin.cli) : "" })];
+      const first = settings[0];
+      const checkKey = pathValue(first.env) || (settingDefault(first) ? toWindows(settingDefault(first)) : "");
+      return settings.map((st, n) => item(setup.group ?? "Plugins", rowId, n === 0 ? name : st.label, st.kind, st.env, { expect: st.expect, what: st.what ?? null, checkKey, ...(settingDefault(st) ? { placeholder: `default: ${toWindows(settingDefault(st))}` } : {}) }));
+    }),
+    // Steam, only when a game's launcher starts it (setup.steam).
+    ...(games.some(({ plugin }) => plugin.setup.steam) ? [item("Windows tools", "steam", "Steam", "file", "AAS_STEAM_EXE", { expect: "steam.exe", placeholder: "default: C:\\Program Files (x86)\\Steam\\steam.exe" })] : []),
     ...(ON_WINDOWS ? [
       item("Screen and sound", "display", "Display for the game", "display", null, { value: display, options: display ? [{ value: display, label: display }] : [] }),
       item("Screen and sound", "svv", "SoundVolumeView (NirSoft)", "file", "AAS_SOUNDVOLUMEVIEW", { expect: "SoundVolumeView.exe" }),
@@ -154,7 +161,9 @@ export async function settingOwners() {
 
 /** The rows a changed setting affects (checked again after a save). */
 export async function affectedBy(keys) {
-  const map = { AAS_OUTPUT_DIR: ["output"], AAS_OBS_EXE: ["obs"], AAS_OBS_PASSWORD: ["obs"], AAS_OBS_URL: ["obs"], AAS_LIVESPLIT_EXE: ["livesplit"], AAS_STEAM_EXE: ["steam"], AAS_SOUNDVOLUMEVIEW: ["svv", "quiet"], AAS_QUIET_AUDIO_DEVICE: ["quiet"] };
+  const map = { AAS_OUTPUT_DIR: ["output"], AAS_STEAM_EXE: ["steam"], AAS_SOUNDVOLUMEVIEW: ["svv", "quiet"], AAS_QUIET_AUDIO_DEVICE: ["quiet"] };
+  // A plugin's own settings belong to its row.
+  for (const { kind, id, setup } of await setupPlugins()) for (const st of setup.settings ?? []) map[st.env] = [...(map[st.env] ?? []), `plugin:${kind}:${id}`];
   for (const { plugin } of await guiGames()) {
     for (const st of plugin.setup.settings) map[st.env] = [...(map[st.env] ?? []), `game-${plugin.id}`];
     if (plugin.setup.displayEnv) map[plugin.setup.displayEnv] = ["display"];
@@ -183,22 +192,18 @@ export async function checkItem(id) {
 
   if (id === "output") {
     const dir = toLocal(env.AAS_OUTPUT_DIR ?? "");
-    let suggest = null;
-    try {
-      const profiles = path.join(windowsFolders().APPDATA ?? "", "obs-studio", "basic", "profiles");
-      for (const p of fs.readdirSync(profiles)) {
-        const rec = fs.readFileSync(path.join(profiles, p, "basic.ini"), "utf8").match(/^(?:RecFilePath|FilePath)=(.+)$/m)?.[1]?.replace(/\\\\/g, "\\");
-        if (rec) { suggest = toWindows(toLocal(rec)); break; }
-      }
-    } catch { /* no OBS profile */ }
-    // OBS points at the recording folder of a run while one is going, and at whatever was left after one that was
-    // killed. Such a folder is where one run's video goes, never where the runs are kept, so it is not offered.
-    const usable = suggest && path.basename(toLocal(suggest)) !== "recording" && !/[\\/]recording[\\/]?$/.test(suggest);
-    const extra = { suggest: usable && suggest !== toWindows(dir) ? suggest : null, suggestSource: "OBS's recording folder" };
+    // A recorder may know where its program already records (setup.outputFolder): offered, never chosen for you.
+    let suggest = null, suggestSource = null;
+    for (const { name, setup } of await setupPlugins()) {
+      if (typeof setup.outputFolder !== "function") continue;
+      try { suggest = setup.outputFolder(); } catch { suggest = null; }
+      if (suggest) { suggestSource = `${name}'s recording folder`; break; }
+    }
+    const extra = { suggest: suggest && suggest !== toWindows(dir) ? suggest : null, suggestSource };
     if (t("a folder is chosen", dir, { level: "missing", detail: "Choose where runs are saved; each run goes to <location>\\<game>\\<run>." })
       && t("the folder exists", exists(dir), { detail: "This folder does not exist." })) {
       t("the harness can write in it", (() => { try { fs.accessSync(dir, fs.constants.W_OK); return true; } catch { return false; } })(), { detail: "This folder is not writable." });
-      if (ON_WINDOWS) t("it is on a Windows drive, so OBS can record into it", /^\/mnt\/[a-z]\//.test(`${dir}/`), { level: "warn", detail: "Not on a Windows drive: OBS cannot record into it." });
+      if (ON_WINDOWS) t("it is on a Windows drive, so a recorder on Windows can write into it", /^\/mnt\/[a-z]\//.test(`${dir}/`), { level: "warn", detail: "Not on a Windows drive: a recorder on Windows cannot write into it." });
     }
     return done(extra);
   }
@@ -219,48 +224,22 @@ export async function checkItem(id) {
     }
     return done();
   }
-  if (id === "claude") {
-    const out = run("claude", ["--version"]);
-    if (t("claude answers --version", Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Claude)." })) {
-      t(`it is 2.1.207 or newer (${out})`, atLeast(version(out), [2, 1, 207]), { level: "warn", detail: `${out}; version 2.1.207 or newer is needed.` });
+  if (id.startsWith("plugin:")) {
+    // A runtime's, recorder's or timer's row: the conditions its own doctor() gives, asked of `aas doctor --<kind>
+    // <id> --json`, so the row and the command line measure the same thing; the command stands under the row.
+    const [, kind, pluginId] = id.split(":");
+    const plug = (await setupPlugins()).find((x) => x.kind === kind && x.id === pluginId);
+    if (!plug) { t("the plugin is known", false, { detail: `Unknown: ${id}` }); return done(); }
+    const via = ["doctor", `--${kind}`, pluginId, "--json"];
+    const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "cli.mjs"), ...via], { encoding: "utf8", timeout: 120000, env: process.env });
+    let rows; try { rows = JSON.parse(r.stdout.trim().split("\n").at(-1)).filter((x) => x.source === kind); } catch { rows = [{ ok: false, what: "aas doctor answered", detail: (r.stderr || r.stdout || "no answer").trim().split("\n").at(-1) }]; }
+    const fixOf = (f) => { const a = f && plug.setup.fixes?.[f]; return a ? { id: `plugin:${kind}:${pluginId}:${f}`, label: a.label, command: a.script ? shownScript(a.script) : a.command.join(" ") } : null; };
+    for (const row of rows) {
+      // A condition only a running program establishes (its server, its endpoint) is listed, not judged, here.
+      if (row.when === "run") { t(`${row.what} (checked when a run starts${row.ok ? "" : `; now: ${row.detail}`})`, true); continue; }
+      t(row.what, row.ok, { level: row.level ?? "fail", detail: row.detail || `Not ready: ${row.what}.`, fix: fixOf(row.fix) });
     }
-    return done();
-  }
-  if (id === "codex") {
-    const out = run("codex", ["--version"]);
-    t(`codex answers --version${out ? ` (${out})` : ""}`, Boolean(out), { level: "missing", detail: "Not installed (only needed for runs with Codex)." });
-    return done();
-  }
-  if (id === "obs") {
-    const exe = toLocal(env.AAS_OBS_EXE ?? "") || defaultPath("AAS_OBS_EXE");
-    const found = !exists(exe) ? detect.obs() : null;
-    const extra = { suggest: found && found !== exe ? toWindows(found) : null, suggestSource: "the registry" };
-    if (!t("obs64.exe is where the setting points", exists(exe), { detail: "OBS Studio was not found: install it from obsproject.com, or choose obs64.exe." })) return done(extra);
-    const v = fileVersion(exe);
-    if (!t(`OBS is 30 or newer (${v || "?"})`, atLeast(version(v), [30]), { detail: `OBS ${v || "?"}; version 30 or newer is needed.` })) return done(extra);
-    const ws = detect.obsWebsocketConfig();
-    if (!t("its WebSocket server is set up", Boolean(ws), { detail: `OBS ${v}. Its WebSocket server was never set up: OBS → Tools → WebSocket Server Settings.` })) return done(extra);
-    if (!t("that server is switched on", ws.server_enabled, { detail: `OBS ${v}. Its WebSocket server is off: OBS → Tools → WebSocket Server Settings → Enable.` })) return done(extra);
-    t("the password here is the one OBS uses", !ws.auth_required || ws.server_password === env.AAS_OBS_PASSWORD, { level: "warn", detail: `OBS ${v}. The password in the settings is not the one OBS uses.`, fix: { id: "obs-password", label: "Use OBS's password" } });
-    t(`the address here is the one OBS listens on (ws://127.0.0.1:${ws.server_port})`, (env.AAS_OBS_URL || "ws://127.0.0.1:4455") === `ws://127.0.0.1:${ws.server_port}`, { level: "warn", detail: `OBS ${v}. OBS listens on ws://127.0.0.1:${ws.server_port}.`, fix: { id: "obs-password", label: "Use OBS's settings" } });
-    return done(extra);
-  }
-  if (id === "livesplit") {
-    const exe = toLocal(env.AAS_LIVESPLIT_EXE ?? "");
-    const mine = detect.portableTools().livesplit;
-    const extra = { suggest: !exe && mine ? toWindows(mine) : null, suggestSource: "the harness's own install" };
-    if (!t("LiveSplit.exe is there", exists(exe), { level: "missing", detail: exe ? "LiveSplit.exe is not there." : "LiveSplit shows the timer and the splits in the recording.", fix: { id: "install-livesplit", label: "Install LiveSplit 1.8.37" } })) return done(extra);
-    const cfg = path.join(path.dirname(exe), "settings.cfg");
-    if (!t("its server starts with LiveSplit", /<ServerStartup>1<\/ServerStartup>/.test(exists(cfg) ? fs.readFileSync(cfg, "utf8") : ""), { level: "warn", detail: "Its server does not start with LiveSplit, so the harness cannot use it.", fix: { id: "livesplit-server", label: "Start the server with LiveSplit" } })) return done(extra);
-    const pin = detect.aasToolsDir() && exe.startsWith(path.join(detect.aasToolsDir(), "LiveSplit")) ? JSON.parse(fs.readFileSync(path.join(REPO, "packages", "timer-livesplit", "UPSTREAM.json"), "utf8")).livesplit.version : null;
-    if (ON_WINDOWS) {
-      const { windowsSetupStatus } = await import("../../../timer-livesplit/windows-setup.mjs");
-      const w = windowsSetupStatus(exe);
-      const fix = { id: "livesplit-windows", label: "Stop LiveSplit's questions (Windows asks permission once)" };
-      t("it does not check for updates at every start", w.outboundBlocked, { level: "warn", detail: "LiveSplit asks about updates at every start.", fix });
-      t("it does not ask for administrator rights at every start", w.fileTypes, { level: "warn", detail: "LiveSplit asks for administrator rights at every start.", fix });
-    }
-    return done({ ...extra, version: pin });
+    return done({ via: `node packages/core/src/cli.mjs ${via.join(" ")}` });
   }
   if (id === "steam") {
     const exe = toLocal(env.AAS_STEAM_EXE ?? "") || defaultPath("AAS_STEAM_EXE");
