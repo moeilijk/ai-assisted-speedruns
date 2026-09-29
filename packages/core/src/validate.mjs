@@ -2,7 +2,7 @@
 // GUI. Every value here ends up in a command line, a file name, a game's console or another program's settings, so
 // each is held to what it is for; a refusal names the option and says what is expected.
 
-/** The efforts a runtime can be given (`--effort`). */
+/** The efforts the runtimes in this repository have listed so far (`aas options` asks each CLI for today's list). */
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"];
 /** The proof modes (`--proof`, AAS_PROOF). */
 export const PROOF_MODES = ["off", "anonymous", "account"];
@@ -18,9 +18,10 @@ export function checkModel(v) {
   return v;
 }
 
+/** An effort as a runtime's CLI names it (low … max today): one plain word; the runtime refuses one it does not take. */
 export function checkEffort(v) {
   if (v === undefined || v === null || v === "") return v;
-  if (!EFFORTS.includes(v)) fail("--effort", v, `one of ${EFFORTS.join(", ")}`);
+  if (typeof v !== "string" || !/^[a-z]{2,16}$/.test(v)) fail("--effort", v, `one word as the AI's CLI lists them (aas options); ${EFFORTS.join(", ")} so far`);
   return v;
 }
 

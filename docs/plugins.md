@@ -78,6 +78,8 @@ export default {
   async start(runDir, brief, { checkpoint }) { /* start the agent, wait; call checkpoint() after every step so a goal or a stop reached by that step ends the session; return { status, endedAt, notes, sessionId, privateLog } */ },
   interrupt(reason) { /* the harness asks the session to end (game over, budget) */ },
   async budget() { /* the plan's stand: { ok, percent, max, detail }; aas run refuses when ok is false */ },
+  async options() { /* { source, models: [{ id, label, efforts?, defaultEffort? }], efforts, freeModel? }: what the
+                       agent's own CLI names today (claude --help, codex debug models); aas options and the GUI show it */ },
   async connectCheck(runDir, { gameId }) { /* does the agent's CLI reach the broker, without asking the model? aas check-agent */ },
   async doctor({ runDir }) { /* [{ ok, what, detail }]: the CLI on the PATH, trust of the run directory, the plan */ },
   findSession(runDir) { /* the private log when it lives outside the run directory */ },
@@ -93,6 +95,8 @@ export default {
 `ai` is the one thing about a runtime that an archive does not take on trust. It is a property of the runtime, not of a run — a runtime either drives a model or it does not — so the harness writes it into every bundle together with `sha256`, the plugin as it ran (`pluginDigest`: every `.mjs`, `.json` and `.md` of the package directory, `test/` left out). A runtime whose hash an archive cannot place is read as a mock.
 
 A runtime in this repository is listed with its digest in `packages/spec/runtimes.json` (`node packages/spec/make-runtimes.mjs --write`, next to `plugins.json` from `make-plugins.mjs`); that list is what an archive places a bundle's `sha256` against.
+
+`options()` is read from the agent's CLI every time it is asked, never written into the plugin: models are retired and released faster than this tooling, so a list kept here would be wrong within weeks. Claude Code names its aliases and effort levels in `claude --help` and takes any model's full name; Codex prints its catalog with `codex debug models`, each model with the efforts it takes. `aas options` prints them, the GUI offers them, and a runtime refuses at the start an effort its CLI does not list.
 
 `connectCheck` is the cheap half of that verification: it has the agent's own CLI list and health-check the MCP server of a configured run directory (`claude mcp list`, `codex mcp list`), which asks the model nothing and so costs no tokens. `aas check-agent` and the GUI's mock run use it.
 

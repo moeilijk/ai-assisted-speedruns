@@ -12,6 +12,37 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.34.3 — 2026-09-29
+
+- **The GUI does what the command line does** (the maintainer, 2026-09-29: "nog lang niet alle functionaliteit zit in
+  de GUI"). Measured against `aas help`, the page lacked eight commands and a dozen options. Now, each as the CLI's own
+  command, shown in the log as it runs:
+  - **One list for who plays**: the game's script (a mock run) and every AI whose CLI is on the machine, the run types
+    `aas run --runtime` knows. A mock run checks every installed agent against the game's tools, without tokens.
+  - **Model and effort come from the AI itself**, never from a list in the tooling: Claude Code names its aliases and
+    effort levels in `claude --help` and takes any model's full name; Codex prints its catalog with `codex debug
+    models`, each model with the efforts it takes (one of them lists `ultra`, which the tooling refused until now).
+    `aas options` prints them; the Model field offers them and takes a full name; Effort follows the model. The core
+    holds an effort to one word and the runtime refuses at the start one its CLI does not list (`RuntimePlugin.options()`).
+  - **Signing**: a Signing panel on the Run tab makes the key (`aas key`), shows its public line to record at the
+    Archive, and makes a claim (`aas key --claim --identity …`). Once a key is there the bundle is published with
+    `--sign`, at Start and at Continue, and the page says so above the commands.
+  - **Budget** on the Run tab once an AI is chosen: the lines of `aas budget`, and whether a run may start.
+  - **Continue asks its choices**: a later end of the game, the save to start from, time and turn limits, a prompt for
+    the next segment, leaving the programs open, going on past a breaking release (`aas resume --goal --save
+    --max-minutes --max-turns --prompt --keep-open --allow-breaking`).
+  - **More options at Start**: turn limit, autosave every N minutes or off, leave the programs open, a prompt and an
+    instructions file for an AI run (`--max-turns`, `--autosave-minutes`/`--no-autosave`, `--keep-open`, `--prompt`,
+    `--instructions`).
+  - **After a run**: Check bundle (`aas check`), Cut video with timers (`aas render`), YouTube text (`aas upload-sheet`),
+    next to Upload.
+  - **Before a run** (Setup): the read-only checks for the choices on the Run tab (`aas doctor`), and the connection
+    check with the game started and closed again (`aas check-connection --exercise`). A game's row on the Setup tab
+    now takes its conditions from `aas doctor --game --json` and names that command, so the row and the shell measure
+    the same thing; the game's endpoint counts as a condition a run establishes when it starts the game.
+  - `e2e:real` answers Continue's dialog and fails when Continue starts nothing (measured 2026-09-29 11:52: the old
+    script left the dialog open and Continue never ran, while the test still passed that step).
+
 ## 0.34.2 — 2026-09-27
 
 - **A ticket request that gets no connection is tried again.** The Archive was restarting for a deploy at the

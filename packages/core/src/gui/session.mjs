@@ -3,6 +3,9 @@
 // One session at a time: start the game, OBS and LiveSplit, run `aas run` (which makes the timeline and the cut), then
 // `aas publish`.
 import { checkEffort, checkInside, checkModel, checkName, checkNumber, checkSeed } from "../validate.mjs";
+import crypto from "node:crypto";
+import { AAS_KEY_FILE, resolveSignKey } from "../publish.mjs";
+import { publicInfo, readKey } from "../sign.mjs";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -37,6 +40,24 @@ export async function recorderOptions(setup) {
 /** The agents installed on this machine. Testing an agent that is not here proves nothing, and is not a failure. */
 export const agentsPresent = () => RUNTIMES.filter((r) => r.cli && onPath(r.cli));
 
+/**
+ * The key `aas publish --sign` would use without a path (publish.mjs resolves it: AAS_SIGN_KEY, the key of `aas key`,
+ * an SSH key): its file and public line, or null when there is none yet.
+ */
+export function signingKey() {
+  let file;
+  try { file = resolveSignKey(null); } catch { return null; }
+  try { return { file, ...publicInfo(crypto.createPublicKey(readKey(file).privateKey)), own: file === AAS_KEY_FILE() }; }
+  catch (e) { return { file, error: e.message }; }
+}
+
+/** A prompt as `--prompt` takes it: text, at most 4000 characters, no control characters but newlines. */
+const checkPrompt = (v) => {
+  if (v === undefined || v === null || v === "") return null;
+  if (typeof v !== "string" || v.length > 4000 || /[^\P{Cc}\n\t]/u.test(v)) throw new Error("A prompt is text of at most 4000 characters.");
+  return v;
+};
+
 export function createSession() {
   const lines = [];
   const listeners = new Set();
@@ -46,10 +67,13 @@ export function createSession() {
   const emit = (type, data) => { for (const l of listeners) l(type, data); };
   // The last line a command printed: what an action reports back to the page, or why it failed.
   let lastLine = "";
+  // While set, every line a command prints is kept here too (a key's claim, the budget's lines, doctor's rows).
+  let capture = null;
   const log = (text, kind = "out") => {
     for (const t of String(text).split(/\r?\n/)) {
       if (!t.trim()) continue;
       if (kind === "out" || kind === "err") lastLine = t.trim();
+      if (capture && (kind === "out" || kind === "err")) capture.push(t);
       const line = { at: new Date().toTimeString().slice(0, 8), kind, text: t };
       lines.push(line);
       if (lines.length > 3000) lines.shift();
@@ -80,7 +104,8 @@ export function createSession() {
     return `${prefix}-${Date.now()}`;
   };
 
-  const q = (a) => (/[\s"'()&;|<>$]/.test(a) ? `"${a}"` : a);
+  // A word for the shown command line: quoted when it has to be, with what a double-quoted bash word cannot hold escaped.
+  const q = (a) => (/[\s"'()&;|<>$`\\]/.test(a) ? `"${a.replace(/[\\"$`]/g, "\\$&")}"` : a);
   const CLI_SHOWN = "node packages/core/src/cli.mjs";
 
   /**
@@ -112,12 +137,28 @@ export function createSession() {
     const runArgs = ["run", "--runtime", runtime.id, "--game", g.file, "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless", "--goal", goal];
     if (runtime.id === "scripted") runArgs.push("--bot", setup.bot);
     if (opts.maxMinutes) runArgs.push("--max-minutes", String(checkNumber("Time limit (minutes)", opts.maxMinutes, { min: 0.01 })));
+    if (opts.maxTurns) runArgs.push("--max-turns", String(checkNumber("Turn limit", opts.maxTurns, { integer: true, min: 1 })));
+    // The autosave: every N minutes (the CLI's own default when empty), or off.
+    if (opts.autosave === "off") runArgs.push("--no-autosave");
+    else if (opts.autosave) runArgs.push("--autosave-minutes", String(checkNumber("Autosave (minutes)", opts.autosave, { min: 0.001 })));
+    if (opts.keepOpen) runArgs.push("--keep-open");
     // The model and its effort go to an AI run only, as `aas run` takes them (--model, --effort); empty is the AI's
-    // own default. A mock run asks no model anything.
+    // own default. A mock run asks no model anything. So do the prompt and the instructions: a mock plays its script.
     if (runtime.id !== "scripted" && opts.model) runArgs.push("--model", checkModel(String(opts.model)));
     if (runtime.id !== "scripted" && opts.effort) runArgs.push("--effort", checkEffort(opts.effort));
+    const prompt = runtime.id !== "scripted" ? checkPrompt(opts.prompt) : null;
+    if (prompt) runArgs.push("--prompt", prompt);
+    // The instructions file: a file on this machine, read by `aas configure` into the brief (and so into the bundle).
+    const instructions = runtime.id !== "scripted" && opts.instructions ? toLocal(String(opts.instructions)) : null;
+    if (instructions) {
+      if (!fs.existsSync(instructions) || !fs.statSync(instructions).isFile()) throw new Error(`Instructions file ${toWindows(instructions)} is not there.`);
+      runArgs.push("--instructions", instructions);
+    }
     // A game without a seed never gets one, whatever the page sends.
     if (opts.seed && setup.seed) runArgs.push("--seed", checkSeed(String(opts.seed)));
+    // The bundle is signed when this machine has a key (`aas key`, AAS_SIGN_KEY, or an SSH key), as `aas publish --sign` would.
+    const key = signingKey();
+    const publishArgs = ["publish", runDir, pub, ...(key && !key.error ? ["--sign"] : [])];
     // Long command lines are shown one option per line (bash continuation), so they stay readable and still paste.
     const shownArgs = (args) => {
       const words = args.map((a) => (a === g.file || a === setup.bot ? rel(a) : q(a)));
@@ -129,8 +170,7 @@ export function createSession() {
     };
     // A mock run is the test of everything this machine has, and it may not cost tokens: so it starts by having
     // every agent that is installed reach the game's tools, without asking the model anything.
-    // A mock run checks the AI of the run: the same agent that would play it live.
-    const agents = runtime.id === "scripted" ? agentsPresent().filter((a) => a.id === opts.ai) : [];
+    const agents = runtime.id === "scripted" ? agentsPresent() : [];
     const agentStep = (a) => {
       const args = ["check-agent", "--runtime", a.id, "--game", g.file];
       return { id: `agent-${a.id}`, title: `Does ${a.label.replace(" (AI run)", "")} reach the game's tools? (no model call, so no tokens)`, args: [CLI, ...args], shown: `${CLI_SHOWN} ${shownArgs(args)}` };
@@ -141,9 +181,9 @@ export function createSession() {
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit with the splits for this goal", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs"), ...(splits ? [splits] : [])], shown: `npm run livesplit:launch${splits ? ` -- ${rel(splits)}` : ""}` }] : []),
       { id: "run", title: `The run, played by ${runtime.id === "scripted" ? "the script" : "the AI"}; it closes ${andList(["the game", ...(livesplit ? ["LiveSplit"] : []), ...(recorder.launch ? [shortName(recorder)] : [])])} at the end, then makes the timeline and the cut (the video without the thinking pauses)`, args: [CLI, ...runArgs], shown: `${CLI_SHOWN} ${shownArgs(runArgs)}` },
-      { id: "publish", title: "The bundle (a folder, a public zip to share and an upload zip for the Archive)", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+      { id: "publish", title: `The bundle (a folder, a public zip to share and an upload zip for the Archive)${key && !key.error ? `, signed with ${key.own ? "your key from aas key" : toWindows(key.file)}` : ", unsigned: no signing key on this machine yet (Signing, on the Run tab)"}`, args: [CLI, ...publishArgs], shown: `${CLI_SHOWN} ${shownArgs(publishArgs)}` },
     ];
-    return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
+    return { game: g, setup, runtime, run, runDir, pub, goal, livesplit, output, steps, recorder: recorderId, recorders: choices, signed: Boolean(key && !key.error), stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
   }
 
   /** Runs a session's steps in order: the checks, the game, the recorder, LiveSplit, the run (with its timeline and cut), the bundle. */
@@ -211,7 +251,23 @@ export function createSession() {
    * Continue: a run that stopped (a budget, a limit, a Stop) goes on as its next segment with `aas resume`, with the
    * recorder and timer it had, the game and its tools started first like at Start, and a new revision of its bundle.
    */
-  async function resume(runDirShown) {
+  /** What a stopped run can be continued with: its game's later ends, its saves, its goal so far. */
+  async function runInfo(runDirShown) {
+    const runDir = toLocal(runDirShown ?? "");
+    await checkInside("Run folder", runDir, toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
+    if (!runDir || !fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run that has started.");
+    const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
+    const records = fs.readFileSync(path.join(runDir, "run.jsonl"), "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const started = records.filter((r) => r.event === "run.started").map((r) => r.data).at(-1) ?? {};
+    const g = (await guiGames()).find((x) => x.plugin.id === (started.game ?? brief.category?.game));
+    const ends = g?.plugin.ends ?? [];
+    const goal = brief.category?.goal ?? "";
+    const at = ends.findIndex((e) => e.id === goal);
+    const saves = [...new Set(records.filter((r) => r.kind === "event" && r.event === "game.saved").map((r) => r.data?.name).filter(Boolean))];
+    return { runDir: toWindows(runDir), game: g?.plugin.id ?? null, runtime: brief.runtime, goal, ends: ends.map((e) => ({ id: e.id, label: e.label, later: at >= 0 && ends.indexOf(e) > at })), saves, lastSave: saves.at(-1) ?? null, ai: brief.runtime !== "scripted" };
+  }
+
+  async function resume(runDirShown, opts = {}) {
     if (state.phase !== "idle") throw new Error("A session is already running.");
     const runDir = toLocal(runDirShown ?? "");
     // Only a run in the output location: a run directory names the modules `aas resume` loads.
@@ -234,12 +290,24 @@ export function createSession() {
     const run = path.basename(runDir);
     const pub = path.join(path.dirname(runDir), "public", revision > 1 ? `${run}-r${revision}` : run);
     const args = ["resume", "--run-dir", runDir, "--recorder", recorderId, ...(livesplit ? ["--timer", "livesplit"] : []), "--overlay-port", "8765", "--headless"];
+    // The choices Continue offers, as `aas resume` takes them: a later end, the save to start from, the limits, a
+    // prompt for the next segment, and going on past a breaking release of the tooling.
+    if (opts.goal) { if (!g.plugin.ends.some((e) => e.id === opts.goal)) throw new Error(`Goal ${JSON.stringify(String(opts.goal)).slice(0, 60)} is not one of ${g.plugin.name}'s ends.`); args.push("--goal", opts.goal); }
+    if (opts.save) args.push("--save", checkName("Save", String(opts.save), { max: 128 }));
+    if (opts.maxMinutes) args.push("--max-minutes", String(checkNumber("Time limit (minutes)", opts.maxMinutes, { min: 0.01 })));
+    if (opts.maxTurns) args.push("--max-turns", String(checkNumber("Turn limit", opts.maxTurns, { integer: true, min: 1 })));
+    if (opts.keepOpen) args.push("--keep-open");
+    const prompt = runtime.id !== "scripted" ? checkPrompt(opts.prompt) : null;
+    if (prompt) args.push("--prompt", prompt);
+    if (opts.allowBreaking) args.push("--allow-breaking");
+    const key = signingKey();
+    const publishArgs = ["publish", runDir, pub, ...(key && !key.error ? ["--sign"] : [])];
     const steps = [
       { id: "game", title: `Start ${g.plugin.name} with its mods and bridge (a game that is already up is left alone)`, args: [setup.launch], shown: shownScript(setup.launch) },
       ...(recorder.launch ? [{ id: "recorder", title: `Start ${shortName(recorder)} (the recording)`, args: [recorder.launch], shown: shownScript(recorder.launch) }] : []),
       ...(livesplit ? [{ id: "livesplit", title: "Start LiveSplit", args: [path.join(REPO, "packages", "timer-livesplit", "launch-livesplit.mjs")], shown: "npm run livesplit:launch" }] : []),
-      { id: "run", title: "The run goes on as its next segment, then the timeline and the cut are made again", args: [CLI, ...args], shown: `${CLI_SHOWN} ${args.map((a) => (a === runDir ? q(runDir) : a)).join(" ")}` },
-      { id: "publish", title: "The bundle again, as a new revision", args: [CLI, "publish", runDir, pub], shown: `${CLI_SHOWN} publish ${q(runDir)} ${q(pub)}` },
+      { id: "run", title: "The run goes on as its next segment, then the timeline and the cut are made again", args: [CLI, ...args], shown: `${CLI_SHOWN} ${args.map((a) => q(a)).join(" ")}` },
+      { id: "publish", title: `The bundle again, as a new revision${key && !key.error ? ", signed" : ", unsigned"}`, args: [CLI, ...publishArgs], shown: `${CLI_SHOWN} ${publishArgs.map((a) => q(a)).join(" ")}` },
     ];
     const p = { game: g, setup, runtime, run, runDir, pub, steps, stop: setup.stop ? { args: [setup.stop], shown: shownScript(setup.stop) } : null };
     cancelled = false;
@@ -299,6 +367,124 @@ export function createSession() {
     }
   }
 
+  /**
+   * The publisher's signing key, as `aas key` makes and claims it: create (the key `aas publish --sign` uses without a
+   * path), and claim (the signed statement that names the identities the key belongs to; its text comes back).
+   */
+  async function key(action, identities = []) {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    const ids = [].concat(identities ?? []).map((x) => String(x).trim()).filter(Boolean);
+    for (const id of ids) if (!/^(https?:\/\/|mailto:)[^\s"'`$\\]{3,200}$/.test(id)) throw new Error(`${id.slice(0, 60)} is not an identity: https://… or mailto:…`);
+    if (action === "claim" && !ids.length) throw new Error("A claim names at least one identity (https://… or mailto:…).");
+    if (action !== "create" && action !== "claim") throw new Error(`Unknown action: ${action}`);
+    const args = action === "create" ? ["key"] : ["key", "--claim", ...ids.flatMap((id) => ["--identity", id])];
+    set({ phase: "working", step: `key-${action}` });
+    try {
+      lastLine = ""; capture = [];
+      const code = await node([CLI, ...args], `${CLI_SHOWN} ${args.map((a) => q(a)).join(" ")}`);
+      const out = capture; capture = null;
+      if (code !== 0) throw new Error(lastLine.replace(/^FAIL:\s*/, "") || `${action} did not succeed`);
+      if (action === "create") { const k = signingKey(); return { message: `${out[0] ?? "done"}; bundles are signed with it from now on`, key: k }; }
+      // The claim is the text after the key's own three lines (file, public line, fingerprint).
+      const text = out.slice(3).join("\n").trim();
+      return { message: `Claim made for ${ids.join(", ")}; copy it from below and publish it where only you can write`, claim: text };
+    } finally {
+      capture = null;
+      set({ phase: "idle", step: null });
+    }
+  }
+
+  /** The plans' stand, as `aas budget` prints it: one line per AI, and whether a run may start. */
+  async function budget() {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    set({ phase: "working", step: "budget" });
+    try {
+      capture = [];
+      const code = await node([CLI, "budget"], `${CLI_SHOWN} budget`);
+      const lines = capture; capture = null;
+      return { ok: code === 0, lines, message: code === 0 ? "Runs may start: every plan is under its limit." : "A plan is at its limit for runs: an AI run on it is refused until the window resets (see the lines)." };
+    } finally {
+      capture = null;
+      set({ phase: "idle", step: null });
+    }
+  }
+
+  /** What an AI's CLI names today (`aas options`): the models and efforts the Run tab offers for it. */
+  async function options(runtimeId) {
+    const runtime = RUNTIMES.find((r) => r.id === runtimeId && r.cli);
+    if (!runtime) throw new Error(`Unknown AI: ${runtimeId}`);
+    const plugin = await loadRuntime(runtime.id);
+    if (!plugin.options) return { source: null, models: [], efforts: [], freeModel: "a model's full name" };
+    const o = await plugin.options();
+    return { ...o, shown: `${CLI_SHOWN} options --runtime ${runtime.id}` };
+  }
+
+  /**
+   * The tools around a run, each the CLI's own command shown in the log: check (a bundle against the rules), render
+   * (the cut with burned-in timers), sheet (the YouTube text), doctor (read-only checks for the choices on the Run
+   * tab), connection (the game started, the broker against it, everything closed again).
+   */
+  async function tool(action, arg = {}) {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    const output = toLocal(readEnv().AAS_OUTPUT_DIR ?? "");
+    let args = null, shown = null, steps = null, stop = null;
+    if (action === "check") {
+      const zip = toLocal(String(arg.path ?? ""));
+      await checkInside("Bundle", zip, output);
+      if (!fs.existsSync(zip)) throw new Error("The bundle is not there.");
+      args = ["check", zip];
+    } else if (action === "render" || action === "sheet") {
+      const runDir = toLocal(String(arg.runDir ?? ""));
+      await checkInside("Run folder", runDir, output);
+      if (!fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run that has started.");
+      args = action === "render" ? ["render", runDir, ...(arg.burn ? ["--burn", String(arg.burn).replace(/[^a-z,]/g, "")] : [])] : ["upload-sheet", runDir];
+    } else if (action === "doctor" || action === "connection") {
+      const games = await guiGames();
+      const g = games.find((x) => x.plugin.id === arg.game);
+      if (!g) throw new Error(`Unknown game: ${arg.game}`);
+      const runtime = RUNTIMES.find((r) => r.id === arg.runtime);
+      const env = readEnv();
+      const livesplit = Boolean(env.AAS_LIVESPLIT_EXE) && fs.existsSync(toLocal(env.AAS_LIVESPLIT_EXE));
+      if (action === "doctor") {
+        const recorders = await recorderOptions(g.plugin.setup);
+        const rec = recorders.some((r) => r.id === arg.recorder) ? arg.recorder : recorders[0].id;
+        args = ["doctor", "--game", g.file, "--recorder", rec, ...(livesplit ? ["--timer", "livesplit"] : []), ...(runtime?.cli ? ["--runtime", runtime.id] : [])];
+      } else {
+        // The connection: the game up as at a start, the broker against it with the plugin's own exercise, then closed.
+        if (!output || !fs.existsSync(output)) throw new Error("Choose an output location first (Setup).");
+        const dir = path.join(output, g.plugin.setup.folder, "connection-check");
+        const cc = ["check-connection", "--game", g.file, "--run-dir", dir, "--exercise"];
+        steps = [
+          { args: [g.plugin.setup.launch], shown: shownScript(g.plugin.setup.launch) },
+          { args: [CLI, ...cc], shown: `${CLI_SHOWN} ${cc.map((a) => (a === g.file ? rel(a) : q(a))).join(" ")}` },
+        ];
+        stop = g.plugin.setup.stop ? { args: [g.plugin.setup.stop], shown: shownScript(g.plugin.setup.stop) } : null;
+      }
+    } else throw new Error(`Unknown tool: ${action}`);
+    set({ phase: "working", step: action });
+    try {
+      lastLine = ""; capture = [];
+      let code = 0;
+      for (const st of steps ?? [{ args: [CLI, ...args], shown: shown ?? `${CLI_SHOWN} ${args.map((a) => q(a)).join(" ")}` }]) {
+        code = await node(st.args, st.shown);
+        if (code !== 0) break;
+      }
+      // The command's own last line is the answer, said before the close (whose lines follow in the log).
+      const said = lastLine.replace(/^FAIL:\s*/, "");
+      const lines = capture; capture = null;
+      if (stop) { log("Closing what was started.", "note"); await node(stop.args, stop.shown); }
+      // A check's exit code is its verdict (the bundle does not conform, a doctor row failed), not whether the
+      // button worked: the report is the answer, and the log says which rows failed.
+      const verdict = action === "check" || action === "doctor";
+      if (code !== 0 && !verdict) throw new Error(said || `${action} did not succeed`);
+      const made = action === "render" ? lines.map((l) => l.match(/^written (.+?): /)?.[1]).find(Boolean) : action === "sheet" ? lines.map((l) => l.match(/^upload sheet: (.+UPLOAD\.txt)$/)?.[1]).find(Boolean) : null;
+      return { ok: code === 0, message: verdict ? `${action === "check" ? "Checked" : "Checks done"}: ${said}` : said || `${action}: done`, lines, made: made ? toWindows(made) : null };
+    } finally {
+      capture = null;
+      set({ phase: "idle", step: null });
+    }
+  }
+
   /** One-click fixes named by the set-up checks. */
   async function fix(id) {
     if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
@@ -353,6 +539,6 @@ export function createSession() {
     get state() { return state; },
     get lines() { return lines; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    plan, start, resume, stop, fix, archive, nextRunName, log,
+    plan, start, resume, runInfo, stop, fix, archive, key, budget, options, tool, nextRunName, log,
   };
 }

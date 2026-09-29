@@ -9,9 +9,10 @@ import { affectedBy, allGames, configItems, guiGames, settingOwners } from "./ch
 import { gameEnvFile } from "../settings.mjs";
 import { writeEnv, ENV_FILE } from "./env-file.mjs";
 import { readSettings as readEnv } from "../settings.mjs";
-import { agentsPresent, createSession, recorderOptions, RUNTIMES } from "./session.mjs";
+import { agentsPresent, createSession, recorderOptions, RUNTIMES, signingKey } from "./session.mjs";
 import { drives, IS_WSL, toLocal, toWindows } from "./windows-paths.mjs";
 import { FRAMEWORK_VERSION } from "../plugins.mjs";
+import { AAS_KEY_FILE } from "../publish.mjs";
 import { checkInside } from "../validate.mjs";
 import { createHash } from "node:crypto";
 
@@ -227,11 +228,36 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
           ready: settingReady(plugin.setup.settings[0], env),
           next: Object.fromEntries(RUNTIMES.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
         })));
-        send(res, 200, { games, runtimes: RUNTIMES, agents: agentsPresent().map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
+        // Who can play: the game's script when the game has one, and every AI whose CLI is on this machine.
+        const agents = agentsPresent();
+        send(res, 200, { games, runtimes: RUNTIMES.map((r) => ({ id: r.id, label: r.label, ai: Boolean(r.cli), present: !r.cli || agents.includes(r) })), agents: agents.map((r) => ({ id: r.id, name: r.label.replace(" (AI run)", "") })), output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
+      } else if (req.method === "GET" && url.pathname === "/api/options") {
+        // The models and efforts an AI's CLI names today: read from the CLI each time, as `aas options` does.
+        send(res, 200, await session.options(url.searchParams.get("runtime")));
       } else if (req.method === "GET" && url.pathname === "/api/plan") {
         const o = Object.fromEntries(url.searchParams);
         const p = await session.plan(o);
-        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), recorder: p.recorder, steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
+        send(res, 200, { run: p.run, runDir: toWindows(p.runDir), bundle: toWindows(p.pub), recorder: p.recorder, signed: p.signed, steps: p.steps.map(({ id, title, shown }) => ({ id, title, shown })), stop: p.stop?.shown ?? null });
+      } else if (req.method === "GET" && url.pathname === "/api/run-info") {
+        send(res, 200, await session.runInfo(url.searchParams.get("runDir")));
+      } else if (req.method === "GET" && url.pathname === "/api/key") {
+        // The signing key `aas publish --sign` would use: there or not, and its public line to register.
+        const k = signingKey();
+        send(res, 200, { key: k ? { ...k, file: toWindows(k.file) } : null, defaultFile: toWindows(AAS_KEY_FILE()) });
+      } else if (req.method === "POST" && url.pathname === "/api/key") {
+        const b = await body(req);
+        const r = await session.key(b.action, b.identities ?? []);
+        session.log(`Done: ${r.message}`, "ok");
+        send(res, 200, { ok: true, ...r, key: r.key ? { ...r.key, file: toWindows(r.key.file) } : undefined });
+      } else if (req.method === "GET" && url.pathname === "/api/budget") {
+        const r = await session.budget();
+        session.log(r.message, r.ok ? "ok" : "err");
+        send(res, 200, r);
+      } else if (req.method === "POST" && url.pathname === "/api/tool") {
+        const b = await body(req);
+        const r = await session.tool(b.action, b);
+        session.log(`Done: ${r.message}`, r.ok ? "ok" : "err");
+        send(res, 200, r);
       } else if (req.method === "GET" && url.pathname === "/api/state") {
         send(res, 200, { state: session.state, lines: session.lines.slice(-500) });
       } else if (req.method === "GET" && url.pathname === "/api/events") {
@@ -242,7 +268,8 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
       } else if (req.method === "POST" && url.pathname === "/api/start") {
         send(res, 200, { state: await session.start(await body(req)) });
       } else if (req.method === "POST" && url.pathname === "/api/continue") {
-        send(res, 200, { state: await session.resume((await body(req)).runDir) });
+        const b = await body(req);
+        send(res, 200, { state: await session.resume(b.runDir, b) });
       } else if (req.method === "POST" && url.pathname === "/api/stop") {
         send(res, 200, { state: await session.stop((await body(req)).game) });
       } else if (req.method === "GET" && url.pathname === "/api/proof") {

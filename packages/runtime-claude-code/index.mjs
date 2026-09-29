@@ -74,11 +74,40 @@ export function claudeModelReports(runDir) {
   return reports;
 }
 
+/**
+ * What the CLI itself offers, read from `claude --help`: the effort levels in the `--effort` line and the model
+ * aliases in the `--model` paragraph. Claude Code has no command that lists its models; its help names the aliases
+ * for the latest ones and takes any model's full name, so a full name stays allowed next to the aliases.
+ */
+export function parseClaudeHelp(text) {
+  const efforts = (text.match(/--effort <level>[^\n]*\n?[^(]*\(([^)]+)\)/)?.[1] ?? "").split(",").map((x) => x.trim()).filter((x) => /^[a-z]+$/.test(x));
+  const paragraph = text.match(/--model <model>([\s\S]*?)\n\s+-/)?.[1] ?? "";
+  const quoted = [...paragraph.matchAll(/'([A-Za-z0-9][A-Za-z0-9._-]*)'/g)].map((m) => m[1]);
+  const aliases = quoted.filter((x) => !/\d/.test(x));
+  const example = quoted.find((x) => /\d/.test(x)) ?? null;
+  return { efforts, aliases, example };
+}
+
+/** `aas options`: the models and efforts as the CLI on this machine names them. */
+export function claudeOptions() {
+  const r = spawnSync("claude", ["--help"], { encoding: "utf8", timeout: 20000 });
+  if (r.status !== 0) throw new Error("claude --help did not answer (is Claude Code installed?)");
+  const { efforts, aliases, example } = parseClaudeHelp(`${r.stdout}${r.stderr}`);
+  return {
+    source: "claude --help",
+    models: aliases.map((id) => ({ id, label: `${id} (the latest ${id})` })),
+    freeModel: example ? `or a model's full name, such as ${example}` : "or a model's full name",
+    efforts,
+  };
+}
+
 export default {
   id: "claude-code",
   /** a model plays. */
   ai: true,
   name: "Claude Code",
+  /** The models and efforts the CLI names (`aas options`); the GUI offers these and takes a full name too. */
+  async options() { return claudeOptions(); },
   /** The Claude plan's stand: runs stay under AAS_BUDGET_WEEKLY_MAX percent of the week. */
   async budget() { const b = await checkBudget(); return { ok: b.ok, percent: b.percent, max: b.max, detail: b.detail, data: { five_hour_percent: b.usage.fiveHour.percent } }; },
   /** Read-only checks for `aas doctor`: claude on the PATH, its config file writable, the run directory trusted (a resume). */
@@ -120,7 +149,7 @@ export default {
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
   interrupt(reason) { interruptChild?.(reason); },
-  version: "0.34.0",
+  version: "0.34.3",
   async configure(runDir, broker, brief) {
     const mcp = path.join(runDir, ".mcp.json");
     const settings = path.join(runDir, ".claude", "settings.json");

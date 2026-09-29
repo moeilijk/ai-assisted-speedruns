@@ -84,9 +84,9 @@ test("a second start opens the GUI that is already running instead of failing on
 });
 
 test("the game check reads the game's own settings, not only the machine's", async () => {
-  // Since 0.22.0 a game's folder lives in .local/games/<game>.env. The GUI runs a plugin's checks in a process of
-  // its own (game-doctor.mjs), and a process that loads only .env reports a game that is set up as one that is not.
-  const { execFileSync } = await import("node:child_process");
+  // Since 0.22.0 a game's folder lives in .local/games/<game>.env. The GUI's game row asks `aas doctor --game --json`
+  // in a process of its own, and a process that loads only .env reports a game that is set up as one that is not.
+  const { spawnSync } = await import("node:child_process");
   const home = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gamesettings-"));
   const games = path.join(home, "games");
   fs.mkdirSync(games);
@@ -96,8 +96,9 @@ test("the game check reads the game's own settings, not only the machine's", asy
   async doctor() { return [{ ok: Boolean(process.env.AAS_MAKE_BELIEVE_ROOT), what: "its folder", detail: process.env.AAS_MAKE_BELIEVE_ROOT ?? "not set" }]; } };
 `);
   fs.writeFileSync(path.join(games, "make-believe.env"), "AAS_MAKE_BELIEVE_ROOT=/somewhere\n");
-  const doctor = path.join(process.cwd(), "packages", "core", "src", "gui", "game-doctor.mjs");
-  const run = (env) => JSON.parse(execFileSync(process.execPath, [doctor, path.join(plugin, "plugin.mjs")], { encoding: "utf8", env: { ...process.env, ...env } }));
+  const cli = path.join(process.cwd(), "packages", "core", "src", "cli.mjs");
+  // The exit code says whether every row passed (the fake plugin fails some on purpose); the rows are the answer.
+  const run = (env) => JSON.parse(spawnSync(process.execPath, [cli, "doctor", "--game", path.join(plugin, "plugin.mjs"), "--json"], { encoding: "utf8", env: { ...process.env, ...env } }).stdout.trim().split("\n").at(-1)).filter((r) => r.what === "its folder");
   assert.deepEqual(run({ AAS_GAME_ENV_DIR: games, AAS_ENV_FILE: path.join(home, ".env") }), [{ ok: true, what: "its folder", detail: "/somewhere" }]);
   // And without that file the plugin says so itself, instead of the check inventing a reason.
   fs.rmSync(path.join(games, "make-believe.env"));
@@ -205,7 +206,7 @@ test("the model and effort chosen on the page go to an AI run's command, never t
   assert.match(ai, /--effort high/);
   const mock = runStep(await s.plan({ game: "balatro", runtime: "scripted", model: "claude-opus-5-5", effort: "high" }));
   assert.doesNotMatch(mock, /--model|--effort/);
-  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", effort: "extreme" }), /--effort "extreme" is not allowed: one of low, medium, high, xhigh, max/);
+  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", effort: "hi gh" }), /--effort "hi gh" is not allowed: one word as the AI.s CLI lists them/);
   await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", model: "x; rm -rf /" }), /--model .* is not allowed/);
 });
 
@@ -252,6 +253,110 @@ test("no button answers with a bare Done, and the page learns when the tooling c
   try {
     const g = await (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/gui`)).json();
     assert.equal(g.stale, false, "a GUI that runs the code on disk is not stale");
+  } finally {
+    gui.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
+});
+
+test("the models and efforts come from the AI's own CLI: claude --help and codex debug models, read as they are", async () => {
+  // Nothing in the tooling names a model: models are retired and released faster than releases, so the lists are
+  // read from the CLIs each time (owner, 2026-09-29).
+  const { parseClaudeHelp } = await import("../../runtime-claude-code/index.mjs");
+  const help = `Options:
+  --effort <level>                      Effort level for the current session
+                                        (low, medium, high, xhigh, max)
+  --environment <environment_id>        Create a new cloud session
+  --model <model>                       Model for the current session. Provide
+                                        an alias for the latest model (e.g.
+                                        'fable', 'opus', or 'sonnet') or a
+                                        model's full name (e.g.
+                                        'claude-fable-5').
+  -n, --name <name>                     Set a display name for this session
+`;
+  assert.deepEqual(parseClaudeHelp(help), { efforts: ["low", "medium", "high", "xhigh", "max"], aliases: ["fable", "opus", "sonnet"], example: "claude-fable-5" });
+  const { parseCodexCatalog } = await import("../../runtime-codex/index.mjs");
+  const catalog = JSON.stringify({ models: [
+    { slug: "gpt-hidden", display_name: "Hidden", visibility: "hide", supported_reasoning_levels: [{ effort: "low" }] },
+    { slug: "gpt-a", display_name: "GPT-A", visibility: "list", default_reasoning_level: "medium", supported_reasoning_levels: [{ effort: "low" }, { effort: "medium" }, { effort: "ultra" }] },
+    { slug: "gpt-b", display_name: "gpt-b", visibility: "list", default_reasoning_level: "high", supported_reasoning_levels: [{ effort: "high" }] },
+  ] });
+  assert.deepEqual(parseCodexCatalog(catalog), { models: [
+    { id: "gpt-a", label: "gpt-a (GPT-A)", efforts: ["low", "medium", "ultra"], defaultEffort: "medium" },
+    { id: "gpt-b", label: "gpt-b", efforts: ["high"], defaultEffort: "high" },
+  ], efforts: ["low", "medium", "ultra", "high"] });
+  // The core's own check only holds an effort to one word: which words are allowed is the runtime's CLI's to say.
+  const { checkEffort } = await import("../src/validate.mjs");
+  assert.equal(checkEffort("ultra"), "ultra");
+  assert.throws(() => checkEffort('high" x'), /one word as the AI's CLI lists them/);
+});
+
+test("the run's options on the page reach the command, each as aas run takes it, and only where it applies", async () => {
+  const { createSession } = await import("../src/gui/session.mjs");
+  const s = createSession();
+  const runStep = (p) => p.steps.find((x) => x.id === "run").shown;
+  const instructions = path.join(dir, "my-instructions.md");
+  fs.writeFileSync(instructions, "# play well\n");
+  const ai = runStep(await s.plan({ game: "balatro", runtime: "claude-code", maxTurns: "40", autosave: "5", keepOpen: "1", prompt: "Reach ante 2.\nSay \"go\".", instructions }));
+  assert.match(ai, /--max-turns 40/);
+  assert.match(ai, /--autosave-minutes 5/);
+  assert.match(ai, /--keep-open/);
+  assert.match(ai, /--prompt "Reach ante 2\.\nSay \\"go\\"\."/, "the prompt is one quoted word, its quotes escaped, so the shown line still pastes");
+  assert.match(ai, new RegExp(`--instructions ${instructions.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}`));
+  const off = runStep(await s.plan({ game: "balatro", runtime: "claude-code", autosave: "off" }));
+  assert.match(off, /--no-autosave/);
+  assert.doesNotMatch(off, /--autosave-minutes/);
+  // A mock plays the game's script: no prompt and no instructions go to it, its limits do.
+  const mock = runStep(await s.plan({ game: "balatro", runtime: "scripted", maxTurns: "40", prompt: "x", instructions }));
+  assert.match(mock, /--max-turns 40/);
+  assert.doesNotMatch(mock, /--prompt|--instructions/);
+  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", instructions: path.join(dir, "missing.md") }), /is not there/);
+  await assert.rejects(s.plan({ game: "balatro", runtime: "claude-code", maxTurns: "0" }), /Turn limit/);
+});
+
+test("the bundle is signed when this machine has a key, and the page is told which", async () => {
+  // XDG_CONFIG_HOME of this test process holds no key yet; publish.mjs finds the key aas key makes there.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "aas-gui-key-"));
+  const previous = { xdg: process.env.XDG_CONFIG_HOME, sign: process.env.AAS_SIGN_KEY, ssh: process.env.HOME };
+  process.env.XDG_CONFIG_HOME = home;
+  delete process.env.AAS_SIGN_KEY;
+  process.env.HOME = home; // so an SSH key of the person running the tests does not count
+  try {
+    const { createSession, signingKey } = await import("../src/gui/session.mjs");
+    const s = createSession();
+    assert.equal(signingKey(), null, "no key yet");
+    let p = await s.plan({ game: "balatro", runtime: "scripted" });
+    assert.equal(p.signed, false);
+    assert.doesNotMatch(p.steps.find((x) => x.id === "publish").shown, /--sign/);
+    const { createKey } = await import("../src/sign.mjs");
+    const { AAS_KEY_FILE } = await import("../src/publish.mjs");
+    createKey(AAS_KEY_FILE());
+    const k = signingKey();
+    assert.equal(k.own, true, "the key aas key makes");
+    assert.match(k.publicLine, /^ssh-ed25519 /);
+    p = await s.plan({ game: "balatro", runtime: "scripted" });
+    assert.equal(p.signed, true);
+    assert.match(p.steps.find((x) => x.id === "publish").shown, /publish [\s\S]* --sign$/);
+    assert.match(p.steps.find((x) => x.id === "publish").title, /signed with your key from aas key/);
+  } finally {
+    if (previous.xdg === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = previous.xdg;
+    if (previous.sign !== undefined) process.env.AAS_SIGN_KEY = previous.sign;
+    process.env.HOME = previous.ssh;
+  }
+});
+
+test("who plays is one list: the game's script when it has one, and every AI whose CLI is here", async () => {
+  const { startGui } = await import("../src/gui/server.mjs");
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
+  try {
+    const j = await (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/games`)).json();
+    assert.deepEqual(j.runtimes.map((r) => r.id), ["scripted", "claude-code", "codex"], "the run types aas run --runtime knows, in that order");
+    assert.equal(j.runtimes[0].present, true, "the script is always here");
+    for (const r of j.runtimes.slice(1)) assert.equal(r.present, j.agents.some((a) => a.id === r.id), `${r.id} is offered exactly when its CLI is on the PATH`);
+    const page = fs.readFileSync(new URL("../src/gui/page.html", import.meta.url), "utf8");
+    assert.doesNotMatch(page, /id="ai"/, "no second list for the AI");
+    assert.match(page, /list="models"/, "the model is typed or picked from what the CLI lists");
   } finally {
     gui.server.close();
     process.removeAllListeners("SIGINT");

@@ -109,7 +109,7 @@ Then set up the game ([Slay the Spire](games/slay-the-spire/README.md), [Portal]
 **Test the machine first with a mock run.** A mock run is the game played by its own scripted player: no model, no
 tokens. It tests everything an AI run needs — the agents that are installed reaching the game's tools, the game with
 its mods and bridge, OBS, LiveSplit, in-game time and milestones, the timeline and the bundle — except the model's own
-playing. Start it in the GUI (Played by: the game's script) or from a shell; when it goes through, an AI run of the same game
+playing. Start it in the GUI (Played by: Mock run) or from a shell; when it goes through, an AI run of the same game
 and goal starts on the same tools. Its bundle is a complete bundle and never an entry: an archive reads which runtime
 drove the run and what the timeline holds, and publishes nothing a script
 played (SPEC §3). Then do a first AI run:

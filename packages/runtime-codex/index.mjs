@@ -84,12 +84,36 @@ export function renderConfig(broker, { placeholders = false } = {}) {
     .replace("__BROKER_ENV__", env.join("\n"));
 }
 
+/**
+ * What Codex itself offers: `codex debug models` prints its model catalog, each model with the reasoning efforts
+ * it takes and its default. Models the catalog hides are left out; the list changes with every Codex release, so
+ * nothing here names a model.
+ */
+export function parseCodexCatalog(text) {
+  const models = (JSON.parse(text).models ?? []).filter((m) => m.visibility !== "hide" && typeof m.slug === "string").map((m) => ({
+    id: m.slug,
+    label: m.display_name && m.display_name !== m.slug ? `${m.slug} (${m.display_name})` : m.slug,
+    efforts: (m.supported_reasoning_levels ?? []).map((l) => l.effort).filter((e) => typeof e === "string"),
+    defaultEffort: m.default_reasoning_level ?? null,
+  }));
+  return { models, efforts: [...new Set(models.flatMap((m) => m.efforts))] };
+}
+
+/** `aas options`: the catalog as the CLI on this machine prints it. */
+export function codexOptions() {
+  const r = spawnSync("codex", ["debug", "models"], { encoding: "utf8", timeout: 30000, maxBuffer: 64 * 1024 * 1024 });
+  if (r.status !== 0) throw new Error(`codex debug models did not answer${r.stderr?.trim() ? `: ${r.stderr.trim().split("\n").at(-1)}` : " (is Codex installed?)"}`);
+  return { source: "codex debug models", freeModel: "or a model's slug the catalog does not list", ...parseCodexCatalog(r.stdout) };
+}
+
 export default {
   id: "codex",
   /** a model plays. */
   ai: true,
   name: "Codex",
-  version: "0.33.8",
+  version: "0.34.3",
+  /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
+  async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
   /** Every rollout Codex wrote with this run directory as its working directory, oldest first: what the proof covers. */
   sessionLogs(runDir) {
@@ -172,8 +196,16 @@ export default {
     const prompt = brief.resume ? brief.resume.prompt : brief.goalPrompt;
     if (!prompt) throw new Error("Headless runs need a goal prompt (aas configure --prompt, or goalPrompt in the game plugin).");
     const args = ["exec", ...(brief.resume?.sessionId ? ["resume", brief.resume.sessionId] : []), "--json", "--skip-git-repo-check", "--cd", runDir, "--sandbox", "read-only", ...model];
-    // The effort is written into Codex's TOML config: only a known word, never a quote that ends the string.
-    if (brief.reasoningEffort && !["low", "medium", "high", "xhigh", "max"].includes(brief.reasoningEffort)) throw new Error(`effort ${JSON.stringify(String(brief.reasoningEffort)).slice(0, 40)} is not one of low, medium, high, xhigh, max`);
+    // The effort is written into Codex's TOML config: only a plain word, never a quote that ends the string, and
+    // one the catalog lists for this model (or for any model, when the model is not the catalog's).
+    if (brief.reasoningEffort && !/^[a-z]{2,16}$/.test(String(brief.reasoningEffort))) throw new Error(`effort ${JSON.stringify(String(brief.reasoningEffort)).slice(0, 40)} is not a plain word`);
+    if (brief.reasoningEffort) {
+      let known = null;
+      try { known = codexOptions(); } catch { /* no catalog: Codex itself refuses an effort it does not take */ }
+      const forModel = known?.models.find((m) => m.id === brief.model);
+      const allowed = forModel ? forModel.efforts : known?.efforts;
+      if (allowed && !allowed.includes(brief.reasoningEffort)) throw new Error(`effort ${brief.reasoningEffort} is not one ${forModel ? `${brief.model} takes` : "Codex lists"}: ${allowed.join(", ")} (codex debug models)`);
+    }
     if (brief.reasoningEffort) args.push("-c", `model_reasoning_effort="${brief.reasoningEffort}"`);
     args.push("-o", path.join(runDir, "codex-last-message.txt"), prompt);
     const env = { ...process.env };

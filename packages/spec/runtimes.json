@@ -5,16 +5,16 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.34.0",
+      "version": "0.34.3",
       "ai": true,
-      "sha256": "a231f8d216e989011d31c89b854393528d8c75f0d2dd8a614b194fbfe78bff90"
+      "sha256": "dd286826200ee7dea8c2c13ceea93e4a815887641affa9d18f1f28b842a674dd"
     },
     {
       "id": "codex",
       "name": "Codex",
-      "version": "0.33.8",
+      "version": "0.34.3",
       "ai": true,
-      "sha256": "62450b9938827f5e194dc0dd40663d036804c5e9c34f8db5cf573e5a32fc0f97"
+      "sha256": "e34076d9ded177fb787e866286e7c9697389423ff8c1a0e8bc7f8dedb5e0ec19"
     },
     {
       "id": "scripted",

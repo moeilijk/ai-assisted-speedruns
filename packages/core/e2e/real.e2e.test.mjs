@@ -152,8 +152,13 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       const cont = await page.$("#result button[data-continue]");
       if (!cont) { if (!/completed/.test(stopped)) failures.push(`${g.name}: no Continue after Stop (${stopped.slice(0, 80)})`); }
       else {
+        // Continue asks its choices first (a later end, the save, limits); the run's own values are kept.
         await cont.click();
+        await page.waitForSelector("#cont[open]", { timeout: 30000 });
+        log(`${g.name}: Continue asks: goal ${await page.$eval("#contgoal", (e) => e.value)}, save ${await page.$eval("#contsave", (e) => e.value)}`);
+        await page.click("#contgo");
         for (let i = 0; i < 5; i += 1) await page.waitForTimeout(1000);
+        if ((await phase()) === "Ready") failures.push(`${g.name}: Continue did not start a session`);
         for (let i = 0; i < 3600 && (await phase()) !== "Ready"; i += 1) await page.waitForTimeout(1000);
         const done = await page.$eval("#result", (e) => e.textContent);
         log(`${g.name}: after Continue: ${done.slice(0, 120)}`);

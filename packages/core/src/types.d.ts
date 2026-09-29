@@ -235,6 +235,17 @@ export interface BudgetVerdict { ok: boolean; percent: number | null; max: numbe
 /** One row of `aas doctor`. */
 export interface DoctorRow { ok: boolean; what: string; detail?: string }
 
+/** What an AI's CLI offers (`aas options`): its models, each with the efforts it takes when the CLI says so per model. */
+export interface RuntimeOptions {
+  /** Where the list came from ("claude --help", "codex debug models"). */
+  source: string;
+  models: { id: string; label?: string; efforts?: string[]; defaultEffort?: string | null }[];
+  /** The efforts the CLI names (all models together). */
+  efforts: string[];
+  /** When a model outside the list is accepted too: the sentence that says so ("or a model's full name"). */
+  freeModel?: string | null;
+}
+
 export interface RuntimePlugin {
   id: string;
   /** The name people know the runtime by ("Claude Code"); required, a bundle carries it next to the id. */
@@ -258,6 +269,8 @@ export interface RuntimePlugin {
   /** Does the agent's own CLI reach the broker (`claude mcp list`, `codex mcp list`)? No model call, so no tokens; `aas check-agent`. */
   connectCheck?(runDir: string, ctx: { gameId: string }): Promise<{ ok: boolean; detail: string }>;
   budget?(): Promise<BudgetVerdict>;
+  /** The models and efforts the agent's own CLI names today (`aas options`, the GUI's Model and Effort). Read from the CLI, never kept in the plugin. */
+  options?(): Promise<RuntimeOptions>;
   /** Read-only checks for `aas doctor`. */
   doctor?(ctx: { runDir?: string | null }): Promise<DoctorRow[]>;
   /** The private session log of a run (when the runtime keeps it outside the run directory). */

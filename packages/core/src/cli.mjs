@@ -28,7 +28,7 @@ if (process.env.AAS_ARCHIVE_FETCH) {
 }
 
 // Flags that never take a value (so `aas check --strict <dir>` keeps its directory).
-const BOOLEAN_FLAGS = new Set(["upload", "keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help"]);
+const BOOLEAN_FLAGS = new Set(["upload", "keep", "no-open", "strict", "core", "headless", "exercise", "no-cut", "no-autosave", "ignore-budget", "keep-open", "allow-breaking", "help", "json"]);
 // Flags whose value may be left out: `--verify` reads stdin, `--claim` alone asks for a claim, `--key` and `--sign`
 // alone mean the default key.
 const OPTIONAL_VALUE = new Set(["verify", "claim", "key", "sign", "video-url"]);
@@ -92,7 +92,9 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
       }
       case "doctor": {
         const { doctor } = await import("./doctor.mjs");
-        const r = await doctor({ game: opts.game, recorder: opts.recorder ?? null, timer: opts.timer ?? null, runtime: opts.runtime ?? null, runDir: opts["run-dir"] ?? null });
+        // --json: the rows as data (the GUI's Setup tab reads them), instead of the PASS/FAIL lines.
+        const r = await doctor({ game: opts.game, recorder: opts.recorder ?? null, timer: opts.timer ?? null, runtime: opts.runtime ?? null, runDir: opts["run-dir"] ?? null, ...(opts.json ? { log() {} } : {}) });
+        if (opts.json) console.log(JSON.stringify(r.rows));
         process.exitCode = r.ok ? 0 : 1;
         break;
       }
@@ -140,6 +142,29 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
           }
         }
         process.exitCode = stop ? 1 : 0;
+        break;
+      }
+      case "options": {
+        // The models and efforts each AI's own CLI names today (`claude --help`, `codex debug models`): the list an
+        // AI run can be given, read from the AI instead of kept here, because the models change faster than releases.
+        const { PACKAGES } = await import("./plugins.mjs");
+        const ids = opts.runtime ? [opts.runtime] : fs.readdirSync(PACKAGES).filter((d) => d.startsWith("runtime-")).sort().map((d) => d.slice("runtime-".length));
+        const all = {};
+        for (const id of ids) {
+          let rt;
+          try { rt = await loadRuntime(id); } catch (e) { if (opts.runtime) throw e; continue; }
+          if (!rt.options) continue;
+          try { all[id] = await rt.options(); } catch (e) { all[id] = { error: e.message }; }
+          if (opts.json) continue;
+          const o = all[id];
+          if (o.error) { console.log(`${rt.name}: ${o.error}`); continue; }
+          console.log(`${rt.name} (${o.source}):`);
+          for (const m of o.models) console.log(`  model ${m.id.padEnd(24)} ${m.label && m.label !== m.id ? m.label : ""}${m.efforts?.length ? `  efforts ${m.efforts.join(", ")}${m.defaultEffort ? ` (default ${m.defaultEffort})` : ""}` : ""}`.trimEnd());
+          if (o.freeModel) console.log(`  ${o.freeModel}`);
+          console.log(`  efforts: ${o.efforts.join(", ") || "none listed"}`);
+        }
+        if (opts.json) console.log(JSON.stringify(all));
+        if (!Object.keys(all).length) throw new Error(opts.runtime ? `${opts.runtime} lists no options` : "no runtime lists its options");
         break;
       }
       case "run": {
@@ -334,10 +359,11 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
             "  aas run --runtime <id> --game <plugin.mjs> --run-dir <dir> [--recorder <obs|source-demo|null>] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--autosave-minutes 10 | --no-autosave] [--ignore-budget] [--keep-open] [--proof off|anonymous|account] [configure options]",
             "                                           when the run ends the game, the timer, the recorder and a Steam the launcher started are closed; --keep-open leaves them",
             "  aas budget [--max <percent>]             each agent's plan usage; runs stay under AAS_BUDGET_WEEKLY_MAX (Claude Code, default 50%; --max sets it) and AAS_CODEX_BUDGET_MAX (Codex)",
+            "  aas options [--runtime <id>] [--json]    the models and efforts each AI's own CLI names today (--model, --effort take these, or a model's full name)",
             "  aas resume --run-dir <dir> [--save name] [--goal <later end>] [--prompt text] [--allow-breaking] [--recorder obs] [--timer livesplit] [--overlay-port 8765] [--headless --max-turns N --max-minutes M] [--keep-open] [--proof off|anonymous|account]",
             "  aas stop --run-dir <dir>                 stops the session in that directory the way Ctrl-C does (saved, recording kept, everything closed)",
             "  aas start --runtime <id> --run-dir <dir>",
-            "  aas doctor [--game <plugin.mjs>] [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>]   read-only checks before a run",
+            "  aas doctor [--game <plugin.mjs>] [--recorder obs] [--timer livesplit] [--runtime claude-code] [--run-dir <dir>] [--json]   read-only checks before a run",
             "  aas check-connection --game <plugin.mjs> --run-dir <dir> [--exercise]",
             "  aas timeline <run-dir> [--attempt last|N] [--margin-before s] [--margin-after s]   timers, sections, cut list, timers.srt, inputs.srt",
             "  aas render <run-dir> [--video f] [--out f] [--burn timers,inputs] [--no-cut] [--crf 18] [--attempt last|N]   ffmpeg: playbacks only (pauses cut), optional burned-in timers/keys",

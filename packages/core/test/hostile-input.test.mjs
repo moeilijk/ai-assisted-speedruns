@@ -53,7 +53,7 @@ test("configure refuses a model, effort, seed, id or proof mode that would break
   const cases = [
     [{ model: "claude opus" }, /--model "claude opus" is not allowed/],
     [{ model: 'x"; rm -rf /' }, /--model .* is not allowed/],
-    [{ effort: 'high" sandbox="danger-full-access' }, /--effort .* is not allowed: one of low, medium, high, xhigh, max/],
+    [{ effort: 'high" sandbox="danger-full-access' }, /--effort .* is not allowed: one word as the AI's CLI lists them/],
     [{ seed: "23M\nSTART WATCHER" }, /--seed .* is not allowed: letters and digits/],
     [{ seed: "--ignore-budget" }, /--seed .* is not allowed/],
     [{ seed: "a;b" }, /--seed .* is not allowed/],

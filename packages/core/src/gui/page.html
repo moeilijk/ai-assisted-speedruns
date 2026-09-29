@@ -133,17 +133,27 @@
     <h2>New run</h2>
     <div class="grid">
       <label class="f">Game<select id="game"></select></label>
-      <label class="f">Played by<select id="playedby"><option value="scripted">The game's script (mock run)</option><option value="ai">An AI</option></select></label>
-      <label class="f" id="aifield">AI<select id="ai"></select></label>
-      <label class="f" id="modelfield">Model<input id="model" placeholder="the AI's own default" autocomplete="off" spellcheck="false"></label>
-      <label class="f" id="effortfield">Effort<select id="effort"><option value="">the AI's own default</option><option>low</option><option>medium</option><option>high</option><option>xhigh</option><option>max</option></select></label>
+      <label class="f">Played by<select id="playedby"></select></label>
+      <label class="f" id="modelfield">Model<input id="model" list="models" placeholder="the AI's own default" autocomplete="off" spellcheck="false"><datalist id="models"></datalist><span class="muted" id="modelhint" style="font-size:12px"></span></label>
+      <label class="f" id="effortfield">Effort<select id="effort"><option value="">the AI's own default</option></select><span class="muted" id="efforthint" style="font-size:12px"></span></label>
       <label class="f">Run name<input id="runname" placeholder="" autocomplete="off"></label>
       <label class="f">Goal<select id="goal"></select></label>
       <label class="f">Recording<select id="recorder"></select></label>
       <label class="f">Time limit (minutes)<input id="maxmin" type="number" min="1" step="1" placeholder="no limit"></label>
       <label class="f" id="seedfield">Seed (optional)<input id="seed" autocomplete="off"></label>
     </div>
+    <details id="more" style="margin-top:12px">
+      <summary class="muted" style="cursor:pointer">More options (turn limit, autosave, prompt, instructions)</summary>
+      <div class="grid" style="margin-top:10px">
+        <label class="f">Turn limit (tool calls)<input id="maxturns" type="number" min="1" step="1" placeholder="no limit"></label>
+        <label class="f">Autosave<select id="autosave"><option value="">every 10 minutes (default)</option><option value="5">every 5 minutes</option><option value="20">every 20 minutes</option><option value="off">off</option></select></label>
+        <label class="f"><span>&nbsp;</span><label><input type="checkbox" id="keepopen"> Leave the game, OBS and LiveSplit open at the end</label></label>
+        <label class="f" id="promptfield" style="grid-column:1 / -1">Prompt (the first message to the AI; empty: the game plugin's own)<textarea id="prompt" rows="3" placeholder="the game plugin's own goal prompt" spellcheck="false"></textarea></label>
+        <label class="f" id="instrfield" style="grid-column:1 / -1">Instructions file (replaces the game plugin's instructions; empty: the plugin's own)<span style="display:flex;gap:6px"><input id="instructions" placeholder="the plugin's own instructions" spellcheck="false" style="flex:1"><button class="b" id="instrbrowse">Browse…</button></span></label>
+      </div>
+    </details>
     <p class="muted" id="savedto" style="margin:12px 0 0">Saved to <span class="path" id="where">—</span></p>
+    <p class="muted" id="budget" style="margin:6px 0 0"></p>
     <div class="row-actions">
       <button class="b primary" id="start">Start</button>
       <button class="b danger" id="stop">Stop</button>
@@ -159,6 +169,13 @@
     <p class="muted" id="account" style="margin:0"></p>
     <p class="feedback" id="archivemsg"></p>
     <table id="tickets"></table>
+  </div>
+  <div class="panel" id="signing">
+    <h2>Signing</h2>
+    <p class="muted" id="keystate" style="margin:0"></p>
+    <div class="row-actions" id="keyactions" style="margin-top:8px"></div>
+    <p class="feedback" id="keymsg"></p>
+    <pre class="cmds" id="claim" style="display:none"></pre>
   </div>
   <div class="panel">
     <h2>What this runs, as commands</h2>
@@ -182,8 +199,31 @@
     </div>
     <p class="muted" style="margin:0 0 4px">Every row lists the conditions it tried: that list is all it establishes, and anything not in it was not tried. These rows read settings, versions and files; that the programs also work <i>together</i> — starting, connecting, recording, playing — is proved by a mock run on the Run tab, without tokens.</p>
   </div>
+  <div class="panel">
+    <h2>Before a run</h2>
+    <p class="muted" style="margin:0 0 8px">The same read-only checks the command line does for the game, the recording, the timer and the AI chosen on the Run tab (<span class="path">aas doctor</span>), and the connection: the game started, the broker against it with the plugin's own exercise, everything closed again (<span class="path">aas check-connection</span>). What each button runs stands in the log on the Run tab.</p>
+    <div class="row-actions" style="margin-top:0"><button class="b" id="doctor">Run the checks (aas doctor)</button><button class="b" id="connection">Check the connection to the game</button><span class="feedback" id="doctormsg" style="margin:0"></span></div>
+    <pre class="cmds" id="doctorout" style="display:none;margin-top:10px"></pre>
+  </div>
   <div id="groups"></div>
 </section>
+
+<dialog id="cont">
+  <div class="dlg-head"><b>Continue this run</b></div>
+  <div style="padding:14px 16px;max-width:640px">
+    <p class="muted" id="contwhat" style="margin:0 0 10px"></p>
+    <div class="grid">
+      <label class="f">Goal<select id="contgoal"></select></label>
+      <label class="f">Start from save<select id="contsave"></select></label>
+      <label class="f">Time limit (minutes)<input id="contmaxmin" type="number" min="1" step="1" placeholder="no limit"></label>
+      <label class="f">Turn limit (tool calls)<input id="contmaxturns" type="number" min="1" step="1" placeholder="no limit"></label>
+      <label class="f" id="contpromptfield" style="grid-column:1 / -1">Prompt for this part (empty: the tooling's own)<textarea id="contprompt" rows="2" spellcheck="false"></textarea></label>
+      <label class="f" style="grid-column:1 / -1"><span></span><label><input type="checkbox" id="contkeepopen"> Leave the game, OBS and LiveSplit open at the end</label></label>
+      <label class="f" style="grid-column:1 / -1"><span></span><label><input type="checkbox" id="contbreaking"> Go on although the tooling had a breaking release since this run started (the bundle says so)</label></label>
+    </div>
+  </div>
+  <div class="dlg-foot"><button class="b" id="contcancel">Cancel</button><button class="b primary" id="contgo">Continue</button></div>
+</dialog>
 </main>
 
 <dialog id="browse">
@@ -223,7 +263,7 @@ for (const t of ["run", "setup"]) $(`tab-${t}`).onclick = () => {
 };
 
 // Run tab
-let games = [], runtimes = [], agents = [], phase = "idle", nameTouched = false, aiTouched = false, goalTouched = false;
+let games = [], runtimes = [], agents = [], phase = "idle", nameTouched = false, goalTouched = false;
 async function loadGames() {
   const j = await api("/api/games");
   games = j.games; runtimes = j.runtimes; agents = j.agents;
@@ -235,9 +275,10 @@ async function loadGames() {
 function fillGame() {
   const g = games.find((x) => x.id === $("game").value);
   if (!g) return;
-  // Who plays: the game's own script (a mock run, only for a game that has one) or an AI (only one that is installed).
+  // Who plays, one list: the game's own script (a mock run, only for a game that has one) and every AI whose CLI is
+  // on this machine, the run types `aas run --runtime` knows.
   const keepBy = $("playedby").value;
-  $("playedby").innerHTML = [...(g.mock ? [["scripted", "The game's script (mock run)"]] : []), ...(agents.length ? [["ai", "An AI"]] : [])].map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join("");
+  $("playedby").innerHTML = runtimes.filter((r) => r.present && (r.ai || g.mock)).map((r) => `<option value="${r.id}">${esc(r.label)}</option>`).join("");
   if ([...$("playedby").options].some((o) => o.value === keepBy)) $("playedby").value = keepBy;
   fillGoal();
   // Only the choices this game has: a game without a seed does not ask for one.
@@ -246,16 +287,31 @@ function fillGame() {
   const keepRec = $("recorder").value;
   $("recorder").innerHTML = g.recorders.map((r) => `<option value="${r.id}">${esc(r.name)}</option>`).join("");
   if ([...$("recorder").options].some((o) => o.value === keepRec)) $("recorder").value = keepRec;
-  fillPlayedBy();
-}
-function fillPlayedBy() {
-  // The AI of the run: it plays an AI run, and a mock run checks that it reaches the game's tools. So a mock proves
-  // the set-up of the AI run you would do next.
-  const keepAi = $("ai").value;
-  $("ai").innerHTML = agents.map((a) => `<option value="${a.id}">${esc(a.name)}</option>`).join("");
-  if (aiTouched && [...$("ai").options].some((o) => o.value === keepAi)) $("ai").value = keepAi;
-  $("aifield").style.display = agents.length ? "" : "none";
   fillRuntime();
+}
+// What an AI's own CLI names today (aas options): the models to pick from (a full name can be typed too) and the
+// efforts, per model when the CLI says so. Read from the CLI, never kept in the page: the models change faster.
+const optionsOf = {};
+async function loadOptions(rt) {
+  if (!optionsOf[rt]) {
+    try { optionsOf[rt] = await api(`/api/options?runtime=${encodeURIComponent(rt)}`); }
+    catch (e) { optionsOf[rt] = { models: [], efforts: [], freeModel: null, error: e.message }; }
+  }
+  if (runtimeId() !== rt) return;
+  const o = optionsOf[rt];
+  $("models").innerHTML = o.models.map((m) => `<option value="${esc(m.id)}">${esc(m.label ?? m.id)}</option>`).join("");
+  $("modelhint").textContent = o.error ? `The CLI did not list its models: ${o.error}` : `${o.models.length ? `${o.models.map((m) => m.id).join(", ")} ` : ""}${o.freeModel ?? ""}${o.source ? ` (from ${o.source})` : ""}`.trim();
+  fillEfforts();
+}
+function fillEfforts() {
+  const o = optionsOf[runtimeId()];
+  if (!o) return;
+  const m = o.models.find((x) => x.id === $("model").value.trim());
+  const efforts = m?.efforts?.length ? m.efforts : o.efforts;
+  const keep = $("effort").value;
+  $("effort").innerHTML = `<option value="">the AI's own default${m?.defaultEffort ? ` (${esc(m.defaultEffort)})` : ""}</option>${efforts.map((e) => `<option>${esc(e)}</option>`).join("")}`;
+  if (efforts.includes(keep)) $("effort").value = keep;
+  $("efforthint").textContent = efforts.length ? (m ? `what ${m.id} takes` : "") : "the CLI lists no efforts";
 }
 // The goal offered by default follows who plays: an AI run aims at the game's own end, a mock run at the game's
 // first end, because it is a test of the machine and playing on to the credits proves nothing the first end did
@@ -276,13 +332,30 @@ function fillRuntime() {
   if (!nameTouched) $("runname").value = "";
   if (rt !== "scripted" && !$("maxmin").value) $("maxmin").value = 60;
   if (rt === "scripted" && $("maxmin").value === "60") $("maxmin").value = "";
-  // The model and its effort belong to an AI run; a mock run plays the game's script and asks no model anything.
-  for (const f of ["modelfield", "effortfield"]) $(f).style.display = rt === "scripted" ? "none" : "";
+  // The model, its effort, the prompt and the instructions belong to an AI run; a mock run plays the game's script
+  // and asks no model anything.
+  for (const f of ["modelfield", "effortfield", "promptfield", "instrfield"]) $(f).style.display = rt === "scripted" ? "none" : "";
+  if (rt !== "scripted") loadOptions(rt);
+  loadBudget(rt);
   refreshPlan();
 }
-// The run type the harness knows: the script, or the agent that plays. The AI field means one or the other.
-const runtimeId = () => ($("playedby").value === "scripted" ? "scripted" : $("ai").value);
-const choices = () => ({ game: $("game").value, runtime: runtimeId(), ai: $("ai").value, run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value, model: $("model").value.trim(), effort: $("effort").value });
+// The run type the harness knows (aas run --runtime): the script, or the AI that plays.
+const runtimeId = () => $("playedby").value;
+const choices = () => ({ game: $("game").value, runtime: runtimeId(), run: $("runname").value.trim(), goal: $("goal").value, maxMinutes: $("maxmin").value, seed: $("seed").value.trim(), recorder: $("recorder").value, model: $("model").value.trim(), effort: $("effort").value,
+  maxTurns: $("maxturns").value, autosave: $("autosave").value, keepOpen: $("keepopen").checked ? "1" : "", prompt: $("prompt").value, instructions: $("instructions").value.trim() });
+// The plans' stand, as `aas budget` prints it: shown once an AI is chosen, and again on its button.
+let budgetShown = false;
+async function loadBudget(rt, force = false) {
+  if (rt === "scripted" && !force) { $("budget").innerHTML = ""; budgetShown = false; return; }
+  if (budgetShown && !force) return;
+  budgetShown = true;
+  $("budget").textContent = "Asking each plan for its stand (aas budget)…";
+  try {
+    const b = await api("/api/budget");
+    $("budget").innerHTML = `${b.lines.map((l) => `<span class="path">${esc(l)}</span>`).join("<br>")}<br><span class="${b.ok ? "ok" : "fail"}">${esc(b.message)}</span> <button class="b" id="budgetbtn">Check again</button>`;
+  } catch (e) { $("budget").innerHTML = `The budget could not be read: ${esc(e.message)} <button class="b" id="budgetbtn">Try again</button>`; }
+  const btn = $("budgetbtn"); if (btn) btn.onclick = () => loadBudget(runtimeId(), true);
+}
 let planTimer = null;
 function refreshPlan() {
   clearTimeout(planTimer);
@@ -292,14 +365,16 @@ function refreshPlan() {
     try {
       const p = await api(`/api/plan?${q}`);
       $("where").textContent = p.runDir;
+      $("savedto").innerHTML = `Saved to <span class="path" id="where">${esc(p.runDir)}</span>. ${p.signed ? "The bundle is signed with your key." : "The bundle is unsigned: make a key under Signing to sign it."}`;
       $("cmds").innerHTML = p.steps.map((s) => `<span class="c"># ${esc(s.title)}</span>\n<span class="${s.id === "run" ? "run" : ""}">${esc(s.shown)}</span>`).join("\n\n")
         + (p.stop ? `\n\n<span class="c"># Only if something stayed open</span>\n${esc(p.stop)}` : "");
       $("cmds").dataset.text = p.steps.map((s) => `# ${s.title}\n${s.shown}`).join("\n\n");
     } catch (e) { $("cmds").textContent = e.message; }
   }, 120);
 }
-for (const id of ["game", "playedby", "ai", "goal", "recorder", "maxmin", "seed", "runname", "model", "effort"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
-  if (id === "ai") aiTouched = true; if (id === "goal") goalTouched = true; if (id === "game") goalTouched = false; if (id === "game") fillGame(); else if (id === "playedby") fillPlayedBy(); else if (id === "ai") fillRuntime(); else refreshPlan(); });
+for (const id of ["game", "playedby", "goal", "recorder", "maxmin", "seed", "runname", "model", "effort", "maxturns", "autosave", "keepopen", "prompt", "instructions"]) $(id).addEventListener("input", () => { if (id === "runname") nameTouched = Boolean($("runname").value);
+  if (id === "goal") goalTouched = true; if (id === "game") goalTouched = false; if (id === "game") fillGame(); else if (id === "playedby") fillRuntime(); else { if (id === "model") fillEfforts(); refreshPlan(); } });
+$("instrbrowse").onclick = async (e) => { e.preventDefault(); const picked = await browse($("instructions").value, "file", ""); if (picked) { $("instructions").value = picked; refreshPlan(); } };
 $("copy").onclick = async () => { try { await navigator.clipboard.writeText($("cmds").dataset.text || ""); $("copied").textContent = "Copied."; } catch { $("copied").textContent = "Select the text and copy it."; } setTimeout(() => ($("copied").textContent = ""), 2500); };
 $("start").onclick = async () => {
   const c = choices();
@@ -349,7 +424,8 @@ function report() {
   return `${ASK}\n\n**Details**\n\n${details()}${log}\n`;
 }
 $("off-reload").onclick = () => location.reload();
-const STEPS = { "agent-claude-code": "checking that Claude Code reaches the tools", "agent-codex": "checking that Codex reaches the tools", game: "starting the game", recorder: "starting the recording", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything" };
+const STEPS = { "agent-claude-code": "checking that Claude Code reaches the tools", "agent-codex": "checking that Codex reaches the tools", game: "starting the game", recorder: "starting the recording", livesplit: "starting LiveSplit", run: "the run is playing", publish: "timeline and bundle", close: "closing everything",
+  "key-create": "making the signing key", "key-claim": "making the claim", budget: "asking the plans for their stand", check: "checking the bundle", render: "cutting the video (ffmpeg)", sheet: "writing the YouTube text", doctor: "running the checks", connection: "checking the connection to the game" };
 function showState(s) {
   last = s;
   if (!live) return; // a page without a connection says so; it does not pretend to know the state
@@ -366,22 +442,82 @@ function showState(s) {
     const link = (p, t) => (p ? `<button class="b" data-open="${esc(p)}">${esc(t)}</button>` : "");
     const upload = r.bundle && proof.signedIn ? `<button class="b" data-upload="${esc(r.bundle)}">Upload to the Archive</button>` : "";
     const cont = r.status === "stopped" && r.runDir ? `<button class="b" data-continue="${esc(r.runDir)}">Continue this run</button>` : "";
-    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "Open run folder"), link(r.recording, "Show recording"), link(r.publicBundle, "Show public zip (to share)"), link(r.bundle, "Show upload zip (Archive only)"), upload, cont].filter(Boolean).join("")}`;
+    // The tools around a bundle, each the CLI's own command: check it against the rules, cut the video with the
+    // timers burned in, write the YouTube text.
+    const tools = r.bundle ? `<button class="b" data-tool="check" data-path="${esc(r.bundle)}">Check bundle</button>` : "";
+    const video = r.recording && r.runDir ? `<button class="b" data-tool="render" data-rundir="${esc(r.runDir)}">Cut video with timers</button>` : "";
+    const sheet = r.bundle && r.runDir ? `<button class="b" data-tool="sheet" data-rundir="${esc(r.runDir)}">YouTube text</button>` : "";
+    $("result").innerHTML = `Last session: <b>${esc(r.status)}</b>${r.notes ? ` — ${esc(r.notes)}` : ""}<br>${[link(r.runDir, "Open run folder"), link(r.recording, "Show recording"), link(r.publicBundle, "Show public zip (to share)"), link(r.bundle, "Show upload zip (Archive only)"), upload, tools, video, sheet, cont].filter(Boolean).join("")}<div id="toolout"></div>`;
   }
-  if (s.phase === "idle") { loadGames(); loadProof(); }
+  if (s.phase === "idle") { loadGames(); loadProof(); loadKey(); }
 }
 $("result").onclick = (e) => {
   const p = e.target.dataset?.open;
   if (p) act("runmsg", "Opening…", () => api("/api/open", { path: p }), `Opened ${p} in Explorer.`);
   const cr = e.target.dataset?.continue;
-  if (cr) {
-    if (proof.mode === "off" && !confirm("This part of the run is unsigned: the Archive accepts it and marks it unsigned. Continue?")) { feedback("runmsg", "busy", "Cancelled; the run was not continued."); return; }
-    act("runmsg", "Continuing the run…", async () => { await api("/api/continue", { runDir: cr }); return { message: "Continued; each step follows in the log below." }; });
+  if (cr) continueRun(cr);
+  const tool = e.target.dataset?.tool;
+  if (tool) {
+    const busy = { check: "Checking the bundle against the rules…", render: "Cutting the video; ffmpeg takes a while…", sheet: "Writing the YouTube text…" }[tool];
+    act("runmsg", busy, async () => {
+      const r = await api("/api/tool", { action: tool, path: e.target.dataset.path, runDir: e.target.dataset.rundir });
+      const out = $("toolout");
+      if (out) out.innerHTML = `<pre class="cmds" style="margin-top:8px">${esc(r.lines.join("\n"))}</pre>${r.made ? `<button class="b" data-open="${esc(r.made)}">Show ${esc(r.made.split(/[\\/]/).pop())}</button>` : ""}`;
+      return { message: r.message };
+    });
   }
   const z = e.target.dataset?.upload;
   if (z && !confirm("Upload this bundle to the Archive under your account? This is the upload zip: it carries the run's logs in a private part, which the Archive uses to check the proof and deletes after its decision. The public zip next to it is the one to share.")) feedback("runmsg", "busy", "Cancelled; nothing was uploaded.");
   else if (z) act("runmsg", "Uploading to the Archive…", () => api("/api/archive", { action: "upload", arg: z }), "Upload sent; the Archive's answer stands in the log below.");
 };
+// Continue: the choices `aas resume` takes, asked in a dialog with what this run has (its later ends, its saves).
+async function continueRun(runDir) {
+  let info;
+  try { info = await api(`/api/run-info?runDir=${encodeURIComponent(runDir)}`); } catch (e) { feedback("runmsg", "fail", `Not done: ${e.message}`); return; }
+  const dlg = $("cont");
+  $("contwhat").textContent = `${runDir}: the run goes on as its next segment (aas resume), the game, the recording and LiveSplit started first as at Start, and the bundle made again as a new revision.`;
+  $("contgoal").innerHTML = info.ends.map((e) => `<option value="${esc(e.id)}" ${e.id === info.goal ? "selected" : ""} ${!e.later && e.id !== info.goal ? "disabled" : ""}>${esc(e.label)}${e.id === info.goal ? " (the run's goal)" : e.later ? " (later end)" : ""}</option>`).join("");
+  $("contsave").innerHTML = info.saves.slice().reverse().map((n, i) => `<option value="${esc(n)}">${esc(n)}${i === 0 ? " (the last save)" : ""}</option>`).join("") || `<option value="">no save yet</option>`;
+  $("contpromptfield").style.display = info.ai ? "" : "none";
+  $("contprompt").value = ""; $("contmaxmin").value = info.ai ? 60 : ""; $("contmaxturns").value = ""; $("contkeepopen").checked = false; $("contbreaking").checked = false;
+  dlg.showModal();
+  const go = await new Promise((resolve) => { $("contgo").onclick = () => { dlg.close(); resolve(true); }; $("contcancel").onclick = () => { dlg.close(); resolve(false); }; });
+  if (!go) { feedback("runmsg", "busy", "Cancelled; the run was not continued."); return; }
+  if (proof.mode === "off" && !confirm("This part of the run is unsigned: the Archive accepts it and marks it unsigned. Continue?")) { feedback("runmsg", "busy", "Cancelled; the run was not continued."); return; }
+  const goal = $("contgoal").value === info.goal ? "" : $("contgoal").value;
+  const save = $("contsave").value === info.lastSave ? "" : $("contsave").value;
+  act("runmsg", "Continuing the run…", async () => { await api("/api/continue", { runDir, goal, save, maxMinutes: $("contmaxmin").value, maxTurns: $("contmaxturns").value, prompt: $("contprompt").value, keepOpen: $("contkeepopen").checked ? "1" : "", allowBreaking: $("contbreaking").checked ? "1" : "" }); return { message: "Continued; each step follows in the log below." }; });
+}
+
+// Signing: the key `aas publish --sign` uses (aas key makes it), and the claim that says whose it is.
+async function loadKey() {
+  let k;
+  try { k = await api("/api/key"); } catch { return; }
+  const key = k.key;
+  $("keystate").innerHTML = key
+    ? key.error ? `A key is set (${esc(key.file)}) but cannot be read: ${esc(key.error)}`
+    : `Bundles are signed with ${key.own ? "your key from aas key" : "the key"} <span class="path">${esc(key.file)}</span>.<br>Its public line, to record on your account page at the Archive (Record key): <span class="path">${esc(key.publicLine)}</span><br>Fingerprint <span class="path">${esc(key.fingerprint)}</span>`
+    : `No signing key on this machine yet, so bundles are unsigned. A key says "the same hand published these"; the Archive says whose hand once its public line is recorded on your account page. <span class="path">aas key</span> makes one in <span class="path">${esc(k.defaultFile)}</span>.`;
+  $("keyactions").innerHTML = key && !key.error
+    ? `<input id="identities" placeholder="https://your.site/…, mailto:you@… (one or more, comma-separated)" style="min-width:320px;flex:1"><button class="b" data-key="claim">Make a claim</button>`
+    : `<button class="b primary" data-key="create">Make a signing key (aas key)</button>`;
+}
+$("keyactions").onclick = async (e) => {
+  const action = e.target.dataset?.key;
+  if (!action) return;
+  const identities = action === "claim" ? $("identities").value.split(",").map((x) => x.trim()).filter(Boolean) : [];
+  const r = await act("keymsg", action === "create" ? "Making the key…" : "Making the claim…", () => api("/api/key", { action, identities }), action === "create" ? "Key made." : "Claim made.");
+  if (r?.claim) { $("claim").style.display = ""; $("claim").textContent = r.claim; }
+  loadKey();
+};
+
+// Before a run (Setup): aas doctor for the choices on the Run tab, and the connection check with the game started.
+for (const [id, action] of [["doctor", "doctor"], ["connection", "connection"]]) $(id).onclick = () => act("doctormsg", action === "doctor" ? "Running the checks…" : "Starting the game and checking the connection; this takes a minute…", async () => {
+  const r = await api("/api/tool", { action, game: $("game").value, recorder: $("recorder").value, runtime: runtimeId() });
+  $("doctorout").style.display = ""; $("doctorout").textContent = r.lines.join("\n");
+  return { message: r.message };
+});
+
 // The archive: signed in or not, how runs record their proof, and the tickets of this machine's runs.
 let proof = { signedIn: false, answered: true, mode: "off", tickets: [] };
 const MODES = { account: "Runs record their proof under your account.", anonymous: "Runs record their proof anonymously.", off: "Runs are unsigned: the Archive accepts them and marks them unsigned." };
@@ -438,7 +574,7 @@ async function loadSetup() {
 function updateRow(item) {
   if (!setup) return;
   // A check result belongs to every row of that check (a game's rows share one); each row keeps its own setting.
-  const RESULT = ["status", "detail", "tests", "fix", "suggest", "suggestSource", "at", "options"];
+  const RESULT = ["status", "detail", "tests", "fix", "suggest", "suggestSource", "at", "options", "via"];
   const rows = setup.items.map((x, n) => [x, n]).filter(([x]) => x.id === item.id);
   if (!rows.length) return;
   for (const [x, n] of rows) {
@@ -495,11 +631,13 @@ function row(i) {
   // A button names what it does, and the command it runs stands under it: nothing here happens unnamed.
   const fix = i.fix && first ? `<button class="b ${i.status === "ok" ? "" : "primary"}" data-fix="${esc(i.fix.id)}">${esc(i.fix.label)}</button>` : "";
   const fixCommand = i.fix?.command && first ? `<div class="suggest muted">That button runs: <span class="path">${esc(i.fix.command)}</span></div>` : "";
+  // The command the row's conditions came from, when they are a command's own (aas doctor): the same check by hand.
+  const via = i.via && first ? `<div class="suggest muted">Checked with: <span class="path">${esc(i.via)}</span></div>` : "";
   const what = i.what ? `<div class="what muted">${linkFiles(i.what)}</div>` : "";
   return `<div class="setting" data-id="${i.id}" data-env="${esc(i.env ?? "")}">
     <div><div class="name">${esc(i.label)}</div>${i.status && STATUS[i.status] ? `<span class="status ${i.status}"><span class="dot"></span>${STATUS[i.status]}</span>` : ""}${what}</div>
     <div class="field">${field}${fix}</div>
-    <div class="detail muted">${!first || i.tests?.length ? "" : esc(i.detail)}</div>${first ? tests(i) : ""}${suggest}${fixCommand}
+    <div class="detail muted">${!first || i.tests?.length ? "" : esc(i.detail)}</div>${first ? tests(i) : ""}${via}${suggest}${fixCommand}
     <div class="feedback ${rowMsg[key]?.state ?? ""}" data-fb="${esc(key)}" style="grid-column:2">${esc(rowMsg[key]?.text ?? "")}</div></div>`;
 }
 // What a row really establishes: every condition it tried, with its outcome. Whatever is not in this list was not
@@ -589,6 +727,7 @@ function browse(start, kind, expect) {
   for (const l of j.lines) addLine(l);
   await loadGames();
   await loadProof();
+  await loadKey();
   // ?static: no live connection (page screenshots in tests); the page shows the state it loaded.
   const isStatic = new URLSearchParams(location.search).has("static");
   live = true;

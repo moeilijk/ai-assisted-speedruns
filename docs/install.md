@@ -72,9 +72,10 @@ Every command below is written as `aas <command>`; that is the package's bin,
 ## 2a. The GUI
 
 `npm run gui` (or double-click `AAS.cmd` in the repository folder in Windows Explorer) opens a page in your browser
-that does §3 to §8 for you: it fills in and checks the settings below, installs what the games and LiveSplit need,
-and starts runs. It shows the commands it runs, so everything below stays available from the shell. The rest of this
-guide is the same set-up by hand.
+that does §3 to §10 for you: it fills in and checks the settings below, installs what the games and LiveSplit need,
+runs the checks of §8, starts and continues runs, makes the cut and the YouTube text of §9, makes and claims the
+signing key of §10, and uploads to the Archive. It shows the commands it runs, so everything below stays available
+from the shell. The rest of this guide is the same set-up by hand.
 
 ## 3. Machine settings (`.env`)
 

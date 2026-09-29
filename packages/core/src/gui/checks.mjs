@@ -327,13 +327,22 @@ export async function checkItem(id) {
     if (!t(`the ${folder} is chosen`, current, { level: "missing", detail: `Choose the folder with ${st.expect ?? "the game"}.`, fix: install })) return done(extra);
     if (!t(`the ${folder} exists`, exists(current), { detail: "This folder does not exist.", fix: install })) return done(extra);
     if (st.expect && !t(`${st.expect} is in the ${folder}`, exists(path.join(current, st.expect)), { detail: `${st.expect} is not in this folder.`, fix: install })) return done(extra);
-    const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "gui", "game-doctor.mjs"), g.file], { encoding: "utf8", timeout: 60000, env: process.env });
-    let rows; try { rows = JSON.parse(r.stdout); } catch { rows = [{ ok: false, what: "its own checks answered", detail: (r.stderr || "no answer").trim().split("\n").at(-1) }]; }
+    // The rest is what `aas doctor --game` establishes, asked of the command itself (--json), so the row and the
+    // command line measure the same thing; the command stands under the row.
+    const via = ["doctor", "--game", g.file, "--json"];
+    const r = spawnSync(process.execPath, [path.join(REPO, "packages", "core", "src", "cli.mjs"), ...via], { encoding: "utf8", timeout: 90000, env: process.env });
+    let rows; try { rows = JSON.parse(r.stdout.trim().split("\n").at(-1)); } catch { rows = [{ ok: false, what: "aas doctor answered", detail: (r.stderr || r.stdout || "no answer").trim().split("\n").at(-1) }]; }
     // A check may name a fix of its own (setup.fixes): a step of the game's set-up other than the install.
     const ownFix = (id) => { const f = g.plugin.setup.fixes?.[id]; return f ? { id: `fix:${g.plugin.id}:${id}`, label: f.label, command: shownScript(f.script) } : null; };
-    for (const row of rows) t(row.what, row.ok, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: (row.fix && ownFix(row.fix)) || install });
+    for (const row of rows) {
+      // The game's endpoint is only there while the game runs; at set-up time that is nothing to fix, so it is
+      // listed as what it is: a condition a run establishes when it starts the game.
+      const endpoint = /^game endpoint /.test(row.what);
+      t(row.what, row.ok || endpoint, { level: "warn", detail: row.detail ?? `Not ready: ${row.what}.`, fix: (row.fix && ownFix(row.fix)) || install });
+      if (endpoint && !row.ok) tests.at(-1).what = `${row.what} (checked when a run starts the game; now: ${row.detail})`;
+    }
     // Everything passed, so the same action is offered again rather than needed: the sentence stays, "again" says why.
-    return done({ ...extra, fix: tests.every((x) => x.ok) && install ? { ...install, label: `${install.label} (again)` } : undefined });
+    return done({ ...extra, via: `node packages/core/src/cli.mjs ${via.map((a) => (a === g.file ? rel(a) : a)).join(" ")}`, fix: tests.every((x) => x.ok) && install ? { ...install, label: `${install.label} (again)` } : undefined });
   }
   t("the check is known", false, { detail: `Unknown check: ${id}` });
   return done();
