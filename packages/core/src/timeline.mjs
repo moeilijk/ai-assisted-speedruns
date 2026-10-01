@@ -10,6 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { readRunLog } from "./events.mjs";
+import { playbackSeconds } from "./igt.mjs";
 
 const hms = (s, ms = false) => {
   const sign = s < 0 ? "-" : "";
@@ -70,7 +71,7 @@ export function computeTimeline(runDir, options = {}) {
         start: start ? rel(start.timestamp) : rel(e.timestamp) - (e.data.wall_ms ?? 0) / 1000,
         end: rel(e.timestamp),
         ticks,
-        igt: Math.round(ticks * 15) / 1000,
+        igt: playbackSeconds(e.data),
         aborted: e.data.aborted === true,
         reason: e.data.reason ?? null,
         error: e.data.error ?? null,

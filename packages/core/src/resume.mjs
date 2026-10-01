@@ -16,6 +16,7 @@ import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { earlyStop, writePidFile } from "./run.mjs";
 import { session } from "./session.mjs";
+import { playbackSeconds } from "./igt.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
@@ -130,8 +131,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     if (plugin.loadState) ready = (await plugin.loadState({ name: save, log, runDir, seed: brief.seed ?? null })) ?? ready;
     events.append("game.ready", { at: new Date().toISOString(), restored: save, seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
     early.check();
-    // In-game time already played before this resume (ticks × 15 ms), so LiveSplit continues from it.
-    const igtSoFar = previous.filter((r) => r.kind === "event" && r.event === "game.playback" && r.data?.phase === "end" && typeof r.data.ticks === "number").reduce((acc, r) => acc + Math.round(r.data.ticks * 15) / 1000, 0);
+    // In-game time already played before this resume, as the timer counts it (igt.mjs), so LiveSplit continues from it.
+    const igtSoFar = previous.filter((r) => r.kind === "event" && r.event === "game.playback" && r.data?.phase === "end").reduce((acc, r) => acc + playbackSeconds(r.data), 0);
     await timer?.start(brief, { igt: igtSoFar });
     log(`timer continues from IGT ${igtSoFar.toFixed(3)} s`);
     early.check();

@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setup, setupRows } from "./setup.mjs";
+import { playbackSeconds } from "../core/src/igt.mjs";
 
 export function connectLiveSplit({ host = "127.0.0.1", port = 16834 } = {}, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
@@ -140,8 +141,7 @@ export function createLiveSplitTimer(options = {}) {
         case "game.playback":
           if (event.data?.phase === "start") send("unpausegametime");
           else if (event.data?.phase === "end") {
-            if (typeof event.data.ticks === "number") igt += Math.round(event.data.ticks * 15) / 1000;
-            else if (typeof event.data.seconds === "number") igt += Math.round(event.data.seconds * 1000) / 1000;
+            igt += playbackSeconds(event.data);
             send(`setgametime ${igt.toFixed(3)}`);
             send("pausegametime");
           }
