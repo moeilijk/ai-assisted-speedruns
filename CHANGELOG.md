@@ -110,10 +110,11 @@ and their changes are listed here, with those made since.
   note of its own, no proof unless a test asks for it, and an archive address that cannot exist. Its temporary
   directory is its own too (`TMPDIR`), removed with it: earlier runs had left 2115 directories in `/tmp`. A test
   fails when any of these points at the machine's own.
-- **One in-game time for the timer, the timeline and a resume** (`packages/core/src/igt.mjs`): the plugin's own
-  seconds first, else Source ticks at 15 ms. Portal 2 runs at 60 ticks a second and reports both, and was counted 10%
-  short; a resume of a game that reports seconds only (Slay the Spire, Balatro, the emulators) started LiveSplit's game
-  time again at 0.
+- **LiveSplit's game time: the plugin's own seconds first, also on a resume** (`packages/core/src/igt.mjs`). Portal 2
+  runs at 60 ticks a second and reports both, and the timer counted its ticks at 15 ms, 10% short; a resume of a game
+  that reports seconds only (Slay the Spire, Balatro, the emulators) started LiveSplit's game time again at 0. The
+  published timeline still counts Portal 2's ticks at 15 ms: `timeline.mjs` is a file the Archive carries, and its
+  timeline must stay the one the Archive makes from the logs, so that change goes in together with the Archive.
 - **One part, one version.** Five `package.json` files named another version than their plugin (the Claude Code
   runtime said 0.32.0, the plugin 0.34.5). They now say the same, and `make-plugins --write` refuses when they differ.
   The scripted runtime, the OBS recorder and the LiveSplit timer go to 0.34.5 with it.
