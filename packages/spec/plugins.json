@@ -75,9 +75,9 @@
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.34.4",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "234b7315c7205a4ac32195db0129d26c0bc50ff6282c1cbd0e4af8794d485a92"
+      "sha256": "d82cd06d506e4b41c9c07faaad530a01a8bfddc87327b53cc121adcb90d08a09"
     },
     {
       "kind": "game",
@@ -158,7 +158,7 @@
       "name": "Slay the Spire",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "f551e69c9ab6dc60dbb463c43d955b34eeed4ab4f1276d6b14eeb700be7d88f1"
+      "sha256": "d89efcfa62e2ddbbee79e5edbe0a6bee6dc1eeb25b3f9b6dde924cab1e67844c"
     },
     {
       "kind": "game",

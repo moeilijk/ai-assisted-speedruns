@@ -57,10 +57,20 @@ const toMenu = async (rpc, log) => {
   return s;
 };
 
+/** The ends a game state shows already, as the milestones play would have told them: every ante before the current
+ *  one (ante 8 ends with the win), and the win. */
+function endsShown(s) {
+  const out = [];
+  const ante = typeof s?.ante_num === "number" ? s.ante_num : null;
+  if (ante !== null) for (let a = 1; a < Math.min(ante, 9); a += 1) if (a < 8) out.push({ label: `Ante ${a}`, split: SEGMENTS[a - 1], end: `ante${a}`, ante: a, seed: s.seed ?? null, chapter: true });
+  if (s?.won === true) out.push({ label: "Win", split: "Ante 8", end: "win", ante, seed: s.seed ?? null, chapter: true });
+  return out;
+}
+
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.34.4",
+  version: "0.34.5",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",
@@ -156,6 +166,9 @@ export default {
         s = await rpc.call(method, params);
       } catch (error) {
         emit("game.playback", { phase: "end", index: i, error: String(error?.message ?? error), wall_ms: Date.now() - started, command: label });
+        // The game may have taken the action before the answer failed (a timeout): what it shows now is still followed,
+        // so an ante it passed is told before the agent can stop (2026-10-02, found by reading the flow).
+        if (error?.name !== "JsonRpcError") track(await rpc.call("gamestate").catch(() => null));
         if (error?.name === "JsonRpcError") throw new Error(`Balatro refused ${label}: ${error.message.replace(/^[^:]+: /, "")}`);
         throw error;
       }
@@ -247,7 +260,9 @@ export default {
     await rpc.call("aas.started", { deck: DECK, stake: STAKE, ...(seed ? { seed: String(seed) } : {}) });
     const s = await rpc.call("gamestate");
     log(`save ${name} loaded: ${s.state}, ante ${s.ante_num}, round ${s.round_num}, seed ${s.seed ?? "?"}`);
-    return { readyAt: new Date(), seed: s.seed ?? null, seed_code: s.seed ?? null };
+    // A save made after an end shows it: the antes before the one it stands in are beaten, and a won run is won. The
+    // harness skips those its log already holds, and needs no agent session when the goal is among them.
+    return { readyAt: new Date(), seed: s.seed ?? null, seed_code: s.seed ?? null, reached: endsShown(s) };
   },
   /**
    * Everything someone needs to reproduce this run: the game's build, the mods with their pins and hashes as they are

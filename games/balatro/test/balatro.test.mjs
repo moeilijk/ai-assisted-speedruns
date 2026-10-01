@@ -263,3 +263,18 @@ test("in a resumed run (loaded, not started, by a fresh bridge) a game over can 
     void agent;
   } finally { await t.close(); }
 });
+
+test("a save made after an ante's boss tells that end when it is loaded, so a run past its goal needs no agent", async () => {
+  // 2026-10-02: no game plugin told the ends a loaded save already shows; the harness then started the agent.
+  const t = await setup({ winAnte: 9 });
+  try {
+    await t.plugin.prepareRun({ log() {} });
+    t.bot.state.ante = 3; t.bot.persist(); // two bosses beaten
+    await t.plugin.saveState({ name: "aas_test_ante3" });
+    const r = await t.plugin.loadState({ name: "aas_test_ante3", log() {} });
+    assert.deepEqual(r.reached.map((m) => [m.end, m.split]), [["ante1", "Ante 1"], ["ante2", "Ante 2"]]);
+    t.bot.state.ante = 1; t.bot.persist();
+    await t.plugin.saveState({ name: "aas_test_ante1" });
+    assert.deepEqual((await t.plugin.loadState({ name: "aas_test_ante1", log() {} })).reached, []);
+  } finally { await t.close(); }
+});

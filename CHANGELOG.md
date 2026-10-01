@@ -37,6 +37,10 @@ and their changes are listed here, with those made since.
 - **BizHawk and FCEUX: a loaded save tells the ends it shows** (`reached`), so a run saved after its goal ends without
   an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save written
   over (`packages/core/src/logged-ends.mjs`, shared with the harness).
+- **Balatro: a loaded save tells the ends it shows** (every ante before the one it stands in, and the win), and an
+  action whose answer fails after the game took it (a timeout) still has the game's state followed, so an ante it
+  passed is told before the agent can stop.
+- **Slay the Spire: an act end the run's log already holds is not told again** after a resume.
 - **Slay the Spire: a resume continues the named save.** The resume first went through `prepareRun`, which clicked
   Continue on whatever autosave the game had, before the named save was put in place. And a game that is already
   running counts as ready only once it has loaded, as after a start.

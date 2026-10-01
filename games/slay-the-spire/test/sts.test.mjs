@@ -303,3 +303,29 @@ test("a resume restores the named save before it continues, also when it comes i
     await fake.close();
   }
 });
+
+test("an act end the run's log already holds is not told again after a resume", async () => {
+  const { mkdtempSync, writeFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const runDir = mkdtempSync(join(tmpdir(), "aas-sts-told-"));
+  writeFileSync(join(runDir, "run.jsonl"), JSON.stringify({ kind: "event", event: "game.milestone", data: { label: "Act 1 boss", end: "act1", chapter: true } }) + "\n");
+  const fake = await startFakeSts({ floorsPerAct: 1, acts: 3 });
+  process.env.AAS_STS_PORT = String(fake.port);
+  const saved = process.env.AAS_RUN_DIR;
+  process.env.AAS_RUN_DIR = runDir;
+  const { default: plugin } = await import(`../plugin.mjs?told=${fake.port}`);
+  const events = [];
+  globalThis.aas = { event: (event, data) => events.push({ event, data }), emitImage() {} };
+  try {
+    await plugin.prepareRun({ log() {} });
+    const sts = await plugin.connect();
+    await sts.play(1, 0); await sts.play(1, 0); // the act 1 boss falls again in the game's state
+    await sts.proceed();
+    sts.close();
+    assert.equal(events.filter((e) => e.event === "game.milestone" && e.data.end === "act1").length, 0);
+  } finally {
+    if (saved === undefined) delete process.env.AAS_RUN_DIR; else process.env.AAS_RUN_DIR = saved;
+    await fake.close();
+  }
+});

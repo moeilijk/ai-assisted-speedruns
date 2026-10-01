@@ -98,5 +98,5 @@ export async function startFakeBalatrobot({ winAnte = 2, blindScore = 300, chips
     });
   });
   await new Promise((r) => server.listen(0, "127.0.0.1", r));
-  return { port: server.address().port, state: st, close: () => new Promise((r) => server.close(() => r())) };
+  return { port: server.address().port, state: st, /** write the game's save as it stands, as the game does after a change */ persist, close: () => new Promise((r) => server.close(() => r())) };
 }

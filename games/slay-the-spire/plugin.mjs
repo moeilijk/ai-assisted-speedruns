@@ -11,6 +11,7 @@ import { readZipEntry } from "../../packages/core/src/zip-read.mjs";
 import net from "node:net";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const HOST = process.env.AAS_STS_HOST || "127.0.0.1";
@@ -212,7 +213,8 @@ export default {
     let dead = false; // at the death screen: only restart() is allowed
     let over = false; // the game's own victory screen: nothing more is sent
     let index = 0;
-    const bossDown = new Set(); // the acts whose boss fell, so that end is told once
+    // The acts whose boss fell, so that end is told once; also across a resume (the ends already in the run's log).
+    const bossDown = new Set([...endsInLog(process.env.AAS_RUN_DIR)].map((e) => /^act(\d)$/.exec(e)?.[1]).filter(Boolean).map(Number));
     const emit = (event, data) => globalThis.aas?.event?.(event, data);
     const track = (s) => {
       const g = gs(s);
