@@ -87,3 +87,18 @@ test("a run whose recorder refuses after it began recording, or whose timer refu
     assert.ok(!existsSync(join(runDir, "session.jsonl")), `${name}: the agent was never started`);
   }
 });
+
+test("a run refused by its plan budget starts no session and leaves the directory for another try", async () => {
+  const s = setup();
+  const runDir = join(s.dir, "budget");
+  const runtime = join(s.dir, "budget-runtime.mjs");
+  writeFileSync(runtime, `import stub from ${JSON.stringify(join(here, "stub-runtime.mjs"))};
+export default { ...stub, async budget() { return { ok: false, detail: "week 71% used of the plan, limit 70%", percent: 71, max: 70 }; } };
+`);
+  await configure({ runtime, game: s.game, "run-dir": runDir }, { log() {} });
+  await assert.rejects(run({ runtime, game: s.game, recorder: s.recorder(false), "run-dir": runDir, "keep-open": true }, { log() {} }), /plan budget reached/);
+  assert.ok(!existsSync(join(runDir, "session.jsonl")), "no agent session");
+  assert.ok(!existsSync(join(runDir, "run.pid")));
+  const again = await run({ runtime, game: s.game, recorder: s.recorder(false), "run-dir": runDir, "keep-open": true, "ignore-budget": true }, { log() {} });
+  assert.equal(again.outcome.status, "stopped", "the directory could be used again");
+});
