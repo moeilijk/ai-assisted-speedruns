@@ -175,6 +175,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     throw error;
   }
   let t0 = null;
+  let ready = null;
   const tooling = toolingIdentity();
   try {
     // The recorder may refuse after StartRecord (the game capture shows nothing): then the recording it began
@@ -183,7 +184,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString() });
     early.check();
     if (plugin.prepareRun) {
-      const ready = await plugin.prepareRun({ runDir, log, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
+      ready = await plugin.prepareRun({ runDir, log, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
       events.append("game.ready", { at: (ready?.readyAt ?? new Date()).toISOString(), seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
     }
     await timer?.start(brief);
@@ -246,11 +247,21 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   process.once("SIGTERM", stopRequested);
   // `aas stop --run-dir` finds this process by this file, never by a process search.
   fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
-  try {
-    outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
-  } catch (error) {
-    outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
-    events.append("run.error", { message: outcome.notes });
+  // An end the game already shows when it is ready (a session continued from a save made after it): the plugin
+  // returns its milestones from prepareRun. When one of them is the goal, no agent session is started, so reaching
+  // it costs the agent no turn (2026-10-02: a run saved on the reward screen of the boss it had to beat).
+  for (const m of ready?.reached ?? []) events.append("game.milestone", m);
+  await follower.flush();
+  if (over) {
+    outcome = { status: "completed", endedAt: new Date().toISOString(), notes: `the goal was already reached when the game was ready (${over.label}); no agent session was started` };
+    log(outcome.notes);
+  } else {
+    try {
+      outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
+    } catch (error) {
+      outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
+      events.append("run.error", { message: outcome.notes });
+    }
   }
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);

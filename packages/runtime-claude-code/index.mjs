@@ -270,7 +270,7 @@ export default {
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
   interrupt(reason) { interruptChild?.(reason); },
-  version: "1.0.1",
+  version: "0.34.5",
   async configure(runDir, broker, brief) {
     const mcp = path.join(runDir, ".mcp.json");
     const settings = path.join(runDir, ".claude", "settings.json");

@@ -45,3 +45,47 @@ export default { ...fake, instructions: "test", async connect() { const g = awai
   assert.ok(won.calls < 22, `the session was interrupted after the victory (${won.calls} tool calls of 22)`);
   await assert.rejects(resume({ "run-dir": won.runDir, runtime: join(here, "stub-runtime.mjs"), recorder: "null", "keep-open": true }, { log() {} }), /run is over \(Victory\)/);
 });
+
+test("a goal the game already shows when it is ready starts no agent session, at a start or a resume", async () => {
+  // 2026-10-02: a live run was saved on the reward screen of the boss it had to beat. Continuing it must reach the
+  // goal from the game's own state, without a turn of the agent (tokens are the person's, not the tooling's to spend).
+  const dir = mkdtempSync(join(tmpdir(), "aas-ready-goal-"));
+  const game = join(dir, "game.mjs");
+  writeFileSync(game, `import fake from ${JSON.stringify(join(here, "fake-game.mjs"))};
+export default { ...fake, instructions: "test", ends: [{ id: "boss", label: "The boss" }, { id: "end", label: "The end", final: true }],
+  async prepareRun({ resume = false } = {}) { return this.ready(resume); },
+  async saveState({ name }) { return { name }; },
+  async loadState() { return this.ready(true); },
+  ready(resume) {
+    const shown = process.env.AAS_TEST_SHOWN === "boss" || (resume && process.env.AAS_TEST_SHOWN === "boss-on-resume");
+    return { readyAt: new Date(), reached: shown ? [{ label: "The boss", end: "boss", chapter: true }] : [] };
+  } };
+`);
+  const sessionLines = (runDir) => { try { return readFileSync(join(runDir, "session.jsonl"), "utf8").trim().split("\n").filter(Boolean).length; } catch { return 0; } };
+  const eventsOf = (runDir) => readFileSync(join(runDir, "run.jsonl"), "utf8").trim().split("\n").map((l) => JSON.parse(l)).filter((e) => e.kind === "event");
+  // At a start.
+  process.env.AAS_TEST_SHOWN = "boss";
+  const startDir = join(dir, "start");
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": startDir, goal: "boss" }, { log() {} });
+  writeFileSync(join(startDir, "stub-codes.json"), JSON.stringify(slow));
+  const started = await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: "null", "run-dir": startDir, "keep-open": true }, { log() {} });
+  assert.equal(started.outcome.status, "completed");
+  assert.equal(started.outcome.over.victory, true);
+  assert.match(started.outcome.notes, /already reached when the game was ready/);
+  assert.equal(sessionLines(startDir), 0, "the agent was never started");
+  assert.ok(eventsOf(startDir).some((e) => e.event === "game.over" && e.data.goal === "boss"));
+  // At a resume: the first session stops short of the goal, the save is continued past it.
+  process.env.AAS_TEST_SHOWN = "boss-on-resume";
+  const resumeDir = join(dir, "resume");
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": resumeDir, goal: "boss" }, { log() {} });
+  writeFileSync(join(resumeDir, "stub-codes.json"), JSON.stringify(["return await game.observe()"]));
+  const first = await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: "null", "run-dir": resumeDir, "keep-open": true }, { log() {} });
+  assert.equal(first.outcome.status, "stopped");
+  const before = sessionLines(resumeDir);
+  assert.ok(before > 0, "the first session did play");
+  const resumed = await resume({ "run-dir": resumeDir, runtime: join(here, "stub-runtime.mjs"), recorder: "null", "keep-open": true }, { log() {} });
+  assert.equal(resumed.outcome?.status ?? resumed.status, "completed");
+  assert.equal(sessionLines(resumeDir), before, "the resume started no agent session");
+  assert.ok(eventsOf(resumeDir).some((e) => e.event === "game.over" && e.data.goal === "boss"));
+  delete process.env.AAS_TEST_SHOWN;
+});

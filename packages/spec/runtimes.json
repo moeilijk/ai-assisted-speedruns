@@ -5,16 +5,16 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "1.0.1",
+      "version": "0.34.5",
       "ai": true,
-      "sha256": "3975a84906cf617ebc7b130c8bb2ba1bc12ee19d38c099b7fb5e75bf18b17c1c"
+      "sha256": "c1f3abd4ae1c0feb9ff4b68f9c187f229ec6361e9d84ea5981064e6b70737000"
     },
     {
       "id": "codex",
       "name": "Codex",
-      "version": "1.0.1",
+      "version": "0.34.5",
       "ai": true,
-      "sha256": "70e890c8bb8ef815b95667ff956652f94b23c4d0078d8c4b4f2c4144ae6eacc0"
+      "sha256": "b000d775640c575eacb6a44eb4804a17fa08d8e248ec4fa6de6188b54f4d62fe"
     },
     {
       "id": "mistral-vibe",

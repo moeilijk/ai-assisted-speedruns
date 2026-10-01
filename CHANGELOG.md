@@ -1,10 +1,10 @@
 # Changelog
 
-1.0.0 came out with the launch of the AAS Archive on 2026-10-01.
+The tooling is in beta: versions stay below 1.0.0 until the AAS Archive goes live on 2026-10-15, together with 1.0.0.
 
-- **Minor** (x.y.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
+- **Minor** (0.x.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
   reads it before the release comes out.
-- **Patch** (x.y.z): everything else.
+- **Patch** (0.x.y): everything else.
 - **BREAKING**: a release after which a run directory or a bundle made with an earlier version is no longer read,
   republished or ranked. Such a release says so in its first line, and what to do with existing runs. None so far.
 
@@ -12,15 +12,16 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
-## 1.0.1 — 2026-10-01
+## 0.34.5 — not released
 
-- **"As the AI is set" names the effort a run really gets, for every AI** (the maintainer, 2026-10-01: the model was
-  named, the effort not). Claude Code names the effort in its `/model` answer only when a setting applies; without
-  one it runs the model at the effort its model menu keeps for it (its documentation: a top-level `effortLevel` does
-  not count for Opus 5.5 and later), and that effort is now shown. Codex named neither: the model is now the one
-  `codex doctor` reports it loads, and the effort is `model_reasoning_effort` of its active profile or its
-  `config.toml`, else that model's default in `codex debug models`. Measured on the page: Claude Code "Opus 5.5" and
-  "medium", Codex "gpt-5.6-luna" and "high", Mistral Vibe "mistral-medium-3.5" and "high", as before.
+Versions 1.0.0 and 1.0.1 (2026-10-01) were withdrawn on 2026-10-02 (the maintainer): their releases and tags are gone,
+and their changes are listed here, with those made since.
+
+- **Slay the Spire: an act's boss is reached when it falls, not when the next act begins.** The first live run beat
+  the Act 1 boss and stopped on its reward screen; the plugin counted the end only on entering act 2, so the goal was
+  not registered and the run ended as if short of it. The end of act 1 and act 2 now counts when the boss room is
+  finished (Communication Mod's `room_type` `MonsterRoomBoss` with `room_phase` `COMPLETE`), once, and not on the
+  game over screen; act 3 still ends with the game's own victory screen.
 - **Slay the Spire is up when the game has loaded, not when its bridge answers.** Communication Mod starts the
   bridge before the game loads, and the launcher took the bridge's port for the game: on 2026-10-01 the port answered
   at 23:00:28, the window appeared at 23:00:35 and the game finished loading at about 23:00:59, so the window was not
@@ -38,15 +39,7 @@ them carries `harness.version` 0.1.0.
   tokens. Every test file now loads `packages/core/test/isolate.mjs`: a config directory, settings files and GUI
   note of its own, no proof unless a test asks for it, and an archive address that cannot exist. A test fails when
   any of these points at the machine's own.
-- The Claude Code and Codex runtimes change, so their hashes in `packages/spec/runtimes.json` do too; an archive
-  takes runs made with 1.0.1 once it holds them.
-
-## 1.0.0 — 2026-10-01
-
-The release the Archive goes live with. The bundle, the summary schema and SPEC 0.44 are those of 0.34.4, and so are
-the runtime plugins and their hashes in `packages/spec/runtimes.json`: a run recorded with 0.34.4 or 1.0.0 is held
-against the same list.
-
+- The Claude Code and Codex runtimes change, so their hashes in `packages/spec/runtimes.json` do too.
 - **The license table names the games and nothing more** (the maintainer, 2026-09-30). The rows for Slay the Spire,
   Portal, Portal 2 and Balatro no longer say "your own copy", and the two Super Mario Bros. rows no longer say "your
   own ROM".
@@ -54,6 +47,11 @@ against the same list.
   that machine as its example, and comments and tests in core and the FCEUX plugin used its drive and folder for
   their example paths; they now use `D:\Runs`. The sound devices the GUI offers are, as before, the playback
   devices active on the machine that runs it (`list-audio.mjs`).
+- **A goal the game already shows when it is ready starts no agent session.** `prepareRun` and `loadState` may return
+  the milestones of ends the game state already shows (`reached`); when one is the goal, the harness records it and does
+  not start the agent. A run saved on the reward screen of the boss it had to beat is continued to its goal without a
+  turn. Measured on the real game with a copy of such a run and a stand-in `claude` that refuses any session: the copy
+  ended on Victory (Act 1 boss) and the stand-in was never called.
 
 ## 0.34.4 — 2026-09-29
 

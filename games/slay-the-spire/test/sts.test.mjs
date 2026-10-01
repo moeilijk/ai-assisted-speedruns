@@ -51,7 +51,8 @@ test("prepareRun starts the run; commands, milestones and the victory are report
   const ends = playbacks.filter((e) => e.data.phase === "end");
   assert.ok(ends.every((e) => typeof e.data.seconds === "number" || e.data.error), "IGT per command");
   const chapters = events.filter((e) => e.event === "game.milestone" && e.data.chapter).map((e) => e.data.label);
-  assert.deepEqual(chapters, ["Act 1 boss", "Victory"]);
+  // This fake ends after act 2: its boss falls on its reward screen, then the fake's own victory screen follows.
+  assert.deepEqual(chapters, ["Act 1 boss", "Act 2 boss", "Victory"]);
   const over = events.filter((e) => e.event === "game.over");
   assert.equal(over.length, 1); assert.equal(over[0].data.victory, true); assert.equal(over[0].data.label, "Victory");
   assert.equal(events.find((e) => e.event === "game.milestone" && e.data.label === "Victory").data.split, "Act 2 boss");
@@ -101,12 +102,17 @@ test("the act boss is an end the harness can take as the goal; the plugin itself
     assert.deepEqual(plugin.segments, ["Act 1 boss", "Act 2 boss", "Act 3 boss", "Heart"]);
     await plugin.prepareRun({ log() {} });
     sts = await plugin.connect();
-    await sts.play(1, 0); await sts.play(1, 0);
+    await sts.play(1, 0);
+    const rewards = await sts.play(1, 0);
+    assert.equal(rewards.game_state.screen_type, "COMBAT_REWARD");
+    assert.equal(rewards.game_state.act, 1);
+    // The boss fell: the end is there on its reward screen, before the next act (an agent may stop right here).
+    const boss = events.find((e) => e.event === "game.milestone" && e.data.split === "Act 1 boss");
+    assert.ok(boss, "the act 1 boss milestone, on the boss's reward screen");
+    assert.equal(boss.data.end, "act1");
     const act2 = await sts.proceed();
     assert.equal(act2.game_state.act, 2);
-    const boss = events.find((e) => e.event === "game.milestone" && e.data.split === "Act 1 boss");
-    assert.ok(boss, "the act 1 boss milestone");
-    assert.equal(boss.data.end, "act1");
+    assert.equal(events.filter((e) => e.event === "game.milestone" && e.data.split === "Act 1 boss").length, 1, "told once, not again when act 2 begins");
     assert.equal(events.filter((e) => e.event === "game.over").length, 0, "no game.over from the plugin before the game's own end");
     await sts.end(); // the game goes on
   } finally {
@@ -189,6 +195,43 @@ test("loadState continues the saved run through a click on Continue at the main 
     const r = await plugin.prepareRun({ log() {}, resume: true });
     assert.equal(r.floor, 2);
     assert.equal(fake.state.commands.filter((c) => c.startsWith("START")).length, 1, "no second START on resume");
+  } finally {
+    await fake.close();
+  }
+});
+
+test("a run continued on the reward screen of a boss that fell has reached that act's end before the agent starts", async () => {
+  // 2026-10-02: the first live run was saved there (floor 16, MonsterRoomBoss, post_combat); continuing it must reach
+  // act1 from the game's own state, so the harness starts no agent session to see it.
+  const fake = await startFakeSts({ floorsPerAct: 1, acts: 3 });
+  process.env.AAS_STS_PORT = String(fake.port);
+  const { default: plugin } = await import(`../plugin.mjs?reached=${fake.port}`);
+  globalThis.aas = { event() {}, emitImage() {} };
+  try {
+    await plugin.prepareRun({ log() {} });
+    const sts = await plugin.connect();
+    await sts.play(1, 0);
+    const rewards = await sts.play(1, 0); // the act 1 boss falls: its reward screen
+    assert.equal(rewards.game_state.room_type, "MonsterRoomBoss");
+    assert.equal(rewards.game_state.screen_type, "COMBAT_REWARD");
+    sts.close();
+    fake.toMenu();
+    const r = await plugin.prepareRun({ log() {}, resume: true });
+    assert.deepEqual(r.reached.map((m) => [m.end, m.split, m.act, m.floor]), [["act1", "Act 1 boss", 1, 1]]);
+    // The harness calls loadState once more after prepareRun (resume.mjs), with the game already in the run; that
+    // answer replaces the first, so it must say the same (measured 2026-10-02 on the real game: it did not, and the
+    // agent was started).
+    const again = await plugin.loadState({ log() {} });
+    assert.deepEqual(again.reached.map((m) => [m.end, m.floor]), [["act1", 1]]);
+    // Before the boss fell nothing is reached.
+    const fresh = await startFakeSts({ floorsPerAct: 3, acts: 3 });
+    try {
+      process.env.AAS_STS_PORT = String(fresh.port);
+      const { default: p2 } = await import(`../plugin.mjs?notyet=${fresh.port}`);
+      await p2.prepareRun({ log() {} });
+      fresh.toMenu();
+      assert.deepEqual((await p2.prepareRun({ log() {}, resume: true })).reached, []);
+    } finally { await fresh.close(); }
   } finally {
     await fake.close();
   }

@@ -187,7 +187,8 @@ export interface GamePlugin {
   /** Game events for the recorder and the log (optional; requires an out-of-broker harness process). */
   events?(): AsyncIterable<RunEvent>;
   /** `aas run`: start the game side (new game, in-game recording, pause) after the recorder started; resolves when the game is ready for the agent. */
-  prepareRun?(ctx: { runDir: string; log?: (text: string) => void; seed?: string | null; goal?: string | null; resume?: boolean; save?: string }): Promise<{ readyAt: Date } | void>;
+  /** `reached`: milestones (with `end`) of ends the game already shows when it is ready; the goal among them starts no agent session. */
+  prepareRun?(ctx: { runDir: string; log?: (text: string) => void; seed?: string | null; goal?: string | null; resume?: boolean; save?: string }): Promise<{ readyAt: Date; reached?: Array<Record<string, unknown>> } | void>;
   /** `aas run`: copy the game's save under this name (autosave every ten minutes, at chapter milestones, at the end). */
   saveState?(ctx: { name: string; log?: (text: string) => void }): Promise<{ name?: string; file?: string | null } | unknown>;
   /** `aas resume`: restore the game to that save; `seed` when a new game has to be started instead. */

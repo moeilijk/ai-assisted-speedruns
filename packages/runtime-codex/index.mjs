@@ -151,7 +151,7 @@ export default {
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "codex",
   setup: { group: "Agents" },
-  version: "1.0.1",
+  version: "0.34.5",
   /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
   async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */

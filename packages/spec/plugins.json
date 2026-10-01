@@ -7,18 +7,18 @@
       "dir": "packages/runtime-claude-code",
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "1.0.1",
+      "version": "0.34.5",
       "ai": true,
-      "sha256": "3975a84906cf617ebc7b130c8bb2ba1bc12ee19d38c099b7fb5e75bf18b17c1c"
+      "sha256": "c1f3abd4ae1c0feb9ff4b68f9c187f229ec6361e9d84ea5981064e6b70737000"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "1.0.1",
+      "version": "0.34.5",
       "ai": true,
-      "sha256": "70e890c8bb8ef815b95667ff956652f94b23c4d0078d8c4b4f2c4144ae6eacc0"
+      "sha256": "b000d775640c575eacb6a44eb4804a17fa08d8e248ec4fa6de6188b54f4d62fe"
     },
     {
       "kind": "runtime",
@@ -84,9 +84,9 @@
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "1.0.0",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "232b8ae6670496db3984ea84dfb0611dd05217784cc30f0b13726def5d6f821a"
+      "sha256": "5aaf95c1c4cb9ed62575bff71ba48f18c4dfc1ecb4667bf18a3c0eedecda35c0"
     },
     {
       "kind": "game",
@@ -102,9 +102,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "1.0.0",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "b20c6fcae961cd500df7e94715b49e7ea4914fe8830f2da477c4850fd479ca92"
+      "sha256": "53b55564653c156516ef84afadc577dddcfedd10fbe60fad47e2d21d65ca214e"
     },
     {
       "kind": "game",
@@ -156,9 +156,9 @@
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "1.0.1",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "07391f88275382f3472105fb48a435002977de5495185ef72ae8501afb19bc11"
+      "sha256": "956dea0df4f65c97b626dbb08c0b24f6f54c391a1a23b2dc9783b363963fd4e0"
     },
     {
       "kind": "game",

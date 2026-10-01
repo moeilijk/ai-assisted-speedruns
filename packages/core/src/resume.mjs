@@ -112,9 +112,9 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   const { t0 } = await recorder.start(brief, ctx);
   events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString(), segment });
+  let ready = null;
   try {
     early.check();
-    let ready = null;
     if (plugin.prepareRun) ready = await plugin.prepareRun({ runDir, log, resume: true, save, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
     if (plugin.loadState) ready = (await plugin.loadState({ name: save, log, runDir, seed: brief.seed ?? null })) ?? ready;
     events.append("game.ready", { at: new Date().toISOString(), restored: save, seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
@@ -180,11 +180,20 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   process.once("SIGTERM", stopRequested);
   // `aas stop --run-dir` finds this process by this file, never by a process search.
   fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
-  try {
-    result = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
-  } catch (error) {
-    result = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
-    events.append("run.error", { message: result.notes });
+  // As in run.mjs: an end the game already shows when it is ready, and when it is the goal no agent session is
+  // started, so reaching it costs the agent no turn.
+  for (const m of ready?.reached ?? []) events.append("game.milestone", m);
+  await follower.flush();
+  if (over) {
+    result = { status: "completed", endedAt: new Date().toISOString(), notes: `the goal was already reached when the game was ready (${over.label}); no agent session was started` };
+    log(result.notes);
+  } else {
+    try {
+      result = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
+    } catch (error) {
+      result = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
+      events.append("run.error", { message: result.notes });
+    }
   }
   process.off("SIGINT", stopRequested);
   process.off("SIGTERM", stopRequested);

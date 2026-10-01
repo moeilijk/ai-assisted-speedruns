@@ -91,6 +91,15 @@ export function connectBridge({ host = HOST, port = PORT, timeoutMs = 5000, onSt
 }
 
 const gs = (s) => s?.game_state ?? null;
+/**
+ * The act whose boss fell in this state, else null: the boss room finished (Communication Mod: room_type
+ * MonsterRoomBoss, room_phase COMPLETE), acts 1 and 2 only (act 3 ends in the game's own victory screen), and not on
+ * the game over screen (a death there is no fall). Used while the game is played and when a saved run is continued.
+ */
+const bossFell = (g) => (g && typeof g.act === "number" && g.act < 3 && g.room_type === "MonsterRoomBoss" && g.room_phase === "COMPLETE" && g.screen_type !== "GAME_OVER" ? g.act : null);
+const bossMilestone = (a, g, seed) => ({ label: `Act ${a} boss`, split: ALL_SEGMENTS[a - 1] ?? `Act ${a} boss`, end: `act${a}`, act: g.act, floor: g.floor, seed, seed_code: seedString(seed), chapter: true });
+/** The ends a state already shows, as milestones: what loadState reports, on every way it returns a continued run. */
+const reachedIn = (state) => { const g = gs(state); const a = bossFell(g); return a ? [bossMilestone(a, g, g?.seed ?? null)] : []; };
 /** The game's own seed code (what the HUD shows and what START accepts) from its 64-bit seed: unsigned, base 35 without the letter O. */
 export function seedString(seed) {
   if (seed === null || seed === undefined || seed === "") return "";
@@ -151,7 +160,7 @@ function lastSeed(runDir) {
 export default {
   id: "slay_the_spire",
   name: "Slay the Spire",
-  version: "1.0.1",
+  version: "0.34.5",
   scopeName: "sts",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_STS_PROCESS || "java.exe",
@@ -203,16 +212,24 @@ export default {
     let dead = false; // at the death screen: only restart() is allowed
     let over = false; // the game's own victory screen: nothing more is sent
     let index = 0;
+    const bossDown = new Set(); // the acts whose boss fell, so that end is told once
     const emit = (event, data) => globalThis.aas?.event?.(event, data);
     const track = (s) => {
       const g = gs(s);
       if (!g || !s.in_game) return;
       if (g.seed !== undefined && g.seed !== null) seed = g.seed;
       if (typeof g.floor === "number" && g.floor !== floor) { floor = g.floor; emit("game.milestone", { label: `Floor ${floor}`, floor, act: g.act, chapter: false }); }
-      if (typeof g.act === "number" && act !== null && g.act > act) {
-        // The act's boss fell: the split of that end. Whether it is the goal is the harness's decision (its ends list).
-        emit("game.milestone", { label: `Act ${act} boss`, split: ALL_SEGMENTS[act - 1] ?? `Act ${act} boss`, end: `act${act}`, act: g.act, floor: g.floor, seed, seed_code: seedString(seed), chapter: true });
-      }
+      // The act's boss fell: the split of that end. Whether it is the goal is the harness's decision (its ends list).
+      // It counts when the boss room is finished (bossFell), so an agent that stops on the reward screen has reached
+      // it too (2026-10-01: the first live run beat the Act 1 boss and stopped at its rewards; the end was missed
+      // because only the next act counted). The next act still counts, for a state that skipped the finished room.
+      const fell = (a) => {
+        if (bossDown.has(a)) return;
+        bossDown.add(a);
+        emit("game.milestone", bossMilestone(a, g, seed));
+      };
+      if (bossFell(g)) fell(bossFell(g));
+      if (typeof g.act === "number" && act !== null && g.act > act) fell(act);
       if (typeof g.act === "number") act = g.act;
       if (g.screen_type === "GAME_OVER" && !over && !dead) {
         const victory = Boolean(g.screen_state?.victory);
@@ -389,7 +406,7 @@ export default {
     const bridge = await connectBridge();
     try {
       const s = await bridge.state();
-      if (s.in_game) { verify(s, "is already in a run"); log(`run already in progress (floor ${gs(s)?.floor}, seed ${seedString(gs(s)?.seed)})`); return { readyAt: new Date(), floor: gs(s)?.floor ?? null, seed: gs(s)?.seed ?? null, seed_code: seedString(gs(s)?.seed) || null }; }
+      if (s.in_game) { verify(s, "is already in a run"); log(`run already in progress (floor ${gs(s)?.floor}, seed ${seedString(gs(s)?.seed)})`); return { readyAt: new Date(), floor: gs(s)?.floor ?? null, seed: gs(s)?.seed ?? null, seed_code: seedString(gs(s)?.seed) || null, reached: reachedIn(s) }; }
       // Died before the session ended: the game deleted its save, so a resume is a new run with the same seed.
       if (GAME_ROOT && !existsSync(join(GAME_ROOT, "saves", `${CLASS}.autosave`)) && atMainMenu(s)) {
         const seed = SEED || lastSeed(runDir);
@@ -412,7 +429,9 @@ export default {
       if (!ready) throw new Error("the game did not continue the saved run within 30 s after clicking Continue (AAS_STS_CONTINUE_XY)");
       verify(ready, "continued");
       log(`continued at floor ${gs(ready)?.floor}, act ${gs(ready)?.act}, seed ${seedString(gs(ready)?.seed)}`);
-      return { readyAt: new Date(), floor: gs(ready)?.floor ?? null, seed: gs(ready)?.seed ?? null, seed_code: seedString(gs(ready)?.seed) || null };
+      // A save made after a boss fell (on its reward screen): that end is already reached, and the harness need not
+      // start the agent to see it.
+      return { readyAt: new Date(), floor: gs(ready)?.floor ?? null, seed: gs(ready)?.seed ?? null, seed_code: seedString(gs(ready)?.seed) || null, reached: reachedIn(ready) };
     } finally {
       bridge.close();
     }
