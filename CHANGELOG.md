@@ -63,6 +63,13 @@ and their changes are listed here, with those made since.
 - **Slay the Spire: a resume continues the named save.** The resume first went through `prepareRun`, which clicked
   Continue on whatever autosave the game had, before the named save was put in place. And a game that is already
   running counts as ready only once it has loaded, as after a start.
+- **A start that fails leaves the run directory usable.** A run counts as started once a session began
+  (`run.started`), not as soon as its log holds anything (a budget check, a refused recorder), which made the
+  directory unusable for `aas run` and `aas resume` alike. A ticket an earlier start of the same segment took but never
+  used is deleted at the archive before the next one is fetched: one segment, one ticket.
+- **The GUI's Continue:** it shows the outcome of its own session, not the previous one when its start failed; it
+  refuses only a run whose goal was reached, as `aas resume` does (a run whose agent ended its own session, such as
+  the first live run, was refused); and a run without an ended session is answered, not a crash.
 - **A resume whose recorder or timer refuses at the start stops the recording it began** and says why in the log, as
   a run already did.
 - **Slay the Spire: an act's boss is reached when it falls, not when the next act begins.** The first live run beat

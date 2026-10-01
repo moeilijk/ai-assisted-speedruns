@@ -191,6 +191,13 @@ export function segmentProof({ runDir, segment, mode, runtime, client, events, l
   return {
     mode,
     async begin() {
+      // A ticket an earlier start of this same segment took, but never used (the start failed before its first head),
+      // is deleted at the archive and dropped here: one segment, one ticket (2026-10-02, found by reading the flow).
+      for (const old of state.tickets.filter((x) => x.segment === segment && !state.heads.some((h) => h.segment === segment))) {
+        await client.manage(old, "delete").catch((e) => log(`proof: the unused ticket ${old.ticket.slice(0, 8)}… of an earlier start could not be deleted (${e.message})`));
+        state.tickets = state.tickets.filter((x) => x !== old);
+        updateTicketIndex(old.ticket, null);
+      }
       const t = await client.ticket();
       if (!/^[0-9a-f]{32}$/.test(String(t?.ticket))) throw new Error("the Archive answered without a ticket");
       const v = verifySigned(ticketMessage(t), t.signature);

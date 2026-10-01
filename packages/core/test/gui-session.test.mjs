@@ -68,6 +68,25 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
     const segments = fs.readFileSync(path.join(localRun, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"') || l.includes('"run.resumed"')).length;
     assert.ok(segments >= 2, "the run log holds both segments");
 
+    // Continue refuses a run whose goal was reached, as aas resume does, and allows one whose agent ended its own
+    // session; a Continue whose start fails shows that, not the previous session's outcome (2026-10-02).
+    const outFile = path.join(localRun, "outcome.json");
+    const realOutcome = fs.readFileSync(outFile, "utf8");
+    fs.writeFileSync(outFile, JSON.stringify({ status: "completed", over: { label: "Victory" } }));
+    const refused = await post("/api/continue", { runDir: first.runDir });
+    assert.notEqual(refused.status, 200);
+    assert.match(JSON.stringify(refused.json), /reached its goal/);
+    fs.writeFileSync(outFile, JSON.stringify({ status: "completed", notes: "the agent ended its session" }));
+    const toolsFile = path.join(localRun, "tools.json");
+    const realTools = fs.readFileSync(toolsFile, "utf8");
+    fs.writeFileSync(toolsFile, "[]\n"); // the resume refuses at its start: other tools than the run began with
+    const failing = await post("/api/continue", { runDir: first.runDir });
+    assert.equal(failing.status, 200, "an agent that ended its own session did not reach the goal: Continue is allowed");
+    s = await untilIdle();
+    assert.notEqual(s.state.result.status, "completed", `not the previous session's outcome: ${JSON.stringify(s.state.result)}`);
+    fs.writeFileSync(toolsFile, realTools);
+    fs.writeFileSync(outFile, realOutcome);
+
     // Stop with nothing running closes what the game's own stop script closes, and says so.
     const stop = await post("/api/stop", { game: "gui_fake" });
     assert.equal(stop.status, 200);

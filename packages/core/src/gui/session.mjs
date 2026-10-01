@@ -212,10 +212,14 @@ export function createSession() {
         else log("No timer: the run has no clock on screen (the splits are still published).", "note");
         if (cancelled) throw new Error("stopped");
         set({ phase: "running", step: "run", stepTitle: byId.run.title });
+        // The outcome of this session only: a Continue whose start failed left the previous session's outcome.json,
+        // which was shown as this one's (2026-10-02, found by reading the flow).
+        const outcomeFile = path.join(runDir, "outcome.json");
+        const outcomeBefore = fs.existsSync(outcomeFile) ? fs.statSync(outcomeFile).mtimeMs : null;
         const runCode = await node(byId.run.args, byId.run.shown);
         set({ phase: "finishing", step: "publish", stepTitle: byId.publish.title });
         let outcome = null;
-        try { outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8")); } catch { /* the run did not get that far */ }
+        try { if (fs.statSync(outcomeFile).mtimeMs !== outcomeBefore) outcome = JSON.parse(fs.readFileSync(outcomeFile, "utf8")); } catch { /* the run did not get that far */ }
         // A stop before the session started leaves no outcome: that is the user's stop, not a failure.
         const stoppedEarly = !outcome && /before the session started/.test(lastLine);
         const result = { status: outcome?.status ?? (stoppedEarly ? "stopped before the session started" : runCode === 0 ? "unknown" : "failed"), notes: outcome?.notes ?? (stoppedEarly ? "the recording of those seconds was discarded; start again for a new run" : null), runDir: toWindows(runDir), recording: null, bundle: null };
@@ -282,8 +286,11 @@ export function createSession() {
     // Only a run in the output location: a run directory names the modules `aas resume` loads.
     await checkInside("Run folder", runDir, toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
     if (!runDir || !fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run that has started.");
-    const outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8"));
-    if (outcome.status === "completed") throw new Error("This run reached its goal; there is nothing to continue.");
+    let outcome = null;
+    try { outcome = JSON.parse(fs.readFileSync(path.join(runDir, "outcome.json"), "utf8")); } catch { /* no session ended in this run yet */ }
+    if (!outcome) throw new Error("This run has no ended session to continue: its start did not get as far as the agent. Start it again with Run.");
+    // As aas resume: only a run whose goal was reached is over (an agent that ended its own session is not).
+    if (outcome.status === "completed" && outcome.over && !opts.goal) throw new Error(`This run reached its goal (${outcome.over.label ?? "victory"}); there is nothing to continue, unless the goal is extended.`);
     const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
     const started = fs.readFileSync(path.join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data).at(-1) ?? {};
     const games = await guiGames();

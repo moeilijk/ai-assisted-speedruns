@@ -210,3 +210,30 @@ test("aas tickets says in words what extend, revoke and delete did, and the loca
   assert.equal(await aas("delete", id), `deleted ticket ${id.slice(0, 8)}… at the Archive and from this machine's list`);
   assert.equal(readTicketIndex().length, 0);
 });
+
+test("a start that failed after its ticket leaves the run directory usable: the next try has one ticket for segment 1", async (t) => {
+  // 2026-10-02 (found by reading the flow): any event in run.jsonl made the directory "already started", and the next
+  // try would have taken a second ticket for the same segment.
+  const { site } = await setup(t);
+  process.env.AAS_PROOF = "anonymous";
+  const { run } = await import("../src/run.mjs");
+  const { configure } = await import("../src/configure.mjs");
+  const { readState } = await import("../src/proof.mjs");
+  const here = join(new URL(import.meta.url).pathname, "..");
+  const dir = fs.mkdtempSync(join(tmpdir(), "aas-retry-"));
+  const runDir = join(dir, "run");
+  const game = join(dir, "game.mjs");
+  fs.writeFileSync(game, `import fake from ${JSON.stringify(join(here, "fake-game.mjs"))};\nexport default { ...fake, instructions: "test" };\n`);
+  const refusing = join(dir, "refusing.mjs");
+  fs.writeFileSync(refusing, `export default { id: "x", name: "x", version: "0", async preflight() {}, async start() { throw new Error("the game window capture shows nothing"); }, async onEvent() {}, async stop() { return { files: [] }; } };\n`);
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": runDir }, { log() {} });
+  await assert.rejects(run({ runtime: join(here, "stub-runtime.mjs"), game: join(here, "fake-game.mjs"), recorder: refusing, "run-dir": runDir, "keep-open": true }, { log() {} }), /shows nothing/);
+  const first = readState(runDir).tickets.map((x) => x.ticket);
+  assert.equal(first.length, 1);
+  const r = await run({ runtime: join(here, "stub-runtime.mjs"), game: join(here, "fake-game.mjs"), recorder: "null", "run-dir": runDir, "keep-open": true }, { log() {} });
+  assert.equal(r.outcome.status, "stopped", "the directory could be used again");
+  const tickets = readState(runDir).tickets;
+  assert.equal(tickets.filter((x) => x.segment === 1).length, 1, "one ticket for segment 1");
+  assert.notEqual(tickets[0].ticket, first[0]);
+  assert.ok(site.requests.some((q) => q.method === "DELETE" && q.path.endsWith(first[0])), "the unused ticket was deleted at the archive");
+});
