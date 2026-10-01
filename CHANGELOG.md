@@ -55,6 +55,11 @@ and their changes are listed here, with those made since.
   action whose answer fails after the game took it (a timeout) still has the game's state followed, so an ante it
   passed is told before the agent can stop.
 - **Slay the Spire: an act end the run's log already holds is not told again** after a resume.
+- **Slay the Spire: the bridge starts again from a fresh install.** It imported the core with a relative path, which
+  does not resolve where install-mod puts the copy (next to the game); since 0.22.0 a fresh install's bridge did not
+  start. It imports nothing from the repository now, and the launcher replaces a copy that differs from the checkout,
+  so an update reaches it. The bridge also keeps every client: a check that connects while a session runs (`aas
+  doctor`, the GUI's game check) no longer drops the agent's connection.
 - **Slay the Spire: a resume continues the named save.** The resume first went through `prepareRun`, which clicked
   Continue on whatever autosave the game had, before the named save was put in place. And a game that is already
   running counts as ready only once it has loaded, as after a start.

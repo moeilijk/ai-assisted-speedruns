@@ -98,6 +98,17 @@ if (await probe()) {
   console.log(`Slay the Spire is already running and ready (bridge on ${port}).`);
   process.exit(0);
 }
+// The bridge the mod starts is a copy next to the game (install-mod.mjs): one that differs from this checkout's is
+// replaced, so an update of the tooling reaches it (2026-10-02: the copy was two weeks older than the repository).
+{
+  const tools = process.env.AAS_STS_TOOLS_DIR ?? path.join(root, "aas");
+  const copy = path.join(tools, "bridge.mjs");
+  const source = path.join(path.dirname(new URL(import.meta.url).pathname), "bridge.mjs");
+  if (fs.existsSync(copy) && !fs.readFileSync(copy).equals(fs.readFileSync(source))) {
+    fs.copyFileSync(source, copy);
+    console.log(`bridge: ${copy} updated from this checkout`);
+  }
+}
 console.log(`steam: ${await ensureSteam({ log: console.log })}`);
 const quiet = await beforeGameStart({ processName: "java.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
 // Windows java gets Windows paths; its output goes to <game>/aas-launch.log for diagnosis.

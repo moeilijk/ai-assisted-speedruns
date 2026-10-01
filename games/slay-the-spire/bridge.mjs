@@ -2,22 +2,21 @@
 // The process Communication Mod starts with the game (config key `command`):
 // the mod writes one JSON game state per line to our stdin and reads commands
 // from our stdout. This bridge exposes that as a TCP line protocol on
-// 127.0.0.1:27183 for the AAS game plugin (one client at a time; the latest
-// state is sent on connect). Lines starting with `{"aas":` are for the bridge
+// 127.0.0.1:27183 for the AAS game plugin (every client is kept and gets every game state, so a check that connects
+// while a session runs does not drop the agent's connection; the latest state is sent on connect). Lines starting with `{"aas":` are for the bridge
 // itself (screenshot of the game window) and never reach the game.
 // Runs under Windows Node (the mod spawns a Windows process); stderr goes to
 // communication_mod_errors.log next to the game.
 import net from "node:net";
 import readline from "node:readline";
 import { spawnSync } from "node:child_process";
-import { loadSettings } from "../../packages/core/src/settings.mjs";
 
-// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
-loadSettings(import.meta.url);
-
+// No import from the repository: this file runs as a copy next to the game (install-mod.mjs), where a relative import
+// of the core does not resolve, and the bridge did not start (2026-10-02: so it was since 0.22.0, unnoticed because the
+// installed copy was older). The port comes from the mod's command line, which install-mod writes.
 const port = Number(process.argv[2] || process.env.AAS_STS_PORT || 27183);
 const title = process.env.AAS_STS_WINDOW_TITLE || "Slay the Spire";
-let client = null;
+const clients = new Set();
 let lastState = null;
 const log = (t) => process.stderr.write(`[aas sts bridge] ${t}\n`);
 
@@ -80,8 +79,7 @@ Start-Sleep -Milliseconds 120; [X.M]::SetCursorPos($old.X, $old.Y) | Out-Null
 }
 
 const server = net.createServer((sock) => {
-  if (client) client.destroy();
-  client = sock;
+  clients.add(sock);
   sock.setEncoding("utf8");
   let buf = "";
   sock.on("data", (d) => {
@@ -102,7 +100,7 @@ const server = net.createServer((sock) => {
       process.stdout.write(`${line}\n`); // a command for the game
     }
   });
-  sock.on("close", () => { if (client === sock) client = null; });
+  sock.on("close", () => clients.delete(sock));
   sock.on("error", () => {});
   sock.write(lastState ? `${lastState}\n` : '{"aas":"hello","state":null}\n');
 });
@@ -114,6 +112,6 @@ const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {
   if (!line.trim()) return;
   lastState = line;
-  if (client) client.write(`${line}\n`);
+  for (const c of clients) c.write(`${line}\n`);
 });
 rl.on("close", () => { log("game closed stdin; exiting"); process.exit(0); });
