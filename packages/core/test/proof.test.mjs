@@ -237,3 +237,26 @@ test("a start that failed after its ticket leaves the run directory usable: the 
   assert.notEqual(tickets[0].ticket, first[0]);
   assert.ok(site.requests.some((q) => q.method === "DELETE" && q.path.endsWith(first[0])), "the unused ticket was deleted at the archive");
 });
+
+test("a refused token: the ticket is not asked again, heads fall back to the ticket's own secret, and one renewal at a time", async (t) => {
+  // 2026-10-02 (found by reading the flow): an invalid_grant was retried three times; a refused refresh in a run lost
+  // every later head; the GUI and a run could renew the rotating token at the same time.
+  const { site } = await setup(t);
+  await login({ open: browser, log: () => {} });
+  // Two renewals at once: one request to the archive, the same token for both.
+  fs.writeFileSync(credentialsFile(), JSON.stringify({ ...readCredentials(), expires_at: new Date(Date.now() - 1000).toISOString() }));
+  const before = site.requests.filter((r) => r.path === "/auth/oauth/token").length;
+  const [a, b] = await Promise.all([accessToken(), accessToken()]);
+  assert.equal(a, b);
+  assert.equal(site.requests.filter((r) => r.path === "/auth/oauth/token").length - before, 1, "one renewal");
+  // An account ticket, then the refresh token is refused: the head still lands, by the ticket's control secret.
+  const client = proofClient({ token: () => accessToken() });
+  const ticket = await client.ticket();
+  fs.writeFileSync(credentialsFile(), JSON.stringify({ ...readCredentials(), refresh_token: "no-longer-known", expires_at: new Date(Date.now() - 1000).toISOString() }));
+  const receipt = await client.head({ ...ticket, segment: 1 }, { seq: 1, kind: "start", segment: 1, head: "a".repeat(64) });
+  assert.equal(receipt.seq, 1, "the head was received");
+  // A ticket asked with that refused token fails at once, not after three more tries.
+  const tokenAsks = site.requests.filter((r) => r.path === "/auth/oauth/token").length;
+  await assert.rejects(client.ticket(), (e) => /refused the token request/.test(e.message) && !/attempts/.test(e.message));
+  assert.equal(site.requests.filter((r) => r.path === "/auth/oauth/token").length - tokenAsks, 1);
+});

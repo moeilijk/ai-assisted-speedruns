@@ -83,6 +83,10 @@ and their changes are listed here, with those made since.
   moved to its display and OBS recorded the black loading screen, which the recorder refused. The launcher now waits
   for Communication Mod's first state, which it sends once the game stands ready, before it moves the window and the
   recording starts.
+- **A refused sign-in no longer costs a run its proof.** When the account's token cannot be renewed during a run, the
+  heads go on with the ticket's own control secret instead of being missed; a ticket asked with a refused token fails
+  at once instead of being asked three more times; and only one process at a time renews the sign-in (a lock next to
+  the credentials), so the GUI and a run no longer make each other's rotating token unknown to the Archive.
 - **The GUI says whether the Archive still accepts this machine's sign-in** (the maintainer, 2026-10-01: it said
   "signed in" while the Archive refused the tokens). It used to look only at whether tokens were on disk. Now it
   asks the way a run asks: a token that has run out is renewed at the Archive, and when the Archive refuses, the

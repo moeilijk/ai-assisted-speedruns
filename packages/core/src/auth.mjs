@@ -132,11 +132,35 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
 
 /** A valid access token, refreshed when it is about to expire; null when this machine is not signed in. */
 export async function accessToken({ fetchImpl = fetch } = {}) {
+  const fresh = (c) => c?.access_token && Date.parse(c.expires_at) - Date.now() > 60000;
   const c = readCredentials();
   if (!c?.access_token) return null;
-  if (Date.parse(c.expires_at) - Date.now() > 60000) return c.access_token;
+  if (fresh(c)) return c.access_token;
   if (!c.refresh_token) return null;
-  return store(await tokenRequest({ grant_type: "refresh_token", refresh_token: c.refresh_token }, { baseUrl: c.archive ?? proofUrl(), fetchImpl }), c.archive ?? proofUrl()).access_token;
+  // One renewal at a time on this machine: the refresh token rotates, so two processes renewing at once (the GUI and a
+  // run) would leave one of them with a token the Archive no longer knows. Whoever waited reads the renewed one.
+  return withRenewLock(async () => {
+    const now = readCredentials();
+    if (fresh(now)) return now.access_token;
+    if (!now?.refresh_token) return null;
+    return store(await tokenRequest({ grant_type: "refresh_token", refresh_token: now.refresh_token }, { baseUrl: now.archive ?? proofUrl(), fetchImpl }), now.archive ?? proofUrl()).access_token;
+  });
+}
+
+/** Runs `fn` holding `<credentials>.lock` (made exclusively); a lock older than 30 s is a crashed holder's and is taken over. */
+async function withRenewLock(fn) {
+  const lock = `${credentialsFile()}.lock`;
+  fs.mkdirSync(path.dirname(lock), { recursive: true, mode: 0o700 });
+  const deadline = Date.now() + 20000;
+  for (;;) {
+    try { fs.closeSync(fs.openSync(lock, "wx", 0o600)); break; } catch (e) {
+      if (e.code !== "EEXIST") throw e;
+      try { if (Date.now() - fs.statSync(lock).mtimeMs > 30000) { fs.rmSync(lock, { force: true }); continue; } } catch { continue; }
+      if (Date.now() > deadline) throw new Error("another process has been renewing this machine's sign-in for 20 s");
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
+  try { return await fn(); } finally { fs.rmSync(lock, { force: true }); }
 }
 
 export const loggedIn = async () => Boolean(readCredentials()?.access_token);

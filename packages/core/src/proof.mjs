@@ -103,6 +103,9 @@ export const currentArchiveFetch = () => archiveFetch ?? fetch;
 export function proofClient({ baseUrl = proofUrl(), token = async () => null, fetchImpl = currentArchiveFetch(), timeoutMs = 15000, retryWaits = null } = {}) {
   const api = `${baseUrl}/api/v1/tickets`;
   const auth = async (control) => { const t = await token(); return t ? { Authorization: `Bearer ${t}` } : control ? { Authorization: `Ticket ${control}` } : {}; };
+  // An account ticket's control secret is the fallback when the account's token cannot be had (refused, expired):
+  // the run's heads and the ticket's management go on (2026-10-02: a refused refresh lost every later head).
+  const authOrControl = async (control) => { try { return await auth(control); } catch (e) { if (!control) throw e; return { Authorization: `Ticket ${control}` }; } };
   return {
     // The ticket is asked for once, before anything is recorded; an archive that is restarting right then (measured
     // 2026-09-27: a deploy at the moment of the request, connection refused, the run refused) gets a few more tries
@@ -112,18 +115,19 @@ export function proofClient({ baseUrl = proofUrl(), token = async () => null, fe
       for (let attempt = 0; ; attempt += 1) {
         try { return await call("POST", api, { headers: await auth(null), fetchImpl, timeoutMs }); }
         catch (e) {
-          if (/answered \d+/.test(e.message) || attempt >= waits.length) throw attempt ? new Error(`${e.message} (${attempt + 1} attempts over ${waits.slice(0, attempt).reduce((a, b) => a + b, 0) / 1000} s)`) : e;
+          // An answer is final at once, a refused token too (it was asked again three times).
+          if (/answered \d+|refused the token request/.test(e.message) || attempt >= waits.length) throw attempt ? new Error(`${e.message} (${attempt + 1} attempts over ${waits.slice(0, attempt).reduce((a, b) => a + b, 0) / 1000} s)`) : e;
           await new Promise((r) => setTimeout(r, waits[attempt]));
         }
       }
     },
     async head(t, body) {
       // An account ticket answers to the account; its control secret is the fallback when the token is gone.
-      try { return await call("POST", `${api}/${t.ticket}/heads`, { headers: await auth(t.control), body, fetchImpl, timeoutMs }); }
+      try { return await call("POST", `${api}/${t.ticket}/heads`, { headers: await authOrControl(t.control), body, fetchImpl, timeoutMs }); }
       catch (e) { if (!/answered 401/.test(e.message) || !t.control) throw e; return call("POST", `${api}/${t.ticket}/heads`, { headers: { Authorization: `Ticket ${t.control}` }, body, fetchImpl, timeoutMs }); }
     },
     async manage(t, action) {
-      const headers = await auth(t.control);
+      const headers = await authOrControl(t.control);
       if (action === "delete") return call("DELETE", `${api}/${t.ticket}`, { headers, fetchImpl, timeoutMs });
       return call("POST", `${api}/${t.ticket}/${action}`, { headers, fetchImpl, timeoutMs });
     },
