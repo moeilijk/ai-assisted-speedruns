@@ -84,7 +84,20 @@ export function scanPublication(dir) {
   return { files, findings };
 }
 
-export async function publish(runDir, outDir, { session, completionMarker, log = console.log , signKey = null } = {}) {
+export async function publish(runDir, outDir, opts = {}) {
+  const dir = path.resolve(outDir);
+  const owned = !fs.existsSync(dir) || !fs.readdirSync(dir).length;
+  try {
+    return await publishInto(runDir, outDir, opts);
+  } catch (error) {
+    // A publish that stopped halfway leaves nothing behind: the directory it made, and its zips, are removed again,
+    // so the next try is not refused for a non-empty directory (2026-10-02, found by reading the flow).
+    if (owned) for (const p of [dir, `${dir}-public.zip`, `${dir}-upload.zip`]) fs.rmSync(p, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function publishInto(runDir, outDir, { session, completionMarker, log = console.log , signKey = null } = {}) {
   runDir = path.resolve(runDir);
   outDir = path.resolve(outDir);
   // The marker the exporters fall back on, fixed once: proof.json names it, so the archive makes the same timeline.
@@ -172,7 +185,8 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
   })();
   const previous = (() => { try { return JSON.parse(fs.readFileSync(revisionFile, "utf8")); } catch { return {}; } })();
   // bundle_dir and upload_note are for the upload sheet (aas upload-sheet), which aas render writes again later.
-  fs.writeFileSync(revisionFile, `${JSON.stringify({ run_id: summary.run_id, revision, published_at: new Date().toISOString(), bundle_dir: path.resolve(outDir), upload_note: previous.upload_note ?? null }, null, 2)}\n`);
+  // Recorded once the bundle is out (after the scan and the zips): a refused bundle leaves no gap in the revisions.
+  const recordRevision = () => fs.writeFileSync(revisionFile, `${JSON.stringify({ run_id: summary.run_id, revision, published_at: new Date().toISOString(), bundle_dir: path.resolve(outDir), upload_note: previous.upload_note ?? null }, null, 2)}\n`);
   summary.bundle = { kind: BUNDLE_KIND, bundle_version: BUNDLE_VERSION, run_id: summary.run_id, run_uid: brief.run_uid ?? null, revision, published_at: new Date().toISOString() };
   // What it takes to play the same thing again: the game's build, the mods with their pins, the run's settings.
   try { summary.game = (await plugin?.build?.({ runDir })) ?? null; } catch (e) { summary.game = null; log(`game build info not available (${e.message})`); }
@@ -359,6 +373,7 @@ export async function publish(runDir, outDir, { session, completionMarker, log =
     log("");
   }
   log(formatReport(outDir, check));
+  recordRevision();
   return { outDir, summary, scan, check, timeline, zip, signature, uploadSheet };
 }
 

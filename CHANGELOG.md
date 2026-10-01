@@ -67,6 +67,9 @@ and their changes are listed here, with those made since.
   (`run.started`), not as soon as its log holds anything (a budget check, a refused recorder), which made the
   directory unusable for `aas run` and `aas resume` alike. A ticket an earlier start of the same segment took but never
   used is deleted at the archive before the next one is fetched: one segment, one ticket.
+- **A publish that fails halfway leaves nothing behind**: the directory and zips it made are removed, so the next try
+  is not refused for a non-empty directory, and the revision is counted only once the bundle is out (a refused bundle
+  left a gap in the revisions). `aas upload` has a test of its own against the tests' archive.
 - **The GUI's Continue:** it shows the outcome of its own session, not the previous one when its start failed; it
   refuses only a run whose goal was reached, as `aas resume` does (a run whose agent ended its own session, such as
   the first live run, was refused); and a run without an ended session is answered, not a crash.

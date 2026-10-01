@@ -32,6 +32,14 @@ export async function startFakeSite(dir, { down = false } = {}) {
       if (site.down) return reply(503, { error: "down" });
       const auth = req.headers.authorization ?? "";
       const account = auth.startsWith("Bearer ") ? tokens.get(auth.slice(7)) ?? false : null;
+      // The upload of a bundle's zip (aas upload): what the archive makes of it is its answer, a refusal with a decision
+      // included; without an account it is refused.
+      if (req.method === "POST" && url.pathname === "/api/v1/bundles") {
+        if (!account) return reply(401, { error: "sign in to upload" });
+        site.uploads = (site.uploads ?? 0) + 1;
+        if (/refuse/.test(String(req.headers["x-filename"] ?? ""))) return reply(422, { status: "rejected", submission: site.uploads, reasons: ["a script played this run"] });
+        return reply(200, { status: "review", submission: site.uploads });
+      }
       if (req.method === "POST" && url.pathname === "/api/v1/tickets") {
         if (account === false) return reply(401, { error: "invalid token" });
         const t = { ticket: hex(16), control: hex(16), issued_at: new Date().toISOString(), account: Boolean(account) };

@@ -260,3 +260,38 @@ test("a refused token: the ticket is not asked again, heads fall back to the tic
   await assert.rejects(client.ticket(), (e) => /refused the token request/.test(e.message) && !/attempts/.test(e.message));
   assert.equal(site.requests.filter((r) => r.path === "/auth/oauth/token").length - tokenAsks, 1);
 });
+
+test("aas upload sends the upload zip under the account, and the archive's decision comes back, a refusal too", async (t) => {
+  // It had no test but the live end-to-end one (2026-10-02, found by reading the flow).
+  await setup(t);
+  const { uploadBundle } = await import("../src/upload.mjs");
+  const { zipBuffer } = await import("../src/zip.mjs");
+  const dir = fs.mkdtempSync(join(tmpdir(), "aas-upload-"));
+  const zip = (name, upload) => { const f = join(dir, name); fs.writeFileSync(f, zipBuffer([{ name: "r1/summary.json", data: Buffer.from("{}") }, ...(upload ? [{ name: "r1/UPLOAD-ONLY.txt", data: Buffer.from("for the archive") }] : [])])); return f; };
+  await assert.rejects(uploadBundle(zip("r1-public.zip", false)), /is the public bundle/);
+  await assert.rejects(uploadBundle(zip("r1-upload.zip", true)), /uploading needs an account/);
+  await login({ open: browser, log: () => {} });
+  assert.deepEqual(await uploadBundle(zip("r1-upload.zip", true)), { status: "review", submission: 1 });
+  const refused = await uploadBundle(zip("refuse-upload.zip", true));
+  assert.equal(refused.status, "rejected", "a refusal with a decision is the archive's answer, not a failed upload");
+});
+
+test("a publish that fails halfway leaves no directory and no revision behind, so the next try is not refused", async () => {
+  const { publish } = await import("../src/publish.mjs");
+  const { run } = await import("../src/run.mjs");
+  const { configure } = await import("../src/configure.mjs");
+  const here = join(new URL(import.meta.url).pathname, "..");
+  const dir = fs.mkdtempSync(join(tmpdir(), "aas-pub-fail-"));
+  const game = join(dir, "game.mjs");
+  fs.writeFileSync(game, `import fake from ${JSON.stringify(join(here, "fake-game.mjs"))};\nexport default { ...fake, instructions: "test" };\n`);
+  const runDir = join(dir, "run");
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": runDir }, { log() {} });
+  await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: "null", "run-dir": runDir, "keep-open": true }, { log() {} });
+  const out = join(dir, "public", "run");
+  // Signing fails after the bundle's files are written: a key that is not there.
+  await assert.rejects(publish(runDir, out, { log() {}, signKey: join(dir, "no-such-key") }), /signing failed|key/);
+  assert.ok(!fs.existsSync(out), "the directory it made is gone");
+  assert.ok(!fs.existsSync(join(runDir, "publish-revision.json")), "no revision was counted");
+  const again = await publish(runDir, out, { log() {} });
+  assert.equal(again.summary.bundle.revision, 1, "the next try is revision 1, not refused and not 2");
+});
