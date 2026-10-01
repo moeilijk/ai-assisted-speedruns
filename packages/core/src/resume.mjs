@@ -110,32 +110,36 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     await overlay?.close();
     throw error;
   }
-  const { t0 } = await recorder.start(brief, ctx);
-  events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString(), segment });
+  let t0 = null;
   let ready = null;
   try {
+    // As in run.mjs: the recorder may refuse after it began recording (the game capture shows nothing), the game
+    // may not come up, and the timer may refuse; in each case what was started is stopped and closed below.
+    ({ t0 } = await recorder.start(brief, ctx));
+    events.append("recording.started", { recorder: recorder.id, t0: t0.toISOString(), segment });
     early.check();
     if (plugin.prepareRun) ready = await plugin.prepareRun({ runDir, log, resume: true, save, seed: brief.seed ?? null, goal: brief.category?.goal ?? null });
     if (plugin.loadState) ready = (await plugin.loadState({ name: save, log, runDir, seed: brief.seed ?? null })) ?? ready;
     events.append("game.ready", { at: new Date().toISOString(), restored: save, seed: ready?.seed ?? null, seed_code: ready?.seed_code ?? null });
     early.check();
+    // In-game time already played before this resume (ticks × 15 ms), so LiveSplit continues from it.
+    const igtSoFar = previous.filter((r) => r.kind === "event" && r.event === "game.playback" && r.data?.phase === "end" && typeof r.data.ticks === "number").reduce((acc, r) => acc + Math.round(r.data.ticks * 15) / 1000, 0);
+    await timer?.start(brief, { igt: igtSoFar });
+    log(`timer continues from IGT ${igtSoFar.toFixed(3)} s`);
+    early.check();
   } catch (error) {
     early.release();
-    // The game did not come up: stop the recording again and discard its file, so that
-    // no recording keeps running and no stray segment lands in the run directory.
+    // Stop the recording again and discard its file, so that no recording keeps running and no stray segment lands
+    // in the run directory.
     const aborted = await recorder.stop().catch(() => ({ files: [] }));
     for (const f of aborted.files ?? []) fs.rmSync(f, { force: true });
     events.append("recording.stopped", { files: [], aborted: String(error?.message ?? error) });
-    events.append("run.error", { message: `game start failed: ${String(error?.message ?? error)}` });
+    events.append("run.error", { message: `${t0 ? "game start" : "recording start"} failed: ${String(error?.message ?? error)}` });
     await overlay?.close();
     // As at the start of a run: what was started is closed, or it stays open after the error.
     if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
     throw error;
   }
-  // In-game time already played before this resume (ticks × 15 ms), so LiveSplit continues from it.
-  const igtSoFar = previous.filter((r) => r.kind === "event" && r.event === "game.playback" && r.data?.phase === "end" && typeof r.data.ticks === "number").reduce((acc, r) => acc + Math.round(r.data.ticks * 15) / 1000, 0);
-  await timer?.start(brief, { igt: igtSoFar });
-  log(`timer continues from IGT ${igtSoFar.toFixed(3)} s`);
   // A short note (it becomes a section label in chapters and splits); the runtime's detail stays apart.
   events.append("run.human", { note: `resumed after ${outcome.status === "failed" ? "a runtime error" : outcome.status === "stopped" ? "a stop" : (outcome.status ?? "a stop")}`, detail: outcome.notes ?? null, save, segment });
   if (goalExtended) {
