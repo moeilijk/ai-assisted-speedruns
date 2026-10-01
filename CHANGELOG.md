@@ -29,6 +29,9 @@ and their changes are listed here, with those made since.
   - An end an earlier session already told is not added or split again: LiveSplit split twice on a resume with a
     larger goal.
   - The session's end is saved also with `--no-autosave`, or the run could not be continued.
+- **Slay the Spire: a resume continues the named save.** The resume first went through `prepareRun`, which clicked
+  Continue on whatever autosave the game had, before the named save was put in place. And a game that is already
+  running counts as ready only once it has loaded, as after a start.
 - **A resume whose recorder or timer refuses at the start stops the recording it began** and says why in the log, as
   a run already did.
 - **Slay the Spire: an act's boss is reached when it falls, not when the next act begins.** The first live run beat

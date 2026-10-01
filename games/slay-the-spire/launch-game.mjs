@@ -71,20 +71,6 @@ if (pos) {
   if (!/HIGHDPIAWARE/.test(current)) { spawnSync("reg.exe", ["add", layers, "/v", javaWin, "/t", "REG_SZ", "/d", "~ HIGHDPIAWARE", "/f"], { stdio: "ignore" }); console.log(`dpi: high-DPI override set for ${javaWin}`); }
 }
 const probe = () => new Promise((res) => { const s = net.connect(port, "127.0.0.1"); s.setTimeout(2000); s.on("connect", () => (s.destroy(), res(true))); s.on("error", () => res(false)); s.on("timeout", () => (s.destroy(), res(false))); });
-if (await probe()) { console.log(`Slay the Spire is already running (bridge on ${port}).`); process.exit(0); }
-console.log(`steam: ${await ensureSteam({ log: console.log })}`);
-const quiet = await beforeGameStart({ processName: "java.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
-// Windows java gets Windows paths; its output goes to <game>/aas-launch.log for diagnosis.
-const win = (p) => execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim();
-// -Dorg.lwjgl.opengl.Window.undecorated: LWJGL's own option for a window without title bar or borders.
-// The game sets this property itself in its fullscreen and borderless branches but leaves it alone in the
-// windowed branch, so setting it here gives a borderless window at the configured size on any display.
-const args = ["-Dorg.lwjgl.opengl.Window.undecorated=true", "-jar", win(mts), "--skip-launcher", "--skip-intro", "--mods", "basemod,CommunicationMod"];
-console.log(`starting ${java} ${args.join(" ")}`);
-const logFd = fs.openSync(path.join(root, "aas-launch.log"), "w");
-const child = spawn(java, args, { cwd: root, detached: true, stdio: ["ignore", logFd, logFd] });
-child.on("error", (e) => { throw new Error(`could not start java: ${e.message}`); });
-child.unref();
 // Up is the game loaded and ready, not the bridge's port answering: Communication Mod starts the bridge before the
 // game has loaded, and sends its first state only once the game stands ready. A recording started on the port alone
 // showed the black loading screen and was refused (2026-10-01: port 23:00:28, window 23:00:35, loaded about 23:00:59).
@@ -103,6 +89,28 @@ const firstState = () => new Promise((res) => {
   s.on("error", () => res(false));
   s.on("timeout", () => (s.destroy(), res(false)));
 });
+// Already running: ready only once it has loaded, as after a start below; a game still loading would record black.
+if (await probe()) {
+  const until = Date.now() + 180000;
+  let loaded = await firstState();
+  while (!loaded && Date.now() < until) { await new Promise((r) => setTimeout(r, 1000)); loaded = await firstState(); }
+  if (!loaded) throw new Error("Slay the Spire is running, but it did not finish loading within 180 s (see aas-launch.log in the game folder).");
+  console.log(`Slay the Spire is already running and ready (bridge on ${port}).`);
+  process.exit(0);
+}
+console.log(`steam: ${await ensureSteam({ log: console.log })}`);
+const quiet = await beforeGameStart({ processName: "java.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
+// Windows java gets Windows paths; its output goes to <game>/aas-launch.log for diagnosis.
+const win = (p) => execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim();
+// -Dorg.lwjgl.opengl.Window.undecorated: LWJGL's own option for a window without title bar or borders.
+// The game sets this property itself in its fullscreen and borderless branches but leaves it alone in the
+// windowed branch, so setting it here gives a borderless window at the configured size on any display.
+const args = ["-Dorg.lwjgl.opengl.Window.undecorated=true", "-jar", win(mts), "--skip-launcher", "--skip-intro", "--mods", "basemod,CommunicationMod"];
+console.log(`starting ${java} ${args.join(" ")}`);
+const logFd = fs.openSync(path.join(root, "aas-launch.log"), "w");
+const child = spawn(java, args, { cwd: root, detached: true, stdio: ["ignore", logFd, logFd] });
+child.on("error", (e) => { throw new Error(`could not start java: ${e.message}`); });
+child.unref();
 const deadline = Date.now() + 180000;
 let up = false, ready = false;
 while (Date.now() < deadline) {

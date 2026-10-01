@@ -270,3 +270,36 @@ test("loadState puts the named save in place as the game's autosave and refuses 
     await fake.close();
   }
 });
+
+test("a resume restores the named save before it continues, also when it comes in through prepareRun", async () => {
+  // resume.mjs calls prepareRun({ resume, save }) first; it continued whatever autosave the game had, before the named
+  // save was put in place (found 2026-10-02 by reading the flow; the fake's Continue hid it).
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const encode = (obj) => { const raw = Buffer.from(JSON.stringify(obj)); const key = Buffer.from("key"); const out = Buffer.alloc(raw.length); for (let i = 0; i < raw.length; i += 1) out[i] = raw[i] ^ key[i % key.length]; return out.toString("base64"); };
+  const fake = await startFakeSts({ floorsPerAct: 3, acts: 3 });
+  const gameRoot = mkdtempSync(join(tmpdir(), "aas-sts-root-"));
+  const runDir = mkdtempSync(join(tmpdir(), "aas-sts-run-"));
+  mkdirSync(join(gameRoot, "saves"), { recursive: true });
+  mkdirSync(join(runDir, "saves"), { recursive: true });
+  writeFileSync(join(gameRoot, "saves", "IRONCLAD.autosave"), encode({ floor_num: 7 })); // another run's autosave
+  writeFileSync(join(runDir, "saves", "mine_002.autosave"), encode({ floor_num: 2 }));
+  process.env.AAS_STS_PORT = String(fake.port);
+  process.env.AAS_STS_GAME_ROOT = gameRoot;
+  const { default: plugin } = await import(`../plugin.mjs?prepare-restore=${fake.port}`);
+  delete process.env.AAS_STS_GAME_ROOT;
+  globalThis.aas = { event() {}, emitImage() {} };
+  try {
+    await plugin.prepareRun({ log() {} });
+    const sts = await plugin.connect();
+    await sts.play(1, 0); await sts.play(1, 0); await sts.proceed(); // the fake is at floor 2
+    sts.close();
+    fake.toMenu();
+    const r = await plugin.prepareRun({ log() {}, resume: true, save: "mine_002", runDir });
+    assert.equal(r.floor, 2);
+    assert.equal(readFileSync(join(gameRoot, "saves", "IRONCLAD.autosave"), "utf8"), encode({ floor_num: 2 }), "the named save was put in place before Continue");
+  } finally {
+    await fake.close();
+  }
+});

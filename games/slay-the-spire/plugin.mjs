@@ -354,9 +354,10 @@ export default {
 
   /** Starts the run for the agent (character, ascension, seed from AAS_STS_*), so that the recording begins at the first choice.
    *  On a resume the game's own save is continued instead (never START, which would replace it). */
-  async prepareRun({ log = () => {}, resume = false, runDir = null, seed: wantedSeed = null } = {}) {
+  async prepareRun({ log = () => {}, resume = false, save = null, runDir = null, seed: wantedSeed = null } = {}) {
     const SEED = wantedSeed || process.env.AAS_STS_SEED || "";
-    if (resume) return this.loadState({ log, runDir });
+    // A resume continues the named save, put in place before Continue is clicked (not whatever autosave the game has).
+    if (resume) return this.loadState({ name: save, log, runDir, seed: wantedSeed });
     const bridge = await connectBridge();
     try {
       let s = await bridge.state();
