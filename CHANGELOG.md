@@ -17,6 +17,20 @@ them carries `harness.version` 0.1.0.
 Versions 1.0.0 and 1.0.1 (2026-10-01) were withdrawn on 2026-10-02 (the maintainer): their releases and tags are gone,
 and their changes are listed here, with those made since.
 
+- **One session for run and resume** (`packages/core/src/session.mjs`). The two had their own copy of everything from
+  the game's start to the end, and the resume had kept faults the run no longer had. In the shared session:
+  - A stop at any moment reaches the run. `run.pid` is written as soon as a stop can be caught, so `aas stop` works
+    while the game, the recorder and the proof start; a stop caught during the start starts no agent session; a stop
+    that comes while the runtime starts its session is passed to it (`stopRequested`), so the whole session does not
+    run anyway.
+  - Closing always writes the outcome, the recording segment and the proof's end, also when the timer, the recorder
+    or the game fails while closing (they are listed in `outcome.json` under `closing`); a first Ctrl-C while the
+    run closes does not cut it off halfway.
+  - An end an earlier session already told is not added or split again: LiveSplit split twice on a resume with a
+    larger goal.
+  - The session's end is saved also with `--no-autosave`, or the run could not be continued.
+- **A resume whose recorder or timer refuses at the start stops the recording it began** and says why in the log, as
+  a run already did.
 - **Slay the Spire: an act's boss is reached when it falls, not when the next act begins.** The first live run beat
   the Act 1 boss and stopped on its reward screen; the plugin counted the end only on entering act 2, so the goal was
   not registered and the run ended as if short of it. The end of act 1 and act 2 now counts when the boss room is

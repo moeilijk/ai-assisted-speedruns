@@ -220,7 +220,7 @@ export default {
    * `codex exec --json` with the goal prompt (or `codex exec resume <thread>` at a resume), the events streamed to
    * stderr as progress, the thread's rollout file located under $CODEX_HOME/sessions for `aas publish`.
    */
-  async start(runDir, brief) {
+  async start(runDir, brief, { stopRequested = null } = {}) {
     if (!isTrusted(runDir)) throw new Error(`Codex does not trust ${runDir}, so it would not load the run's .codex/config.toml (the broker, no shell, no web). aas run/resume set this when they configure the directory; by hand: [projects."${path.resolve(runDir)}"] trust_level = "trusted" in ${codexConfigFile()}.`);
     const headless = brief.headless === true || !process.stdin.isTTY;
     const model = brief.model ? ["--model", brief.model] : [];
@@ -254,6 +254,8 @@ export default {
     const child = spawn("codex", args, { cwd: runDir, env, stdio: ["ignore", "pipe", "inherit"] });
     let threadId = null, turns = 0, usage = null, lastError = null, gameOver = null, timedOut = false;
     interruptChild = (reason) => { gameOver = reason; process.stderr.write(`[runtime-codex] ${reason}; interrupting the session\n`); child.kill("SIGINT"); setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 60000).unref(); };
+    // A stop that came before this session existed (the harness asks; 2026-10-02: it was lost and a whole session ran).
+    { const early = stopRequested?.(); if (early) interruptChild(early); }
     const minutes = Number(brief.budget?.minutes) || 0;
     const deadline = minutes ? setTimeout(() => { timedOut = true; process.stderr.write(`[runtime-codex] time budget of ${minutes} min reached; interrupting the session\n`); child.kill("SIGINT"); setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 60000).unref(); }, minutes * 60000) : null;
     // The plan's stand, as Codex writes it into this thread's rollout after every turn: over the limit, the session is

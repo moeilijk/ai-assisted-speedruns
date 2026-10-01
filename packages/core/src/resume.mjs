@@ -5,17 +5,17 @@
 // `run.human` record, so the category becomes `restart-only`.
 import { checkName, checkProofMode, checkSessionId } from "./validate.mjs";
 import fs from "node:fs";
-import { renderAfterRun } from "./render.mjs";
 import { spawnSync } from "node:child_process";
 import { closeAll } from "./close-all.mjs";
-import { resolveGoal, goalReached, laterGoal } from "./goal.mjs";
+import { resolveGoal, laterGoal } from "./goal.mjs";
 import { applyRunEnv } from "./settings.mjs";
 import path from "node:path";
-import { createEventLog, followEvents, readRunLog, inOrder } from "./events.mjs";
+import { createEventLog, readRunLog } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
-import { AUTOSAVE_MINUTES, createAutosave, earlyStop, writeRecordingSegment } from "./run.mjs";
+import { earlyStop, writePidFile } from "./run.mjs";
+import { session } from "./session.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
 
@@ -84,6 +84,14 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
 
   const events = createEventLog(runDir);
   const early = earlyStop(log);
+  const pidFile = writePidFile(runDir);
+  try {
+    return await startAndPlay();
+  } finally {
+    fs.rmSync(pidFile, { force: true });
+  }
+
+  async function startAndPlay() {
   // Runs on the Claude plan may only use part of the weekly limit (AAS_BUDGET_WEEKLY_MAX).
   // A runtime that runs on a plan knows its own stand (`budget()`): a run may only use part of it.
   if (runtime.budget && !opts["ignore-budget"]) {
@@ -148,89 +156,8 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
   }
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
   await proof.start();
-  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || AUTOSAVE_MINUTES });
-  let over = null;
-  let deaths = 0;
   const goal = resolveGoal(plugin, brief.category?.goal);
-  const ordered = inOrder();
-  const follower = followEvents(runDir, async (ev) => {
-    if (goalReached(goal.end, ev) && !over) {
-      // The victory is fixed here, at the milestone, and the session is interrupted at once: the log is read
-      // every half second, and a fast player would otherwise play on past its goal until its own game.over came
-      // back through the follower (measured 2026-09-25: a mock to act1 played on to the Act 3 victory).
-      over = { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, at: ev.timestamp, deaths, goal: goal.id };
-      log(`game over: ${over.label}; ending the session`);
-      runtime.interrupt?.(`game over: ${over.label}`);
-      // As in run.mjs: the goal's milestone still goes on to the recorder, the timer and the autosave.
-      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, reached_at: ev.timestamp, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
-    }
-    if (ev.event === "game.over") {
-      if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
-      else if (!ev.data?.victory) { deaths += 1; log(`death ${deaths} (${ev.data?.label ?? "defeat"}); the agent may restart, the clock keeps running`); }
-    }
-    // The recorder and the timer see the events in the log's order (inOrder); the autosave queues its own saves.
-    await ordered(async () => {
-      await recorder.onEvent(ev);
-      await timer?.onEvent(ev);
-    });
-    await autosave?.onEvent(ev);
-  });
-  let result;
-  // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
-  // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
-  const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
-  early.release();
-  process.once("SIGINT", stopRequested);
-  process.once("SIGTERM", stopRequested);
-  // `aas stop --run-dir` finds this process by this file, never by a process search.
-  fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
-  // As in run.mjs: an end the game already shows when it is ready, and when it is the goal no agent session is
-  // started, so reaching it costs the agent no turn.
-  for (const m of ready?.reached ?? []) events.append("game.milestone", m);
-  await follower.flush();
-  if (over) {
-    result = { status: "completed", endedAt: new Date().toISOString(), notes: `the goal was already reached when the game was ready (${over.label}); no agent session was started` };
-    log(result.notes);
-  } else {
-    try {
-      result = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
-    } catch (error) {
-      result = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
-      events.append("run.error", { message: result.notes });
-    }
+  const { outcome: result, recording } = await session({ runDir, brief, opts, log, plugin, runtime, recorder, timer, overlay, events, early, proof, goal, ready, t0, segment, sessionId, deathsBefore: outcome.deaths ?? 0, outcomeExtra: { resumedFrom: save, segment } });
+  return { runDir, outcome: result, recording, segment };
   }
-  process.off("SIGINT", stopRequested);
-  process.off("SIGTERM", stopRequested);
-  fs.rmSync(path.join(runDir, "run.pid"), { force: true });
-  autosave?.stop();
-  // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
-  await follower.flush();
-  if (result.status !== "failed") result = { ...result, deaths: (outcome.deaths ?? 0) + deaths, ...(over ? { status: "completed", over, notes: [result.notes, `game over: ${over.label}`].filter((n, i, all) => n && !(i > 0 && String(all[0] ?? "").includes(n))).join("; ") } : {}) };
-  if (plugin.saveState && result.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });
-  events.append("run.ended", { status: result.status, notes: result.notes ?? null, sessionId: result.sessionId ?? sessionId, segment });
-  await follower.stop();
-  const timerResult = await timer?.stop();
-  if (plugin.endRun) await plugin.endRun({ runDir }).catch((e) => log(`endRun failed: ${e.message}`));
-  const recording = await recorder.stop();
-  await overlay?.close();
-  const dest = path.join(runDir, "recording");
-  fs.mkdirSync(dest, { recursive: true });
-  const files = [];
-  for (const f of recording.files ?? []) {
-    const target = path.join(dest, path.basename(f));
-    if (!fs.existsSync(f)) {
-      files.push(f);
-      continue;
-    }
-    if (path.resolve(f) !== target) fs.copyFileSync(f, target);
-    files.push(`recording/${path.basename(f)}`);
-  }
-  const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
-  events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds, segment });
-  await proof.end();
-  fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify({ ...result, sessionId: result.sessionId ?? sessionId, resumedFrom: save, segment }, null, 2)}\n`);
-  log(`resumed run ${result.status}; segment ${segment}; ${files.length} recording file(s)`);
-  if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
-  renderAfterRun(runDir, { log });
-  return { runDir, outcome: result, recording: info, segment };
 }

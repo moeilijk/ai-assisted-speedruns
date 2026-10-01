@@ -36,8 +36,9 @@ export default {
   sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
   /** `checkpoint` (from the harness): reads the run log and acts on it, so a goal or a stop reached by the step just
    *  taken ends the session before the next step, however fast the player is. */
-  async start(runDir, brief, { checkpoint = null } = {}) {
-    interrupted = null;
+  async start(runDir, brief, { checkpoint = null, stopRequested = null } = {}) {
+    // A stop that came before this session existed ends it before its first step.
+    interrupted = stopRequested?.() ?? null;
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".scripted-broker.json"), "utf8"));
     const botPath = brief.bot ?? spec.bot ?? process.env.AAS_BOT;
     if (!botPath) throw new Error("scripted runtime: no bot module (aas configure --bot <module>, or AAS_BOT)");

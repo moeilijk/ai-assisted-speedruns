@@ -93,7 +93,7 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Mistral Vibe",
-  version: "0.34.4",
+  version: "0.34.5",
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "vibe",
   /** The Setup tab's button: Mistral's own installer (it installs uv, pinned and checked by sha256, then mistral-vibe). */
@@ -177,7 +177,7 @@ export default {
    * three tools enabled, approved without asking (they are the only ones), the turn limit and the price limit, and
    * `--resume <session>` at a resume. Every entry Vibe streams is kept with the time it arrived.
    */
-  async start(runDir, brief) {
+  async start(runDir, brief, { stopRequested = null } = {}) {
     const headless = brief.headless === true || !process.stdin.isTTY;
     const gameId = brief.category?.game ?? brief.game?.id;
     if (!gameId) throw new Error("The run's brief names no game.");
@@ -205,6 +205,8 @@ export default {
     let sessionId = brief.resume?.sessionId ?? null, messages = 0, toolCalls = 0, lastError = null, gameOver = null, timedOut = false;
     const stop = () => { child.kill("SIGINT"); setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 60000).unref(); };
     interruptChild = (reason) => { gameOver = reason; process.stderr.write(`[runtime-mistral-vibe] ${reason}; interrupting the session\n`); stop(); };
+    // A stop that came before this session existed (the harness asks; 2026-10-02: it was lost and a whole session ran).
+    { const early = stopRequested?.(); if (early) interruptChild(early); }
     const minutes = Number(brief.budget?.minutes) || 0;
     const deadline = minutes ? setTimeout(() => { timedOut = true; process.stderr.write(`[runtime-mistral-vibe] time budget of ${minutes} min reached; interrupting the session\n`); stop(); }, minutes * 60000) : null;
     let buf = "";

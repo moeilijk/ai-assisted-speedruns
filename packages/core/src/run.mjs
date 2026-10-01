@@ -3,16 +3,15 @@
 // recorder, stops the recorder and collects the recording.
 import fs from "node:fs";
 import { closeAll } from "./close-all.mjs";
-import { resolveGoal, goalReached } from "./goal.mjs";
+import { resolveGoal } from "./goal.mjs";
 import path from "node:path";
 import { configure } from "./configure.mjs";
-import { createEventLog, followEvents, inOrder } from "./events.mjs";
+import { createEventLog } from "./events.mjs";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
-import { formatDuration } from "./videos.mjs";
-import { renderAfterRun } from "./render.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { COST_TEXT } from "./cost-text.mjs";
+import { session } from "./session.mjs";
 
 /**
  * Autosave: a save state after every chapter milestone and every
@@ -112,6 +111,13 @@ export function writeRecordingSegment(runDir, segment, { recorder, timer }) {
  * stopping is clean (`check()` throws; the caller stops the recording, discards it and closes everything, as for a
  * game that did not come up). Without it the signal's default ended the process at once and left OBS recording.
  */
+/** `aas stop --run-dir` finds the process by this file, never by a process search: written as soon as a stop can be caught. */
+export function writePidFile(runDir) {
+  const file = path.join(runDir, "run.pid");
+  fs.writeFileSync(file, `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
+  return file;
+}
+
 export function earlyStop(log) {
   let signal = null;
   const on = (s) => { signal = s; log(`${s}: stopping before the session starts; what was started is closed`); };
@@ -145,6 +151,14 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   if (runtime.ai) log(`what a run costs: ${COST_TEXT}`);
   const events = createEventLog(runDir);
   const early = earlyStop(log);
+  const pidFile = writePidFile(runDir);
+  try {
+    return await startAndPlay();
+  } finally {
+    fs.rmSync(pidFile, { force: true });
+  }
+
+  async function startAndPlay() {
   // Runs on the Claude plan may only use part of the weekly limit (AAS_BUDGET_WEEKLY_MAX).
   // A runtime that runs on a plan knows its own stand (`budget()`): a run may only use part of it.
   if (runtime.budget && !opts["ignore-budget"]) {
@@ -204,102 +218,7 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
   const goal = resolveGoal(plugin, brief.category?.goal);
   events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
   await proof.start();
-  const autosave = opts["no-autosave"] ? null : createAutosave({ plugin, runDir, brief, events, log, autosaveMinutes: Number(opts["autosave-minutes"]) || AUTOSAVE_MINUTES });
-  // `game.over` from the plugin: the attempt ended inside the game (victory or defeat). The
-  // agent session is interrupted; the run's status becomes completed or defeat, not stopped.
-  let over = null;
-  let deaths = 0; // deaths so far in this session (game.over without victory); a death is not the end of the run
-  // The goal: one of the game's ends. The plugin marks its ends with milestones; when the milestone of the goal's
-  // end goes by, the harness declares the victory (game.over), which ends the session like the game's own victory.
-  // The goal's milestone itself goes on to the recorder, the timer (its final split) and the autosave like any other
-  // (measured 2026-09-23: without it LiveSplit never took the last split); the appended game.over comes back through
-  // the follower and ends the session below.
-  const ordered = inOrder();
-  const forward = async (ev) => {
-    if (goalReached(goal.end, ev) && !over) {
-      // The victory is fixed here, at the milestone, and the session is interrupted at once: the log is read
-      // every half second, and a fast player would otherwise play on past its goal until its own game.over came
-      // back through the follower (measured 2026-09-25: a mock to act1 played on to the Act 3 victory).
-      over = { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, at: ev.timestamp, deaths, goal: goal.id };
-      log(`game over: ${over.label}; ending the session`);
-      runtime.interrupt?.(`game over: ${over.label}`);
-      events.append("game.over", { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, goal: goal.id, reached_at: ev.timestamp, deaths, ...Object.fromEntries(Object.entries(ev.data ?? {}).filter(([k]) => ["floor", "act", "chamber", "map", "seed", "seed_code"].includes(k))) });
-    }
-    if (ev.event === "game.over") {
-      if (ev.data?.victory && !over) { over = { victory: true, label: ev.data?.label ?? "Victory", at: ev.timestamp, deaths }; log(`game over: ${over.label}; ending the session`); runtime.interrupt?.(`game over: ${over.label}`); }
-      else if (!ev.data?.victory) { deaths += 1; log(`death ${deaths} (${ev.data?.label ?? "defeat"}); the agent may restart, the clock keeps running`); }
-    }
-    // The recorder and the timer see the events in the log's order (inOrder); the autosave queues its own saves.
-    await ordered(async () => {
-      await recorder.onEvent(ev);
-      await timer?.onEvent(ev);
-    });
-    await autosave?.onEvent(ev);
-  };
-  const follower = followEvents(runDir, forward);
-
-  let outcome;
-  // A stop from outside (Ctrl-C, the GUI's Stop) ends the agent session the way a budget does: the session stops, the
-  // game is saved, the recording is kept and everything is closed as after any run. A second signal is not caught.
-  const stopRequested = (signal) => { log(`${signal}: stopping the session`); runtime.interrupt?.(`stopped by the user (${signal})`); };
-  early.release();
-  process.once("SIGINT", stopRequested);
-  process.once("SIGTERM", stopRequested);
-  // `aas stop --run-dir` finds this process by this file, never by a process search.
-  fs.writeFileSync(path.join(runDir, "run.pid"), `${JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() })}\n`);
-  // An end the game already shows when it is ready (a session continued from a save made after it): the plugin
-  // returns its milestones from prepareRun. When one of them is the goal, no agent session is started, so reaching
-  // it costs the agent no turn (2026-10-02: a run saved on the reward screen of the boss it had to beat).
-  for (const m of ready?.reached ?? []) events.append("game.milestone", m);
-  await follower.flush();
-  if (over) {
-    outcome = { status: "completed", endedAt: new Date().toISOString(), notes: `the goal was already reached when the game was ready (${over.label}); no agent session was started` };
-    log(outcome.notes);
-  } else {
-    try {
-      outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush() });
-    } catch (error) {
-      outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
-      events.append("run.error", { message: outcome.notes });
-    }
+  const { outcome, recording } = await session({ runDir, brief, opts, log, plugin, runtime, recorder, timer, overlay, events, early, proof, goal, ready, t0 });
+  return { runDir, outcome, recording };
   }
-  process.off("SIGINT", stopRequested);
-  process.off("SIGTERM", stopRequested);
-  fs.rmSync(path.join(runDir, "run.pid"), { force: true });
-  autosave?.stop();
-  // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
-  await follower.flush();
-  if (outcome.status !== "failed") outcome = { ...outcome, deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter((n, i, all) => n && !(i > 0 && String(all[0] ?? "").includes(n))).join("; ") } : {}) };
-  // A final save state, so a stopped run can be resumed from exactly here.
-  if (plugin.saveState && outcome.status !== "failed") await autosave?.onEvent({ event: "game.milestone", data: { chapter: true, label: "end of session" } });
-  events.append("run.ended", { status: outcome.status, notes: outcome.notes ?? null, sessionId: outcome.sessionId ?? null });
-  await follower.stop(); // delivers run.ended to recorder and timer
-  if (plugin.endRun) await plugin.endRun({ runDir }).catch((e) => log(`endRun failed: ${e.message}`));
-  const timerResult = await timer?.stop();
-
-  const recording = await recorder.stop();
-  await overlay?.close();
-  const dest = path.join(runDir, "recording");
-  fs.mkdirSync(dest, { recursive: true });
-  const files = [];
-  for (const f of recording.files ?? []) {
-    const target = path.join(dest, path.basename(f));
-    if (!fs.existsSync(f)) {
-      log(`warning: recording file not found from here: ${f}`);
-      files.push(f);
-      continue;
-    }
-    if (path.resolve(f) !== target) fs.copyFileSync(f, target);
-    files.push(`recording/${path.basename(f)}`);
-  }
-  const info = writeRecordingSegment(runDir, { t0: (recording.t0 ?? t0).toISOString(), ended_at: new Date().toISOString(), files, chapters: recording.chapters ?? [] }, { recorder: recorder.id, timer: timer ? { id: timer.id, ...timerResult } : null });
-  events.append("recording.stopped", { files, wall_clock_seconds: info.wall_clock_seconds });
-  await proof.end();
-  fs.writeFileSync(path.join(runDir, "outcome.json"), `${JSON.stringify(outcome, null, 2)}\n`);
-  log(`run ${outcome.status}; ${files.length} recording file(s); ${formatDuration(info.wall_clock_seconds, { whole: true })} wall clock`);
-  // The run is over: close the game, LiveSplit, OBS and a Steam this harness started, and measure what is
-  // still running. Nothing stays open on the machine after a run unless --keep-open asks for it.
-  if (!opts["keep-open"]) await closeAll({ plugin, recorder, timer, log });
-  renderAfterRun(runDir, { log });
-  return { runDir, outcome, recording: info };
 }

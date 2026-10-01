@@ -306,7 +306,7 @@ export default {
     fs.writeFileSync(path.join(runDir, ".claude", "settings.json"), `${JSON.stringify(renderSettings(broker), null, 2)}\n`);
     trustRunDir(runDir);
   },
-  async start(runDir, brief) {
+  async start(runDir, brief, { stopRequested = null } = {}) {
     if (!isTrusted(runDir)) {
       throw new Error(`Claude Code does not trust ${runDir}, so it would ignore the allow rules of .claude/settings.json and the run would not be valid. ` +
         `aas run/resume set this when they configure the directory; to set it by hand: projects["${path.resolve(runDir)}"].hasTrustDialogAccepted: true in ${claudeConfigFile()}.`);
@@ -376,6 +376,8 @@ export default {
       child.kill("SIGINT");
       setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 60000).unref();
     };
+    // A stop that came before this session existed (the harness asks; 2026-10-02: it was lost and a whole session ran).
+    { const early = stopRequested?.(); if (early) interruptChild(early); }
     const budgetPoll = headless && !brief.ignoreBudget ? setInterval(async () => {
       try {
         const b = await checkBudget();

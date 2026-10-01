@@ -26,12 +26,12 @@ export default {
   },
   /** The session log this runtime writes into the run directory: what the run's proof covers. */
   sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
-  async start(runDir, brief) {
+  async start(runDir, brief, { stopRequested = null } = {}) {
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".stub-broker.json"), "utf8"));
     const codesFile = path.join(runDir, brief.resume ? "stub-codes-resume.json" : "stub-codes.json");
     const codes = fs.existsSync(codesFile) ? JSON.parse(fs.readFileSync(codesFile, "utf8")) : ["return await game.observe()"];
     const client = startBroker({ gameModule: spec.gameModule, runDir, readable: spec.readable, endpoints: spec.endpoints, passThrough: spec.envNames ?? [], timeoutMs: 60000 });
-    interrupted = null;
+    interrupted = stopRequested?.() ?? null;
     const session = [];
     const rec = (type, message, extra = {}) => session.push({ type, message, timestamp: new Date().toISOString(), uuid: `u${session.length}`, sessionId: "stub", ...extra });
     try {
