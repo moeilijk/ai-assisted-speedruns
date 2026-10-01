@@ -105,3 +105,16 @@ export default { ...fake, instructions: "test", async prepareRun() { process.emi
   assert.ok(!existsSync(join(runDir, "run.pid")));
   assert.equal(eventsOf(runDir).at(-1).event, "run.error");
 });
+
+test("a game that shows an end past the goal when it is ready has reached the goal: no agent session", async () => {
+  let started = false;
+  const p = { id: "p", ends: [{ id: "a", label: "A" }, { id: "b", label: "B" }, { id: "end", label: "End", final: true }], async saveState({ name }) { return { name }; } };
+  const ctx = bare({ id: "r", async start() { started = true; return { status: "stopped" }; } });
+  const { outcome } = await session({ ...ctx, plugin: p, goal: resolveGoal(p, "a"), ready: { reached: [{ label: "B", end: "b", chapter: true }] }, early: { release: () => null } });
+  assert.equal(started, false);
+  assert.equal(outcome.status, "completed");
+  assert.match(outcome.notes, /already reached when the game was ready/);
+  const over = eventsOf(ctx.runDir).find((e) => e.event === "game.over");
+  assert.equal(over.data.goal, "a");
+  assert.equal(over.data.shown, "b");
+});

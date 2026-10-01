@@ -250,12 +250,12 @@ export default {
       await new Promise((r) => setTimeout(r, 1500));
       const { position } = await waitUntilReady(session);
       log(`restored: TAS-paused at ${JSON.stringify(position)}`);
-      // The chambers the save stands in or past (its map from the console log, the chamber from the position): ends
-      // the run has reached, which the harness skips when its log holds them already.
+      // The chamber the save stands in (its map from the console log, the chamber from the position): the furthest end
+      // the run has reached, which the harness skips when its log holds it already.
       const map = consoleMaps.read().at(-1) ?? null;
       const m = map ? CHAMBER_MAPS.find((x) => x.map === map) : null;
       const at = m ? chamberIndex(chamberAt(map, position) ?? m.chambers[0].id) : -1;
-      const reached = at > 0 ? CHAMBERS.slice(1, at + 1).map((id) => ({ label: `Chamber ${id}`, chamber: id, end: `chamber${id}`, map, chapter: true })) : [];
+      const reached = at > 0 ? [{ label: `Chamber ${CHAMBERS[at]}`, chamber: CHAMBERS[at], end: `chamber${CHAMBERS[at]}`, map, chapter: true }] : [];
       return { position, map, reached };
     } finally {
       session.close();

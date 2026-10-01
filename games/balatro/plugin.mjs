@@ -57,14 +57,13 @@ const toMenu = async (rpc, log) => {
   return s;
 };
 
-/** The ends a game state shows already, as the milestones play would have told them: every ante before the current
- *  one (ante 8 ends with the win), and the win. */
+/** The furthest end a game state shows already, as play would have told it: the win, else the ante before the
+ *  current one (ante 8 ends with the win). */
 function endsShown(s) {
-  const out = [];
   const ante = typeof s?.ante_num === "number" ? s.ante_num : null;
-  if (ante !== null) for (let a = 1; a < Math.min(ante, 9); a += 1) if (a < 8) out.push({ label: `Ante ${a}`, split: SEGMENTS[a - 1], end: `ante${a}`, ante: a, seed: s.seed ?? null, chapter: true });
-  if (s?.won === true) out.push({ label: "Win", split: "Ante 8", end: "win", ante, seed: s.seed ?? null, chapter: true });
-  return out;
+  if (s?.won === true) return [{ label: "Win", split: "Ante 8", end: "win", ante, seed: s.seed ?? null, chapter: true }];
+  const a = ante === null ? 0 : Math.min(ante - 1, 7);
+  return a >= 1 ? [{ label: `Ante ${a}`, split: SEGMENTS[a - 1], end: `ante${a}`, ante: a, seed: s.seed ?? null, chapter: true }] : [];
 }
 
 export default {
@@ -260,8 +259,8 @@ export default {
     await rpc.call("aas.started", { deck: DECK, stake: STAKE, ...(seed ? { seed: String(seed) } : {}) });
     const s = await rpc.call("gamestate");
     log(`save ${name} loaded: ${s.state}, ante ${s.ante_num}, round ${s.round_num}, seed ${s.seed ?? "?"}`);
-    // A save made after an end shows it: the antes before the one it stands in are beaten, and a won run is won. The
-    // harness skips those its log already holds, and needs no agent session when the goal is among them.
+    // A save made after an end shows it: the ante before the one it stands in is beaten, and a won run is won. The
+    // harness skips it when its log holds it already, and needs no agent session when it is at or past the goal.
     return { readyAt: new Date(), seed: s.seed ?? null, seed_code: s.seed ?? null, reached: endsShown(s) };
   },
   /**

@@ -69,10 +69,19 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
   const caught = early.release();
   if (caught) stopReason = `stopped by the user (${caught}) before the session started`;
 
-  // An end the game already shows when it is ready (a session continued from a save made after it): when it is the
-  // goal no agent session is started, so reaching it costs the agent no turn. One an earlier session told is skipped.
-  for (const m of ready?.reached ?? []) if (!m?.end || !told.has(m.end)) events.append("game.milestone", m);
+  // The furthest end the game already shows when it is ready (a session continued from a save made after it): told
+  // unless an earlier session told it. When it is the goal, or an end after the goal in the game's own order, the goal
+  // is reached and no agent session is started, so reaching it costs the agent no turn.
+  const shown = (ready?.reached ?? []).filter((m) => m?.end);
+  for (const m of shown) if (!told.has(m.end)) events.append("game.milestone", m);
   await follower.flush();
+  const order = (id) => (plugin.ends ?? []).findIndex((e) => e.id === id);
+  const past = shown.find((m) => order(goal.id) >= 0 && order(m.end) >= order(goal.id));
+  if (!over && past && goal.end) {
+    over = { victory: true, label: `Victory (${goal.end.label ?? goal.id})`, at: new Date().toISOString(), deaths, goal: goal.id };
+    events.append("game.over", { victory: true, label: over.label, goal: goal.id, reached_at: over.at, deaths, shown: past.end, ...seg });
+    await follower.flush();
+  }
 
   let outcome;
   if (over) {

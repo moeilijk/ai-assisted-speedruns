@@ -77,7 +77,7 @@
       "name": "Balatro",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "d82cd06d506e4b41c9c07faaad530a01a8bfddc87327b53cc121adcb90d08a09"
+      "sha256": "5383a993b91cc1aefb1ca86fa54ab44bd1320738d37fc13a88ea8cc9134af07a"
     },
     {
       "kind": "game",
@@ -86,7 +86,7 @@
       "name": "BizHawk",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "2d079841cfea9865d163b29c5ab3afd240c014a8faa32e5b5b39e4fd79ca90a8"
+      "sha256": "2553732cf858925a669b3f6a758d3d10c98b47ef8af519f9c02eb761cf97d472"
     },
     {
       "kind": "game",
@@ -104,7 +104,7 @@
       "name": "FCEUX",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "be1af234699e5554a07434bacf840957b8d04c322e694b5014a594529592c83c"
+      "sha256": "615340dc09a620549f2e12f2aed8d4ee367363c95ce560b24c82735c343bcd5a"
     },
     {
       "kind": "game",
@@ -140,7 +140,7 @@
       "name": "Portal",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "d98d5cb80137dbe059c65d0467d88308d5d491ae0c3aec0f0903651e955e515f"
+      "sha256": "12dbb8aa845e445181c3f93562f36216b76b6b7d97fe10ace9429ee80add760f"
     },
     {
       "kind": "game",
@@ -149,7 +149,7 @@
       "name": "Portal 2",
       "version": "0.34.5",
       "stub": false,
-      "sha256": "3951af5322e9b46a4279b8195e54d72f42c049645cd0c8353d686d7c674a49ad"
+      "sha256": "ee3eb99f0e46bbbb5ba45ca8759372700b26ecc7b21aae2cae2c77e7e4acc792"
     },
     {
       "kind": "game",

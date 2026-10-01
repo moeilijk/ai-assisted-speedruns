@@ -48,13 +48,13 @@ test("a reload of the map the run is in is no progress; a level change counts th
   });
 });
 
-test("a save made in a later map tells the chambers up to the one it stands in when it is loaded", { skip: !available && "portal-agent not checked out" }, async () => {
+test("a save made in a later map tells the chamber it stands in when it is loaded", { skip: !available && "portal-agent not checked out" }, async () => {
   await withPortal({ transitionAfterTicks: 5, transitionTo: "testchmb_a_01" }, async ({ plugin }) => {
     const portal = await plugin.connect();
     await portal.run([{ ticks: 10, keys: { forward: true } }]);
     await plugin.saveState({ name: "in_a01" });
     const r = await plugin.loadState({ name: "in_a01", log() {} });
     assert.equal(r.map, "testchmb_a_01");
-    assert.deepEqual(r.reached.map((m) => m.end), ["chamber01", "chamber02"]);
+    assert.deepEqual(r.reached.map((m) => m.end), ["chamber02"]);
   });
 });

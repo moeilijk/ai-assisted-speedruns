@@ -174,8 +174,8 @@ export default {
       await sar.pause();
       const { position } = await sar.entity("player");
       log(`restored ${name}: paused at ${JSON.stringify(position)}`);
-      // The map the save loaded, from what the engine printed while loading it: that map and every map before it are
-      // ends the run has reached (the harness skips those its log already holds).
+      // The map the save loaded, from what the engine printed while loading it: the furthest end the run has reached
+      // (the harness skips it when its log holds it already, and takes every end up to it as passed).
       let loaded = null;
       if (logFile && existsSync(logFile) && statSync(logFile).size > before) {
         const fd = fs.openSync(logFile, "r");
@@ -184,7 +184,7 @@ export default {
         loaded = mapsInLog(buf.toString("utf8")).at(-1) ?? null;
       }
       const at = loaded ? mapIndex(loaded) : -1;
-      const reached = at > 0 ? MAPS.slice(1, at + 1).map((m) => ({ label: m.name, split: m.name, end: m.map, map: m.map, chapter: true })) : [];
+      const reached = at > 0 ? [{ label: MAPS[at].name, split: MAPS[at].name, end: MAPS[at].map, map: MAPS[at].map, chapter: true }] : [];
       return { position, map: loaded, reached };
     });
   },

@@ -84,11 +84,11 @@ async function holds(w) {
   const value = Number(typeof v === "object" ? v.value : v);
   return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
 }
-/** The ends the emulator shows now, as the milestones a playback would tell (for a save loaded after them). */
+/** The furthest end the emulator shows now, as the milestone a playback would tell (for a save loaded after it). */
 async function endsShown() {
-  const out = [];
-  for (const end of ENDS) if (end.when && (await holds(end.when))) out.push({ label: end.label, split: end.split ?? end.label, end: end.id, chapter: true });
-  return out;
+  let furthest = null;
+  for (const end of ENDS) if (end.when && (await holds(end.when))) furthest = end;
+  return furthest ? [{ label: furthest.label, split: furthest.split ?? furthest.label, end: furthest.id, chapter: true }] : [];
 }
 
 export default {

@@ -78,11 +78,12 @@ async function readFor(conditions) {
   const values = await batch(list.map((address) => ({ method: "memory.readbyte", params: { address } })));
   return new Map(list.map((a, i) => [a, values[i]]));
 }
-/** The ends the emulator shows now, as the milestones a playback would tell (for a save loaded after them). */
+/** The furthest end the emulator shows now, as the milestone a playback would tell (for a save loaded after it). */
 async function endsShown() {
   const ends = ENDS.filter((e) => e.when);
   const mem = await readFor(ends.map((e) => e.when));
-  return ends.filter((e) => holds(e.when, mem)).map((e) => ({ label: e.label, split: e.split ?? e.label, end: e.id, chapter: true }));
+  const furthest = ends.filter((e) => holds(e.when, mem)).at(-1);
+  return furthest ? [{ label: furthest.label, split: furthest.split ?? furthest.label, end: furthest.id, chapter: true }] : [];
 }
 
 export default {

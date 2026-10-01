@@ -272,7 +272,7 @@ test("a save made after an ante's boss tells that end when it is loaded, so a ru
     t.bot.state.ante = 3; t.bot.persist(); // two bosses beaten
     await t.plugin.saveState({ name: "aas_test_ante3" });
     const r = await t.plugin.loadState({ name: "aas_test_ante3", log() {} });
-    assert.deepEqual(r.reached.map((m) => [m.end, m.split]), [["ante1", "Ante 1"], ["ante2", "Ante 2"]]);
+    assert.deepEqual(r.reached.map((m) => [m.end, m.split]), [["ante2", "Ante 2"]], "the furthest end the save shows");
     t.bot.state.ante = 1; t.bot.persist();
     await t.plugin.saveState({ name: "aas_test_ante1" });
     assert.deepEqual((await t.plugin.loadState({ name: "aas_test_ante1", log() {} })).reached, []);
