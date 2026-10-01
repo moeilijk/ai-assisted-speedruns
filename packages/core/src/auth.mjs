@@ -104,16 +104,16 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
   const redirect = `http://127.0.0.1:${server.address().port}/callback`;
   const url = `${baseUrl}/auth/oauth/authorize/?${new URLSearchParams({ client_id: CLIENT_ID, response_type: "code", redirect_uri: redirect, code_challenge: challenge, code_challenge_method: "S256", state })}`;
   let fail = () => {};
+  let timer;
   const code = new Promise((resolve, reject) => {
     fail = reject;
-    const timer = setTimeout(() => reject(new Error("no answer from the browser within 5 minutes")), timeoutMs);
+    timer = setTimeout(() => reject(new Error("no answer from the browser within 5 minutes")), timeoutMs);
     server.on("request", (req, res) => {
       const u = new URL(req.url, redirect);
       if (u.pathname !== "/callback") { res.writeHead(404).end(); return; }
       const ok = u.searchParams.get("state") === state && u.searchParams.get("code");
       res.writeHead(ok ? 200 : 400, { "Content-Type": "text/html; charset=utf-8" }).end(callbackPage({ ok: Boolean(ok), baseUrl }));
       if (!ok) return;
-      clearTimeout(timer);
       resolve(u.searchParams.get("code"));
     });
   });
@@ -124,6 +124,8 @@ export async function login({ baseUrl = proofUrl(), fetchImpl = fetch, open = op
     const got = await code;
     return store(await tokenRequest({ grant_type: "authorization_code", code: got, redirect_uri: redirect, code_verifier: verifier }, { baseUrl, fetchImpl }), baseUrl);
   } finally {
+    // Also when the opener failed: the 5-minute wait would otherwise keep the command, and the GUI button, busy.
+    clearTimeout(timer);
     server.close();
   }
 }

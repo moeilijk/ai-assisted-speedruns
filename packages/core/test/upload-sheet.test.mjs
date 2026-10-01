@@ -103,7 +103,7 @@ test("a cut rendered before this revision is marked out of date: its line would 
 
 test("paths on a WSL drive mount are shown as the Windows drive the file dialog knows", async () => {
   const { shownPath } = await import("../src/upload-sheet.mjs");
-  assert.equal(shownPath("/mnt/g/OBS/Portal/portal-01/recording/a.cut.mp4"), "G:\\OBS\\Portal\\portal-01\\recording\\a.cut.mp4");
+  assert.equal(shownPath("/mnt/d/Runs/Portal/portal-01/recording/a.cut.mp4"), "D:\\Runs\\Portal\\portal-01\\recording\\a.cut.mp4");
   assert.equal(shownPath("/home/me/runs/x"), "/home/me/runs/x");
 });
 

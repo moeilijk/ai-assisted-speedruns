@@ -78,7 +78,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.34.4",
+  version: "1.0.0",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",

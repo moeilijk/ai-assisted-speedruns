@@ -22,7 +22,7 @@ export function fceuxDir() {
 }
 /**
  * A path as FCEUX (a Windows program) needs it: absolute, with backslashes. Worked out from the path itself, without
- * wslpath, because the broker runs under node --permission and may not start programs: /mnt/g/OBS → G:\OBS, any other
+ * wslpath, because the broker runs under node --permission and may not start programs: /mnt/d/Runs → D:\Runs, any other
  * WSL path → \\wsl.localhost\<distro>\….
  */
 export function hostPath(p, { wsl = isWsl(), distro = process.env.WSL_DISTRO_NAME } = {}) {

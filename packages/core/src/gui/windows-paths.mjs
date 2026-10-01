@@ -6,7 +6,7 @@ import fs from "node:fs";
 export const IS_WSL = process.platform === "linux" && (() => { try { return /microsoft/i.test(fs.readFileSync("/proc/version", "utf8")); } catch { return false; } })();
 export const ON_WINDOWS = IS_WSL || process.platform === "win32";
 
-/** A path for display: /mnt/g/OBS -> G:\OBS; other WSL paths -> \\wsl.localhost\<distro>\...; anything else as it is. */
+/** A path for display: /mnt/d/Runs -> D:\Runs; other WSL paths -> \\wsl.localhost\<distro>\...; anything else as it is. */
 export function toWindows(p) {
   if (!p || !IS_WSL) return p ?? "";
   const m = /^\/mnt\/([a-z])(\/.*)?$/.exec(p);
@@ -14,7 +14,7 @@ export function toWindows(p) {
   try { return execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim(); } catch { return p; }
 }
 
-/** A path the harness can open: G:\OBS -> /mnt/g/OBS (under WSL); a WSL path stays as it is. */
+/** A path the harness can open: D:\Runs -> /mnt/d/Runs (under WSL); a WSL path stays as it is. */
 export function toLocal(p) {
   const s = String(p ?? "").trim().replace(/^"(.*)"$/, "$1");
   if (!s || !IS_WSL) return s;

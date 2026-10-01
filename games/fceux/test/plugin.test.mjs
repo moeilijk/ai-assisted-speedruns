@@ -100,7 +100,7 @@ test("the screenshot is the emulated frame as a PNG, with no file in between", a
 
 test("a path for FCEUX, worked out without wslpath (the broker may not start programs)", async () => {
   const { hostPath } = await import("../paths.mjs");
-  assert.equal(hostPath("/mnt/g/OBS/FCEUX/run-1/saves/a.fc0", { wsl: true }), "G:\\OBS\\FCEUX\\run-1\\saves\\a.fc0");
+  assert.equal(hostPath("/mnt/d/Runs/FCEUX/run-1/saves/a.fc0", { wsl: true }), "D:\\Runs\\FCEUX\\run-1\\saves\\a.fc0");
   assert.equal(hostPath("/home/me/x y/a.fc0", { wsl: true, distro: "Ubuntu" }), "\\\\wsl.localhost\\Ubuntu\\home\\me\\x y\\a.fc0");
 });
 

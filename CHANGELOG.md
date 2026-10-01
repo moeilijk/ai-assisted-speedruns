@@ -1,16 +1,30 @@
 # Changelog
 
-The tooling is in beta: versions stay below 1.0.0 until the AAS Archive goes live on 2026-10-01, together with 1.0.0.
+1.0.0 came out with the launch of the AAS Archive on 2026-10-01.
 
-- **Minor** (0.x.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
+- **Minor** (x.y.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
   reads it before the release comes out.
-- **Patch** (0.x.y): everything else.
+- **Patch** (x.y.z): everything else.
 - **BREAKING**: a release after which a run directory or a bundle made with an earlier version is no longer read,
   republished or ranked. Such a release says so in its first line, and what to do with existing runs. None so far.
 
 Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the repository going public on 2026-09-13.
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
+
+## 1.0.0 — 2026-10-01
+
+The release the Archive goes live with. The bundle, the summary schema and SPEC 0.44 are those of 0.34.4, and so are
+the runtime plugins and their hashes in `packages/spec/runtimes.json`: a run recorded with 0.34.4 or 1.0.0 is held
+against the same list.
+
+- **The license table names the games and nothing more** (the maintainer, 2026-09-30). The rows for Slay the Spire,
+  Portal, Portal 2 and Balatro no longer say "your own copy", and the two Super Mario Bros. rows no longer say "your
+  own ROM".
+- **No names from the machine this was written on.** A comment in the BizHawk launcher named a playback device of
+  that machine as its example, and comments and tests in core and the FCEUX plugin used its drive and folder for
+  their example paths; they now use `D:\Runs`. The sound devices the GUI offers are, as before, the playback
+  devices active on the machine that runs it (`list-audio.mjs`).
 
 ## 0.34.4 — 2026-09-29
 

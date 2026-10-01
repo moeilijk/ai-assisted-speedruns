@@ -66,6 +66,18 @@ test("signing in is the authorization code with PKCE, and the refresh token rota
   assert.ok(site.requests.some((r) => r.path === "/auth/oauth/revoke"));
 });
 
+test("an opener that fails ends the sign-in at once with its reason, and leaves nothing waiting", async () => {
+  // Run in a child: an open timer would keep it alive, which is what a command or the GUI button waiting 5 minutes is.
+  const { spawnSync } = await import("node:child_process");
+  const script = `import { login } from ${JSON.stringify(new URL("../src/auth.mjs", import.meta.url).href)};
+try { await login({ baseUrl: "http://127.0.0.1:9", open: async () => { throw new Error("the Archive answered the sign-in with 401"); }, log: () => {} }); }
+catch (e) { console.log(e.message); }`;
+  const started = Date.now();
+  const r = spawnSync(process.execPath, ["--input-type=module", "-e", script], { encoding: "utf8", timeout: 20000, env: { ...process.env, XDG_CONFIG_HOME: join(tmpdir(), "aas-login-open-fails") } });
+  assert.equal(r.stdout.trim(), "the Archive answered the sign-in with 401");
+  assert.ok(Date.now() - started < 10000, `the command ended after ${Date.now() - started} ms`);
+});
+
 test("a segment with proof: a ticket first, then heads at the start, every hour and at the end, chained", async (t) => {
   const { runDir, session, runtime, events, site } = await setup(t);
   process.env.AAS_PROOF_HOUR_MS = "40";

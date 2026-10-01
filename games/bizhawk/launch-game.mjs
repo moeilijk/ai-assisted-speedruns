@@ -68,7 +68,7 @@ if (quietName) {
   if (r.status !== 0) throw new Error("EmuHawk's sound is not on the quiet device");
 }
 
-/** "BenQ GW2870 (NVIDIA High Definition Audio)": the name BizHawk matches an output device on. */
+/** The playback device named `name` on this machine as BizHawk lists it, "<name> (<device name>)", or null when it is not active. */
 function friendlyName(name) {
   const r = spawnSync(process.execPath, ["--input-type=module", "-e", `import { listAll } from ${JSON.stringify(path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../packages/core/src/windows/audio-route.mjs"))}; console.log(JSON.stringify(listAll()));`], { encoding: "utf8", env: process.env });
   const all = JSON.parse(r.stdout || "[]");

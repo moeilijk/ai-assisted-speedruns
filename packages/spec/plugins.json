@@ -84,9 +84,9 @@
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.34.4",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "8a98b2622f60a36a692a8a2f8eb9d158fb5acdaa982ebc02ab71c5699831a216"
+      "sha256": "232b8ae6670496db3984ea84dfb0611dd05217784cc30f0b13726def5d6f821a"
     },
     {
       "kind": "game",
@@ -102,9 +102,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "0.34.4",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "e565a41b81dc645eeb91d64405df7aae61d720042828b1e583dd59793b11b791"
+      "sha256": "b20c6fcae961cd500df7e94715b49e7ea4914fe8830f2da477c4850fd479ca92"
     },
     {
       "kind": "game",

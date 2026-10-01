@@ -6,7 +6,7 @@ The idea comes from cozyblaze's Portal run. The tool interface and the log forma
 
 ## Status
 
-Pre-release. The 0.x versions are for testing the setup: installing, recording a run, publishing a bundle. Expect them to break with version 1.0.0, which comes out when the archive goes live on 1 October 2026. Changes per version are in [CHANGELOG.md](CHANGELOG.md).
+Version 1.0.0 came out with the launch of the archive on 1 October 2026. Changes per version are in [CHANGELOG.md](CHANGELOG.md).
 
 ## Contents
 
@@ -152,16 +152,16 @@ The games, and the mods and tools the setup downloads or builds, are not in this
 
 | Game | Game, or what the setup downloads or builds | License |
 |---|---|---|
-| Slay the Spire | [Slay the Spire](https://store.steampowered.com/app/646570/) (your own copy) | the game's own |
+| Slay the Spire | [Slay the Spire](https://store.steampowered.com/app/646570/) | the game's own |
 | Slay the Spire | [Communication Mod](https://github.com/ForgottenArbiter/CommunicationMod) | MIT |
 | Slay the Spire | [ModTheSpire](https://steamcommunity.com/sharedfiles/filedetails/?id=1605060445) ([source](https://github.com/kiooeht/ModTheSpire)) | MIT |
 | Slay the Spire | [BaseMod](https://steamcommunity.com/sharedfiles/filedetails/?id=1605833019) ([source](https://github.com/daviscook477/BaseMod)) | MIT |
 | Slay the Spire | [sts_lightspeed](https://github.com/gamerpuppy/sts_lightspeed) (built for the scripted bot) | MIT |
-| Portal | [Portal](https://store.steampowered.com/app/400/) (your own copy), run from [Source Unpack](https://sourceunpack.gameabusefastcomplete.com/) | the game's own |
+| Portal | [Portal](https://store.steampowered.com/app/400/), run from [Source Unpack](https://sourceunpack.gameabusefastcomplete.com/) | the game's own |
 | Portal | [SourcePauseTool](https://github.com/OutOfBoundsOffice/SourcePauseTool) | MIT |
-| Portal 2 | [Portal 2](https://store.steampowered.com/app/620/) (your own copy) | the game's own |
+| Portal 2 | [Portal 2](https://store.steampowered.com/app/620/) | the game's own |
 | Portal 2 | [SourceAutoRecord](https://github.com/p2sr/SourceAutoRecord) | MIT |
-| Balatro | [Balatro](https://store.steampowered.com/app/2379780/) (your own copy) | the game's own |
+| Balatro | [Balatro](https://store.steampowered.com/app/2379780/) | the game's own |
 | Balatro | [Lovely](https://github.com/ethangreen-dev/lovely-injector) | MIT |
 | Balatro | [Steamodded](https://github.com/Steamodded/smods) | GPL-3.0 |
 | Balatro | [balatrobot](https://github.com/coder/balatrobot) | MIT |
@@ -169,13 +169,13 @@ The games, and the mods and tools the setup downloads or builds, are not in this
 | BizHawk | [BizHawk](https://github.com/TASEmulators/BizHawk) 2.11.1 | MIT (the EmuHawk frontend); each core its own, most GPL |
 | BizHawk | [bizhawk-mcp-native](https://github.com/StealthC/bizhawk-mcp-native) by StealthC, through our fork [moeilijk/bizhawk-mcp-native](https://github.com/moeilijk/bizhawk-mcp-native) v0.3.2 | MIT |
 | BizHawk | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
-| BizHawk | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
+| BizHawk | Super Mario Bros. (the `smb` profile checks the ROM by its SHA-1) | the game's own |
 | BizHawk | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |
 | BizHawk | [TASVideos movie 3728M](https://tasvideos.org/3728M), "warpless" by HappyLee & Mars608, which `bizhawk:tas` downloads for the `smb` mock | CC BY 2.0 |
 | FCEUX | [FCEUX](https://github.com/TASEmulators/fceux) 2.6.6, the 64-bit Windows build | GPL-2.0-or-later |
 | FCEUX | [fceux-mcp](https://github.com/IngvarKofoed/fceux-mcp) by IngvarKofoed (its bridge, a Lua script inside FCEUX), through our fork [moeilijk/fceux-mcp](https://github.com/moeilijk/fceux-mcp) | MIT |
 | FCEUX | [nes15](https://github.com/christopherpow/nes-test-roms/tree/master/nes15-1.0.0) by Mathew Brenaman, the test profile's ROM, which the install downloads into `.local/roms` | BSD-2-Clause |
-| FCEUX | Super Mario Bros. (your own ROM; the `smb` profile checks it by its SHA-1) | the game's own |
+| FCEUX | Super Mario Bros. (the `smb` profile checks the ROM by its SHA-1) | the game's own |
 | FCEUX | [smb-autosplitter](https://github.com/periwinkle9/smb-autosplitter) by periwinkle9 (the `smb` profile's memory addresses) | Zlib |
 | FCEUX | [TASVideos movie 3728M](https://tasvideos.org/3728M), "warpless" by HappyLee & Mars608, which `fceux:tas` downloads for the `smb` mock | CC BY 2.0 |
 | every game | [LiveSplit](https://github.com/LiveSplit/LiveSplit) (the timer, installed from the GUI) | MIT |

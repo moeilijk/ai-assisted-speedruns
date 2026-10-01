@@ -16,23 +16,23 @@ const { toLocal, toWindows, IS_WSL } = await import("../src/gui/windows-paths.mj
 
 test("writeEnv changes a setting in place, appends a new one, removes an emptied one, keeps comments", () => {
   fs.writeFileSync(process.env.AAS_ENV_FILE, "# machine settings\nAAS_OBS_URL=ws://127.0.0.1:4455\n# a comment\nAAS_STS_SEED=23M\n");
-  writeEnv({ AAS_OBS_URL: "ws://127.0.0.1:4460", AAS_OUTPUT_DIR: "/mnt/g/OBS", AAS_STS_SEED: "" });
+  writeEnv({ AAS_OBS_URL: "ws://127.0.0.1:4460", AAS_OUTPUT_DIR: "/mnt/d/Runs", AAS_STS_SEED: "" });
   const text = fs.readFileSync(process.env.AAS_ENV_FILE, "utf8");
-  assert.equal(text, "# machine settings\nAAS_OBS_URL=ws://127.0.0.1:4460\n# a comment\n\n# set with aas gui\nAAS_OUTPUT_DIR=/mnt/g/OBS\n");
-  assert.deepEqual(readEnv(), { AAS_OBS_URL: "ws://127.0.0.1:4460", AAS_OUTPUT_DIR: "/mnt/g/OBS" });
-  assert.equal(process.env.AAS_OUTPUT_DIR, "/mnt/g/OBS");
+  assert.equal(text, "# machine settings\nAAS_OBS_URL=ws://127.0.0.1:4460\n# a comment\n\n# set with aas gui\nAAS_OUTPUT_DIR=/mnt/d/Runs\n");
+  assert.deepEqual(readEnv(), { AAS_OBS_URL: "ws://127.0.0.1:4460", AAS_OUTPUT_DIR: "/mnt/d/Runs" });
+  assert.equal(process.env.AAS_OUTPUT_DIR, "/mnt/d/Runs");
   assert.throws(() => writeEnv({ "BAD NAME": "x" }), /not a setting name/);
   writeEnv({ AAS_OUTPUT_DIR: "/mnt/h/runs\nAAS_EVIL=1" });
   assert.equal(readEnv().AAS_EVIL, undefined, "a value cannot add a line");
 });
 
 test("paths: Windows form for people, local form for the harness", { skip: !IS_WSL && "only under WSL" }, () => {
-  assert.equal(toLocal("G:\\OBS\\Balatro"), "/mnt/g/OBS/Balatro");
-  assert.equal(toLocal("g:/OBS"), "/mnt/g/OBS");
+  assert.equal(toLocal("D:\\Runs\\Balatro"), "/mnt/d/Runs/Balatro");
+  assert.equal(toLocal("d:/Runs"), "/mnt/d/Runs");
   assert.equal(toLocal("C:\\"), "/mnt/c");
-  assert.equal(toWindows("/mnt/g/OBS/Balatro"), "G:\\OBS\\Balatro");
+  assert.equal(toWindows("/mnt/d/Runs/Balatro"), "D:\\Runs\\Balatro");
   assert.equal(toWindows("/mnt/c"), "C:\\");
-  assert.equal(toLocal("/mnt/g/OBS"), "/mnt/g/OBS");
+  assert.equal(toLocal("/mnt/d/Runs"), "/mnt/d/Runs");
 });
 
 test("the page server refuses other hosts and cross-origin changes", async () => {
