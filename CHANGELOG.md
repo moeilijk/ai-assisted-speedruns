@@ -40,7 +40,10 @@ and their changes are listed here, with those made since.
   note of its own, no proof unless a test asks for it, and an archive address that cannot exist. Its temporary
   directory is its own too (`TMPDIR`), removed with it: earlier runs had left 2115 directories in `/tmp`. A test
   fails when any of these points at the machine's own.
-- The Claude Code and Codex runtimes change, so their hashes in `packages/spec/runtimes.json` do too.
+- **One part, one version.** Five `package.json` files named another version than their plugin (the Claude Code
+  runtime said 0.32.0, the plugin 0.34.5). They now say the same, and `make-plugins --write` refuses when they differ.
+  The scripted runtime, the OBS recorder and the LiveSplit timer go to 0.34.5 with it.
+- The Claude Code, Codex and scripted runtimes change, so their hashes in `packages/spec/runtimes.json` do too.
 - **The license table names the games and nothing more** (the maintainer, 2026-09-30). The rows for Slay the Spire,
   Portal, Portal 2 and Balatro no longer say "your own copy", and the two Super Mario Bros. rows no longer say "your
   own ROM".

@@ -87,8 +87,26 @@ export function staleVersions(rows, published = readReleased()) {
   });
 }
 
+/**
+ * The rows whose package.json names another version than the plugin itself: one part, one version (2026-10-02:
+ * five package.json files had stayed behind, the Claude Code runtime at 0.32.0 while the plugin said 0.34.5).
+ */
+export function packageMismatches(rows, root = path.resolve(PACKAGES, "..")) {
+  return rows.filter((r) => {
+    if (r.stub || !r.version) return false;
+    const file = path.join(root, r.dir, "package.json");
+    if (!fs.existsSync(file)) return false;
+    return JSON.parse(fs.readFileSync(file, "utf8")).version !== r.version;
+  });
+}
+
 export async function makePlugins({ write = false, log = console.log } = {}) {
   const rows = await pluginRows();
+  const mismatched = packageMismatches(rows);
+  if (write && mismatched.length) {
+    for (const r of mismatched) log(`${r.dir}/package.json does not say ${r.version}, the version of the plugin itself`);
+    throw new Error(`${mismatched.length} package.json file(s) name another version than their plugin: make them the same, then run this again`);
+  }
   const stale = staleVersions(rows);
   if (write && stale.length) {
     for (const r of stale) log(`${r.dir} changed and still says ${r.version}`);

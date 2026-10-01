@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { spawnSync } from "node:child_process";
-import { PLUGINS_FILE, pluginRows, readPublished, readReleased, staleVersions } from "../make-plugins.mjs";
+import { PLUGINS_FILE, packageMismatches, pluginRows, readPublished, readReleased, staleVersions } from "../make-plugins.mjs";
 
 test("plugins.json holds every plugin in this checkout, as it is on disk", async () => {
   const published = readPublished();
@@ -47,4 +47,18 @@ test("the guard compares with the last release, so a version that is not out yet
   const tag = git("describe", "--tags", "--abbrev=0", "--match", "v[0-9]*").stdout.trim();
   if (!tag) return;
   assert.deepEqual(readReleased(), JSON.parse(git("show", `${tag}:packages/spec/plugins.json`).stdout), `the plugins.json of ${tag}`);
+});
+
+test("every plugin's package.json names the plugin's own version", async () => {
+  // 2026-10-02: five had stayed behind (the Claude Code runtime's said 0.32.0 while the plugin said 0.34.5).
+  const rows = await pluginRows();
+  assert.deepEqual(packageMismatches(rows).map((r) => r.dir), []);
+  const fs = await import("node:fs");
+  const path = await import("node:path");
+  const os = await import("node:os");
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "aas-pkg-"));
+  fs.mkdirSync(path.join(root, "packages", "x"), { recursive: true });
+  fs.writeFileSync(path.join(root, "packages", "x", "package.json"), JSON.stringify({ version: "0.1.0" }));
+  assert.deepEqual(packageMismatches([{ dir: "packages/x", version: "0.2.0" }], root).map((r) => r.dir), ["packages/x"]);
+  assert.deepEqual(packageMismatches([{ dir: "packages/x", version: "0.1.0" }], root), []);
 });
