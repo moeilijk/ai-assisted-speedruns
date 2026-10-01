@@ -9,7 +9,7 @@
       "name": "Claude Code",
       "version": "0.34.5",
       "ai": true,
-      "sha256": "e993264cac41a799d6a74da63dc963283847181f757154bb68fcbead2310e9be"
+      "sha256": "77a5d1ddded5816b81f03f248f992c6ccd1f0c37493059d200bf81e7c803a3d2"
     },
     {
       "kind": "runtime",
@@ -18,7 +18,7 @@
       "name": "Codex",
       "version": "0.34.5",
       "ai": true,
-      "sha256": "4883d5f834a804f0f55df26b429960ee268e23cd7a15fa2995eab65848fd6f78"
+      "sha256": "4944f9a4465b95f6e0b9fd9dd06400294b05d3c0910750e2ab2ede7aad7272ce"
     },
     {
       "kind": "runtime",
@@ -27,7 +27,7 @@
       "name": "Mistral Vibe",
       "version": "0.34.5",
       "ai": true,
-      "sha256": "9873f7dd18458881472e2aa6c2823840a395867cace0a01c74f3d0b703e5af9b"
+      "sha256": "b118cff54c07b5adefcb35d1448957bc912d1865bc0e662a01f70c0a7b675a1e"
     },
     {
       "kind": "runtime",

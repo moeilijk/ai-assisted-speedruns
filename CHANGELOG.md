@@ -83,6 +83,10 @@ and their changes are listed here, with those made since.
   moved to its display and OBS recorded the black loading screen, which the recorder refused. The launcher now waits
   for Communication Mod's first state, which it sends once the game stands ready, before it moves the window and the
   recording starts.
+- **Interactive sessions (no `--headless`) end on the goal or a stop, and a resume continues its own session.** Codex
+  and Mistral Vibe never ended an interactive session, and Codex started a new one on a resume; they now continue the
+  named session (`codex resume <id>`, `vibe --resume <id>`) and end with SIGINT, then SIGTERM after 5 s. Claude Code
+  sends its SIGTERM after 5 s too when interactive (a SIGINT only cancels the turn the person sees).
 - **A recording lost while the agent plays ends the session.** OBS was checked only at the start; one that stopped
   recording or stopped answering mid-run went unnoticed while the agent's turns were spent on a run without a
   recording. The OBS recorder now asks every 15 s (`watch`), and the session stops the agent the first time OBS is not

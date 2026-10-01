@@ -225,14 +225,18 @@ export default {
     const headless = brief.headless === true || !process.stdin.isTTY;
     const model = brief.model ? ["--model", brief.model] : [];
     if (!headless) {
-      const args = [...model];
-      if (brief.goalPrompt) args.push(brief.goalPrompt);
+      // A resume continues the session it names (`codex resume <id> [prompt]`, Codex's own way), not a new one.
+      const args = brief.resume?.sessionId ? ["resume", brief.resume.sessionId, ...(brief.resume.prompt ? [brief.resume.prompt] : [])] : [...model, ...(brief.goalPrompt ? [brief.goalPrompt] : [])];
       const child = spawn("codex", args, { cwd: runDir, stdio: "inherit" });
+      // The goal or a stop ends an interactive session too: a SIGINT, then SIGTERM when the CLI only cancelled its turn.
+      interruptChild = (reason) => { if (child.exitCode !== null) return; process.stderr.write(`[runtime-codex] ${reason}; ending the session\n`); child.kill("SIGINT"); setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 5000).unref(); };
+      { const early = stopRequested?.(); if (early) interruptChild(early); }
       const code = await new Promise((res, rej) => {
         child.on("error", (e) => rej(new Error(`Could not start codex: ${e.message}. Install the Codex CLI (npm install -g @openai/codex) or open ${runDir} in the Codex app.`)));
         child.on("close", res);
       });
-      return { status: code === 0 ? "completed" : "failed", endedAt: new Date().toISOString(), notes: `codex exited with ${code}` };
+      interruptChild = null;
+      return { status: code === 0 ? "completed" : "failed", endedAt: new Date().toISOString(), notes: `codex exited with ${code}`, sessionId: brief.resume?.sessionId ?? null };
     }
     const prompt = brief.resume ? brief.resume.prompt : brief.goalPrompt;
     if (!prompt) throw new Error("Headless runs need a goal prompt (aas configure --prompt, or goalPrompt in the game plugin).");

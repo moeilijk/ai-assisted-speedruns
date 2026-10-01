@@ -374,7 +374,8 @@ export default {
       gameOver = reason;
       process.stderr.write(`[runtime-claude-code] ${reason}; interrupting the session\n`);
       child.kill("SIGINT");
-      setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 60000).unref();
+      // Interactive, a SIGINT only cancels the turn the person sees: the session ends with SIGTERM soon after.
+      setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, headless ? 60000 : 5000).unref();
     };
     // A stop that came before this session existed (the harness asks; 2026-10-02: it was lost and a whole session ran).
     { const early = stopRequested?.(); if (early) interruptChild(early); }

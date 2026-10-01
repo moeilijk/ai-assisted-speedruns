@@ -182,9 +182,15 @@ export default {
     const gameId = brief.category?.game ?? brief.game?.id;
     if (!gameId) throw new Error("The run's brief names no game.");
     if (!headless) {
-      const child = spawn("vibe", ["--trust", ...(brief.goalPrompt ? [brief.goalPrompt] : [])], { cwd: runDir, stdio: "inherit" });
+      // A resume continues the session it names (Vibe's own --resume), not a new one.
+      const prompt = brief.resume ? brief.resume.prompt : brief.goalPrompt;
+      const child = spawn("vibe", ["--trust", ...(brief.resume?.sessionId ? ["--resume", String(brief.resume.sessionId)] : []), ...(prompt ? [prompt] : [])], { cwd: runDir, stdio: "inherit" });
+      // The goal or a stop ends an interactive session too: a SIGINT, then SIGTERM when the CLI only cancelled its turn.
+      interruptChild = (reason) => { if (child.exitCode !== null) return; process.stderr.write(`[runtime-mistral-vibe] ${reason}; ending the session\n`); child.kill("SIGINT"); setTimeout(() => { if (child.exitCode === null) child.kill("SIGTERM"); }, 5000).unref(); };
+      { const early = stopRequested?.(); if (early) interruptChild(early); }
       const code = await new Promise((res, rej) => { child.on("error", (e) => rej(new Error(`Could not start vibe: ${e.message}`))); child.on("close", res); });
-      return { status: code === 0 ? "completed" : "failed", endedAt: new Date().toISOString(), notes: `vibe exited with ${code}` };
+      interruptChild = null;
+      return { status: code === 0 ? "completed" : "failed", endedAt: new Date().toISOString(), notes: `vibe exited with ${code}`, sessionId: brief.resume?.sessionId ?? null };
     }
     const prompt = brief.resume ? brief.resume.prompt : brief.goalPrompt;
     if (!prompt) throw new Error("Headless runs need a goal prompt (aas configure --prompt, or goalPrompt in the game plugin).");
