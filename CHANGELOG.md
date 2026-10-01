@@ -37,7 +37,8 @@ and their changes are listed here, with those made since.
   Since 2026-09-27 the tests that start a run used the credentials in `~/.config/aas/` when the person running them
   was signed in: each `npm test` asked the live Archive for 7 proof tickets under that account and could renew its
   tokens. Every test file now loads `packages/core/test/isolate.mjs`: a config directory, settings files and GUI
-  note of its own, no proof unless a test asks for it, and an archive address that cannot exist. A test fails when
+  note of its own, no proof unless a test asks for it, and an archive address that cannot exist. Its temporary
+  directory is its own too (`TMPDIR`), removed with it: earlier runs had left 2115 directories in `/tmp`. A test fails when
   any of these points at the machine's own.
 - The Claude Code and Codex runtimes change, so their hashes in `packages/spec/runtimes.json` do too.
 - **The license table names the games and nothing more** (the maintainer, 2026-09-30). The rows for Slay the Spire,

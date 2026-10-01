@@ -12,12 +12,13 @@ test("every test runs with its own config directory and settings, without proof,
   const own = path.join(os.homedir(), ".config");
   for (const f of [credentialsFile(), ticketIndexFile()]) {
     assert.ok(!f.startsWith(`${own}${path.sep}`), `${f} is the machine's own: run the tests with npm test, which loads test/isolate.mjs`);
-    assert.ok(f.startsWith(os.tmpdir()), `${f} is not a test's own directory`);
+    assert.ok(f.startsWith(path.dirname(os.tmpdir())), `${f} is not in the test file's own directory`);
   }
   const repoLocal = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..", "..", "..");
   for (const k of ["AAS_ENV_FILE", "AAS_GAME_ENV_DIR", "AAS_GUI_NOTE", "AAS_GUI_CHECKS"]) {
-    assert.ok(process.env[k]?.startsWith(os.tmpdir()), `${k} must point into the test's own directory, not at ${process.env[k] ?? path.join(repoLocal, ".local")}`);
+    assert.ok(process.env[k]?.startsWith(path.dirname(os.tmpdir())), `${k} must point into the test's own directory, not at ${process.env[k] ?? path.join(repoLocal, ".local")}`);
   }
+  assert.match(os.tmpdir(), /aas-test-config-[^/]+\/tmp$/, "the temporary directory is the test file's own, removed with it");
   assert.notEqual(proofUrl(), ARCHIVE_URL.replace(/\/+$/, ""), "a test must never reach the live Archive");
   assert.match(proofUrl(), /\.invalid$/, "an address that cannot exist, unless a test sets its own");
   assert.equal(await proofMode({ loggedIn: async () => true }), "off", "no proof unless a test asks for it");
