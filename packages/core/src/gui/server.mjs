@@ -28,6 +28,28 @@ const SECRET = /PASSWORD|TOKEN|SECRET|KEY$/;
 const NOTE_FILE = process.env.AAS_GUI_NOTE || path.join(here, "..", "..", "..", "..", ".local", "gui.json");
 
 // Does an AAS GUI answer here? Under WSL a connection to a closed port hangs for minutes, so the probe has a deadline.
+/**
+ * Whether this machine's sign-in still holds, asked the way a run asks: a token about to expire is renewed at the
+ * Archive, and a refusal there means it no longer holds. The answer is kept until the credentials file changes (a
+ * new sign-in or a renewal), so a refused sign-in is not asked again on every refresh of the page.
+ */
+let signIn = { stamp: null, state: null };
+async function signInState() {
+  const { accessToken, credentialsFile, readCredentials } = await import("../auth.mjs");
+  const stamp = (() => { try { const s = fs.statSync(credentialsFile()); return `${s.mtimeMs}:${s.size}`; } catch { return null; } })();
+  if (stamp && signIn.stamp === stamp) return signIn.state;
+  let state;
+  try {
+    const token = await accessToken();
+    state = token ? { valid: true, until: readCredentials()?.expires_at ?? null } : { valid: false, refused: "the token has expired and there is nothing to renew it with" };
+  } catch (e) {
+    state = { valid: false, refused: e.message };
+  }
+  const after = (() => { try { const s = fs.statSync(credentialsFile()); return `${s.mtimeMs}:${s.size}`; } catch { return null; } })();
+  signIn = { stamp: after, state };
+  return state;
+}
+
 function probe(url, timeout = 1500) {
   return new Promise((resolve) => {
     const req = http.get(`${url}api/gui`, { timeout }, (res) => {
@@ -286,7 +308,8 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         const c = readCredentials();
         const answer = readEnv().AAS_PROOF ?? process.env.AAS_PROOF ?? null;
         const mode = answer === "off" ? "off" : c?.access_token ? "account" : answer === "anonymous" ? "anonymous" : "off";
-        send(res, 200, { signedIn: Boolean(c?.access_token), archive: c?.archive ?? proofUrl(), mode, answered: Boolean(answer), tickets: readTicketIndex().map(({ control, ...t }) => ({ ...t, run_dir: toWindows(t.run_dir) })) });
+        const sign = c?.access_token ? await signInState() : null;
+        send(res, 200, { signedIn: Boolean(c?.access_token), valid: sign?.valid ?? false, validUntil: sign?.until ?? null, refused: sign?.refused ?? null, archive: c?.archive ?? proofUrl(), mode, answered: Boolean(answer), tickets: readTicketIndex().map(({ control, ...t }) => ({ ...t, run_dir: toWindows(t.run_dir) })) });
       } else if (req.method === "POST" && url.pathname === "/api/proof-answer") {
         // The one question: record proof anonymously, or not. The answer is kept in .env, where the CLI reads it too.
         const anonymous = Boolean((await body(req)).anonymous);

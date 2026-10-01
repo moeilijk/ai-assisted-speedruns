@@ -549,8 +549,11 @@ const MODES = { account: "Runs record their proof under your account.", anonymou
 async function loadProof() {
   try { proof = await api("/api/proof"); } catch { return; }
   const host = esc(new URL(proof.archive).host);
-  $("account").innerHTML = proof.signedIn
-    ? `Signed in to ${host}. ${MODES[proof.mode]}<br><button class="b" data-act="logout">Sign out</button>`
+  const until = proof.validUntil ? new Date(proof.validUntil).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : null;
+  $("account").innerHTML = proof.signedIn && proof.valid
+    ? `Signed in to ${host}; the Archive accepts this machine's sign-in${until ? ` (token valid until ${esc(until)}, renewed when it runs out)` : ""}. ${MODES[proof.mode]}<br><button class="b" data-act="logout">Sign out</button>`
+    : proof.signedIn
+    ? `<span style="color:var(--fail)">Signed in to ${host}, but the Archive no longer accepts this machine's sign-in: ${esc(proof.refused ?? "no reason given")}.</span> Runs that record their proof under your account do not start until you sign in again.<br><button class="b" data-act="login">Sign in again</button><button class="b" data-act="logout">Sign out</button>`
     : `Not signed in to ${host}. ${proof.answered ? MODES[proof.mode] : "You are asked once, at the first start, whether runs record their proof anonymously."} <br><button class="b" data-act="login">Sign in</button>${proof.answered ? `<button class="b" data-act="${proof.mode === "anonymous" ? "proof-off" : "proof-anonymous"}">${proof.mode === "anonymous" ? "Stop recording anonymous proof" : "Record anonymous proof"}</button>` : ""}`;
   $("proofnow").textContent = MODES[proof.mode];
   const t = proof.tickets.slice().reverse();

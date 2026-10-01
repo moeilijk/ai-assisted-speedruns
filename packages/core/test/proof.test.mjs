@@ -66,6 +66,25 @@ test("signing in is the authorization code with PKCE, and the refresh token rota
   assert.ok(site.requests.some((r) => r.path === "/auth/oauth/revoke"));
 });
 
+test("the page says whether the Archive still accepts this machine's sign-in, not only that tokens are on disk", async (t) => {
+  await setup(t);
+  await login({ open: browser, log: () => {} });
+  const { startGui } = await import("../src/gui/server.mjs");
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
+  t.after(() => { gui.server.close(); process.removeAllListeners("SIGINT"); process.removeAllListeners("SIGTERM"); });
+  const proof = async () => (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/proof`)).json();
+  const ok = await proof();
+  assert.equal(ok.signedIn, true);
+  assert.equal(ok.valid, true, "a token the Archive issued and has not refused");
+  assert.equal(ok.validUntil, readCredentials().expires_at);
+  // Expired, and the Archive refuses to renew it (as the live Archive answered on 2026-10-01: 400 invalid_grant).
+  fs.writeFileSync(credentialsFile(), JSON.stringify({ ...readCredentials(), refresh_token: "no-longer-known", expires_at: new Date(Date.now() - 1000).toISOString() }));
+  const refused = await proof();
+  assert.equal(refused.signedIn, true, "the tokens are still on disk");
+  assert.equal(refused.valid, false, "but the Archive no longer accepts them");
+  assert.match(refused.refused, /invalid_grant/);
+});
+
 test("an opener that fails ends the sign-in at once with its reason, and leaves nothing waiting", async () => {
   // Run in a child: an open timer would keep it alive, which is what a command or the GUI button waiting 5 minutes is.
   const { spawnSync } = await import("node:child_process");

@@ -12,6 +12,35 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.1 — 2026-10-01
+
+- **"As the AI is set" names the effort a run really gets, for every AI** (the maintainer, 2026-10-01: the model was
+  named, the effort not). Claude Code names the effort in its `/model` answer only when a setting applies; without
+  one it runs the model at the effort its model menu keeps for it (its documentation: a top-level `effortLevel` does
+  not count for Opus 5.5 and later), and that effort is now shown. Codex named neither: the model is now the one
+  `codex doctor` reports it loads, and the effort is `model_reasoning_effort` of its active profile or its
+  `config.toml`, else that model's default in `codex debug models`. Measured on the page: Claude Code "Opus 5.5" and
+  "medium", Codex "gpt-5.6-luna" and "high", Mistral Vibe "mistral-medium-3.5" and "high", as before.
+- **Slay the Spire is up when the game has loaded, not when its bridge answers.** Communication Mod starts the
+  bridge before the game loads, and the launcher took the bridge's port for the game: on 2026-10-01 the port answered
+  at 23:00:28, the window appeared at 23:00:35 and the game finished loading at about 23:00:59, so the window was not
+  moved to its display and OBS recorded the black loading screen, which the recorder refused. The launcher now waits
+  for Communication Mod's first state, which it sends once the game stands ready, before it moves the window and the
+  recording starts.
+- **The GUI says whether the Archive still accepts this machine's sign-in** (the maintainer, 2026-10-01: it said
+  "signed in" while the Archive refused the tokens). It used to look only at whether tokens were on disk. Now it
+  asks the way a run asks: a token that has run out is renewed at the Archive, and when the Archive refuses, the
+  page says so with its answer ("400: invalid_grant") and offers Sign in again; when it accepts, the page says
+  until when the token is valid.
+- **`npm test` never touches the machine's own sign-in, settings or open GUI, and never reaches a real archive.**
+  Since 2026-09-27 the tests that start a run used the credentials in `~/.config/aas/` when the person running them
+  was signed in: each `npm test` asked the live Archive for 7 proof tickets under that account and could renew its
+  tokens. Every test file now loads `packages/core/test/isolate.mjs`: a config directory, settings files and GUI
+  note of its own, no proof unless a test asks for it, and an archive address that cannot exist. A test fails when
+  any of these points at the machine's own.
+- The Claude Code and Codex runtimes change, so their hashes in `packages/spec/runtimes.json` do too; an archive
+  takes runs made with 1.0.1 once it holds them.
+
 ## 1.0.0 — 2026-10-01
 
 The release the Archive goes live with. The bundle, the summary schema and SPEC 0.44 are those of 0.34.4, and so are

@@ -351,6 +351,51 @@ test("the models and efforts come from the AI's own CLI: claude --help and codex
   assert.throws(() => checkEffort('high" x'), /one word as the AI's CLI lists them/);
 });
 
+test("as the AI is set: the model and the effort a run gets without --model and --effort, each as the client itself has it", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-as-set-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  // Claude Code: /model names the effort only when a setting applies; without one the client runs the model at the
+  // effort its menu keeps for it, which is what the page shows then.
+  const bin = path.join(dir, "bin");
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, "claude"), `#!/usr/bin/env node
+const a = process.argv.slice(2);
+if (a[0] === "--version") { console.log("2.1.284 (Claude Code)"); process.exit(0); }
+if (a[0] === "--help") { console.log("Options:"); process.exit(0); }
+const command = a[a.indexOf("-p") + 1];
+const result = command === "/model" ? "Current model: \\\`Now 5\\\`" + (process.env.FAKE_EFFORT ? " (effort: " + process.env.FAKE_EFFORT + ")" : "") + "\\nUsage: /model <name>. Available: opus, or a full model ID."
+  : "Usage: /effort <low|medium|high|auto>";
+console.log(JSON.stringify({ result, num_turns: 0, total_cost_usd: 0 }));
+`, { mode: 0o755 });
+  const cfg = path.join(dir, "claude");
+  fs.mkdirSync(path.join(cfg, "cache", "model-catalog"), { recursive: true });
+  const efforts = { type: "effort", effort_options: [{ id: "low" }, { id: "medium" }, { id: "high", badge: { message: "Recommended" } }] };
+  fs.writeFileSync(path.join(cfg, "cache", "model-catalog", "a.json"), JSON.stringify({ fetchedAt: 1, catalog: { config: { models: [{ id: "claude-now-5", name: "Now 5", section: "main", thinking: efforts }] },
+    state: { model: "claude-now-5", thinking_by_model: [{ id: "claude-now-5", thinking: { type: "effort", effort: "medium" } }] } } }));
+  const saved = { PATH: process.env.PATH, CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR, FAKE_EFFORT: process.env.FAKE_EFFORT };
+  t.after(() => { for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k]; else process.env[k] = v; });
+  Object.assign(process.env, { PATH: `${bin}${path.delimiter}${process.env.PATH}`, CLAUDE_CONFIG_DIR: cfg });
+  delete process.env.FAKE_EFFORT;
+  const { claudeOptions } = await import("../../runtime-claude-code/index.mjs");
+  const plain = await claudeOptions();
+  assert.deepEqual([plain.current, plain.currentEffort], ["Now 5", "medium"], "no setting applies: the effort the client's menu keeps for the model in use");
+  process.env.FAKE_EFFORT = "low";
+  const set = await claudeOptions();
+  assert.deepEqual([set.current, set.currentEffort], ["Now 5", "low"], "a setting applies: the effort /model names");
+  // Codex: model_reasoning_effort of the active profile, else of config.toml; none when neither sets one.
+  const { codexConfiguredEffort } = await import("../../runtime-codex/index.mjs");
+  const file = path.join(dir, "config.toml");
+  fs.writeFileSync(file, 'model = "gpt-a"\n\n[projects."/x"]\ntrust_level = "trusted"\n');
+  assert.equal(codexConfiguredEffort({ file }), null, "not set: Codex runs the model at its own default");
+  fs.writeFileSync(file, 'model = "gpt-a"\nmodel_reasoning_effort = "high"\n\n[projects."/x"]\nmodel_reasoning_effort = "low"\n');
+  assert.equal(codexConfiguredEffort({ file }), "high", "the top level, not a key of another table");
+  fs.writeFileSync(file, 'profile = "deep"\nmodel_reasoning_effort = "high"\n\n[profiles.deep]\nmodel_reasoning_effort = "xhigh"\n');
+  assert.equal(codexConfiguredEffort({ file }), "xhigh", "the active profile's table first");
+  fs.writeFileSync(file, 'profile = "fast"\nmodel_reasoning_effort = "high"\n');
+  fs.writeFileSync(path.join(dir, "fast.config.toml"), 'model_reasoning_effort = "low"\n');
+  assert.equal(codexConfiguredEffort({ file }), "low", "the active profile's own file");
+});
+
 test("the run's options on the page reach the command, each as aas run takes it, and only where it applies", async () => {
   const { createSession } = await import("../src/gui/session.mjs");
   const s = createSession();

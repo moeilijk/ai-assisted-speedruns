@@ -99,11 +99,48 @@ export function parseCodexCatalog(text) {
   return { models, efforts: [...new Set(models.flatMap((m) => m.efforts))] };
 }
 
-/** `aas options`: the catalog as the CLI on this machine prints it. */
+/** A plain string key of one TOML table (the top level when `table` is null), as Codex reads it. */
+function tomlKey(text, key, table = null) {
+  let inTable = table === null;
+  for (const line of text.split("\n")) {
+    const head = line.match(/^\s*\[([^\]]+)\]\s*(#.*)?$/);
+    if (head) { inTable = table !== null && head[1].trim().replace(/"/g, "") === table; continue; }
+    const m = inTable && line.match(new RegExp(`^\\s*${key}\\s*=\\s*"([^"]*)"`));
+    if (m) return m[1];
+  }
+  return null;
+}
+
+/**
+ * The effort Codex runs with when no --effort is given: `model_reasoning_effort` of the active profile (the
+ * `profile` key; its `[profiles.<name>]` table or `$CODEX_HOME/<name>.config.toml`), else of config.toml itself.
+ * Null when neither sets one: Codex then runs the model at its own default.
+ */
+export function codexConfiguredEffort({ file = codexConfigFile() } = {}) {
+  const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const profile = tomlKey(text, "profile");
+  if (profile) {
+    const own = path.join(path.dirname(file), `${profile}.config.toml`);
+    const p = tomlKey(text, "model_reasoning_effort", `profiles.${profile}`) ?? (fs.existsSync(own) ? tomlKey(fs.readFileSync(own, "utf8"), "model_reasoning_effort") : null);
+    if (p) return p;
+  }
+  return tomlKey(text, "model_reasoning_effort");
+}
+
+/** The model Codex loads on this machine without --model, as `codex doctor` reports it; null when it does not say. */
+export function codexConfiguredModel() {
+  const r = spawnSync("codex", ["doctor", "--json"], { encoding: "utf8", timeout: 30000, maxBuffer: 16 * 1024 * 1024 });
+  try { return JSON.parse(r.stdout)?.checks?.["config.load"]?.details?.model ?? null; } catch { return null; }
+}
+
+/** `aas options`: the catalog as the CLI on this machine prints it, and what a run gets without --model and --effort. */
 export function codexOptions() {
   const r = spawnSync("codex", ["debug", "models"], { encoding: "utf8", timeout: 30000, maxBuffer: 64 * 1024 * 1024 });
   if (r.status !== 0) throw new Error(`codex debug models did not answer${r.stderr?.trim() ? `: ${r.stderr.trim().split("\n").at(-1)}` : " (is Codex installed?)"}`);
-  return { source: "codex debug models", freeModel: "or a model's slug the catalog does not list", ...parseCodexCatalog(r.stdout) };
+  const catalog = parseCodexCatalog(r.stdout);
+  const current = codexConfiguredModel();
+  const currentEffort = codexConfiguredEffort() ?? catalog.models.find((m) => m.id === current)?.defaultEffort ?? null;
+  return { source: "codex debug models, codex doctor and its config.toml", freeModel: "or a model's slug the catalog does not list", ...catalog, current, currentEffort };
 }
 
 export default {
@@ -114,7 +151,7 @@ export default {
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "codex",
   setup: { group: "Agents" },
-  version: "0.34.4",
+  version: "1.0.1",
   /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
   async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */

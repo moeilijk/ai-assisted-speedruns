@@ -181,19 +181,23 @@ export async function claudeOptions() {
   // The names the client takes (default, best, opus, …): each asked of the client itself, which model it points at now.
   const names = (usage?.aliases ?? help.aliases).filter((a) => !models.some((m) => m.id === a));
   const resolved = await Promise.all(names.map((n) => askClaude("/model", { model: n }).then((t) => parseModelUsage(t).current).catch(() => null)));
+  // The menu entry of the model the client names: the one whose name its answer starts with ("Opus 5.5 (1M context)" is Opus 5.5).
+  const menuEntry = (name) => (name ? models.filter((m) => m.section !== "name").find((m) => { const n = m.label?.match(/\(([^,)]+)/)?.[1]; return n && (name === n || name.startsWith(`${n} `)); }) ?? null : null);
+  const inUse = menuEntry(usage?.current?.model);
   names.forEach((id, i) => {
     const to = resolved[i];
-    // The menu entry whose name the answer starts with ("Opus 5.5 (1M context)" is Opus 5.5).
-    const byName = to && models.filter((m) => m.section !== "name").find((m) => { const n = m.label?.match(/\(([^,)]+)/)?.[1]; return n && (to.model === n || to.model.startsWith(`${n} `)); });
+    const byName = to && menuEntry(to.model);
     models.push({ id, label: `${id}${to ? ` → ${to.model}${id === "default" ? ", the recommended model" : ""}` : ""}`, efforts: byName?.efforts ?? [], defaultEffort: to?.effort ?? byName?.defaultEffort ?? null, thinking: byName?.thinking ?? "effort", section: "name" });
   });
   return {
     source: `Claude Code ${installed} itself (/model, /effort${catalog ? `, its model menu fetched ${catalog.fetchedAt?.slice(0, 16).replace("T", " ")} UTC` : ""})`,
     models,
-    // What a run gets without --model and --effort: the client as it is set on this machine (~/.claude/settings.json).
-    // The model and the effort are two choices: each is reported on its own.
+    // What a run gets without --model and --effort: the client as it is set on this machine. The model is the one its
+    // /model names. The effort is the one /model adds when a setting applies; without one the client runs the model
+    // at the effort its menu keeps for it (Claude Code's docs: a top-level effortLevel does not count for Opus 5.5 and
+    // later, which start at their own default), so /model then names none and the menu says which.
     current: usage?.current?.model ?? null,
-    currentEffort: usage?.current?.effort ?? null,
+    currentEffort: usage?.current?.effort ?? inUse?.defaultEffort ?? null,
     freeModel: usage?.fullId === false ? null : "or a full model id",
     efforts,
   };
@@ -266,7 +270,7 @@ export default {
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
   interrupt(reason) { interruptChild?.(reason); },
-  version: "0.34.4",
+  version: "1.0.1",
   async configure(runDir, broker, brief) {
     const mcp = path.join(runDir, ".mcp.json");
     const settings = path.join(runDir, ".claude", "settings.json");

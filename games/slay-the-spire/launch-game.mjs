@@ -85,15 +85,35 @@ const logFd = fs.openSync(path.join(root, "aas-launch.log"), "w");
 const child = spawn(java, args, { cwd: root, detached: true, stdio: ["ignore", logFd, logFd] });
 child.on("error", (e) => { throw new Error(`could not start java: ${e.message}`); });
 child.unref();
+// Up is the game loaded and ready, not the bridge's port answering: Communication Mod starts the bridge before the
+// game has loaded, and sends its first state only once the game stands ready. A recording started on the port alone
+// showed the black loading screen and was refused (2026-10-01: port 23:00:28, window 23:00:35, loaded about 23:00:59).
+const firstState = () => new Promise((res) => {
+  const s = net.connect(port, "127.0.0.1");
+  let buf = "";
+  s.setEncoding("utf8");
+  s.setTimeout(3000);
+  s.on("data", (d) => {
+    buf += d;
+    const i = buf.indexOf("\n");
+    if (i === -1) return;
+    s.destroy();
+    try { const m = JSON.parse(buf.slice(0, i)); res(!m.aas && m.ready_for_command === true); } catch { res(false); }
+  });
+  s.on("error", () => res(false));
+  s.on("timeout", () => (s.destroy(), res(false)));
+});
 const deadline = Date.now() + 180000;
-let up = false;
+let up = false, ready = false;
 while (Date.now() < deadline) {
-  await new Promise((r) => setTimeout(r, 3000));
-  if (await probe()) { up = true; break; }
+  await new Promise((r) => setTimeout(r, up ? 1000 : 3000));
+  if (!up && await probe()) { up = true; console.log(`bridge listening on ${port}; waiting for the game to finish loading`); }
+  if (up && await firstState()) { ready = true; break; }
 }
 quiet.restore();
 if (!up) throw new Error("Slay the Spire started but the bridge did not come up within 180 s (see communication_mod_errors.log in the game folder).");
-console.log(`Slay the Spire is up; bridge listening on ${port}.`);
+if (!ready) throw new Error("Slay the Spire's bridge is up, but the game did not finish loading within 180 s (see aas-launch.log in the game folder).");
+console.log(`Slay the Spire is up and ready; bridge listening on ${port}.`);
 // Optionally move the window (title "Slay the Spire"), e.g. to a secondary display.
 const ps = pos ? `
 Add-Type -Namespace X -Name W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f); [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r); [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r); public struct RECT { public int L,T,R,B; }'

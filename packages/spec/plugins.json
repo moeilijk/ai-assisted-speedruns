@@ -7,18 +7,18 @@
       "dir": "packages/runtime-claude-code",
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.34.4",
+      "version": "1.0.1",
       "ai": true,
-      "sha256": "82a051dd9579c28980c9a79e0db4d81b478ec211591a964abaaf58953fedc202"
+      "sha256": "3975a84906cf617ebc7b130c8bb2ba1bc12ee19d38c099b7fb5e75bf18b17c1c"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.34.4",
+      "version": "1.0.1",
       "ai": true,
-      "sha256": "028f46cd0fb4cb0278c9f6ff7484aceb0af1ec7a5fae84ec00b26c3f02ef90bf"
+      "sha256": "70e890c8bb8ef815b95667ff956652f94b23c4d0078d8c4b4f2c4144ae6eacc0"
     },
     {
       "kind": "runtime",
@@ -156,9 +156,9 @@
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "0.34.4",
+      "version": "1.0.1",
       "stub": false,
-      "sha256": "878dbd1e484529c44eeb77082dcfd583367ba35822db24caaf0261745718ddc5"
+      "sha256": "07391f88275382f3472105fb48a435002977de5495185ef72ae8501afb19bc11"
     },
     {
       "kind": "game",

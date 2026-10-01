@@ -151,7 +151,7 @@ function lastSeed(runDir) {
 export default {
   id: "slay_the_spire",
   name: "Slay the Spire",
-  version: "0.34.4",
+  version: "1.0.1",
   scopeName: "sts",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_STS_PROCESS || "java.exe",
