@@ -43,9 +43,10 @@
       "label": "World 1",
       "split": "World 1",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 1
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 1 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 0 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -53,9 +54,10 @@
       "label": "World 2",
       "split": "World 2",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 2
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 2 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 1 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -63,9 +65,10 @@
       "label": "World 3",
       "split": "World 3",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 3
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 3 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 2 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -73,9 +76,10 @@
       "label": "World 4",
       "split": "World 4",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 4
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 4 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 3 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -83,9 +87,10 @@
       "label": "World 5",
       "split": "World 5",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 5
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 5 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 4 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -93,9 +98,10 @@
       "label": "World 6",
       "split": "World 6",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 6
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 6 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 5 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -103,9 +109,10 @@
       "label": "World 7",
       "split": "World 7",
       "when": {
-        "domain": "RAM",
-        "address": 1887,
-        "atLeast": 7
+        "any": [
+          { "domain": "RAM", "address": 1887, "atLeast": 7 },
+          { "all": [{ "domain": "RAM", "address": 1887, "equals": 6 }, { "domain": "RAM", "address": 1904, "equals": 2 }] }
+        ]
       }
     },
     {
@@ -129,6 +136,7 @@
       }
     }
   ],
+  "defeat": { "domain": "RAM", "address": 1904, "equals": 3 },
   "goal": "Beat the game: defeat Bowser at the end of World 8-4. Each world counts as a split.",
   "controls": "D-pad Left/Right to walk, Down to duck (as Super Mario), B to run and to throw fireballs, A to jump (hold longer to jump higher), Start to begin at the title screen and to pause.",
   "tas": {

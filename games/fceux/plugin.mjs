@@ -10,6 +10,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync } from "node:fs";
 import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
+import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { batch, call, HOST as BRIDGE_HOST, PORT as BRIDGE_PORT } from "./bridge.mjs";
@@ -62,6 +63,28 @@ export const CHUNK = 600;
 
 const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf8")}\n## This game\n\n${PROFILE ? `${PROFILE.name} (${PROFILE.system}).\n\nControls: ${PROFILE.controls}\n\nGoal: ${PROFILE.goal}\n` : "No profile chosen (AAS_FCEUX_PROFILE).\n"}`;
 
+/** The addresses a condition of the profile reads: one value (`equals` or `atLeast`), or `all` / `any` of such. */
+const addresses = (w, out = new Set()) => { if (w.all || w.any) (w.all ?? w.any).forEach((c) => addresses(c, out)); else out.add(w.address); return out; };
+function holds(w, mem) {
+  if (w.all) return w.all.every((c) => holds(c, mem));
+  if (w.any) return w.any.some((c) => holds(c, mem));
+  const value = mem.get(w.address);
+  return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
+}
+/** The CPU memory those conditions read, in one batch. */
+async function readFor(conditions) {
+  const list = [...conditions.reduce((s, w) => addresses(w, s), new Set())];
+  if (!list.length) return new Map();
+  const values = await batch(list.map((address) => ({ method: "memory.readbyte", params: { address } })));
+  return new Map(list.map((a, i) => [a, values[i]]));
+}
+/** The ends the emulator shows now, as the milestones a playback would tell (for a save loaded after them). */
+async function endsShown() {
+  const ends = ENDS.filter((e) => e.when);
+  const mem = await readFor(ends.map((e) => e.when));
+  return ends.filter((e) => holds(e.when, mem)).map((e) => ({ label: e.label, split: e.split ?? e.label, end: e.id, chapter: true }));
+}
+
 export default {
   id: "fceux",
   name: "FCEUX",
@@ -101,7 +124,7 @@ export default {
   gameConfig: [join(here, "UPSTREAM.json"), ...(PROFILE ? [join(here, "profiles", `${PROFILE.id}.json`)] : [])],
   documentation: documentation(),
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),
-  goalPrompt: (end) => `You are playing ${PROFILE?.name ?? "a game"} on FCEUX; the game has been started and is paused. Read fceux_documentation, then play ${end && !end.final ? `until you reach: ${end.label}` : `until the goal is reached: ${PROFILE?.goal ?? "the game's end"}`}. Do not look up information about the game online.`,
+  goalPrompt: (end) => `You are playing ${PROFILE?.name ?? "a game"} on FCEUX; the game has been started and is paused. Read fceux_documentation, then play ${end && !end.final ? `until you have completed: ${end.label}` : `until the goal is reached: ${PROFILE?.goal ?? "the game's end"}`}. Do not look up information about the game online.`,
   category: {
     build: `FCEUX ${UPSTREAM.fceux.version} + fceux-mcp ${UPSTREAM.fceux_mcp.version}${PROFILE ? ` + ${PROFILE.name} (ROM SHA-1 ${PROFILE.rom.sha1})` : ""}`,
     observation: "full",
@@ -119,28 +142,26 @@ export default {
   async connect() {
     const emit = (event, data) => globalThis.aas?.event?.(event, data);
     const fps = fpsOf(PROFILE);
-    const reached = new Set();
+    // Ends already in the run's log (an earlier session, or this controller made again) are not told a second time,
+    // and their milestone save is not written over.
+    const reached = endsInLog(process.env.AAS_RUN_DIR);
     let index = 0;
     let over = false;
+    let dead = false;
     // The run's goal, from its brief: the harness declares the victory when that end goes by, but it reads the event
     // log up to half a second later, and the next input may come before that. So after the goal's end the plugin
     // takes no more input itself (as the BizHawk plugin, measured there 2026-09-23).
     const goal = (() => { try { return JSON.parse(readFileSync(join(process.env.AAS_RUN_DIR, "brief.json"), "utf8")).category?.goal ?? null; } catch { return null; } })();
-    // After every playback: has the game reached one of its ends? A condition of the profile: one value (`equals` or
-    // `atLeast`) at an address of the CPU's memory, or `all` / `any` of such conditions.
-    const addresses = (w, out = new Set()) => { if (w.all || w.any) (w.all ?? w.any).forEach((c) => addresses(c, out)); else out.add(w.address); return out; };
-    const holds = (w, mem) => {
-      if (w.all) return w.all.every((c) => holds(c, mem));
-      if (w.any) return w.any.some((c) => holds(c, mem));
-      const value = mem.get(w.address);
-      return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
-    };
+    // After every playback: has the game reached one of its ends, or a defeat (the profile's `defeat`, e.g. SMB's game
+    // over, told once each time the game enters it)?
     const checkEnds = async () => {
       const open = ENDS.filter((e) => e.when && !reached.has(e.id));
-      if (!open.length) return;
-      const list = [...open.reduce((s, e) => addresses(e.when, s), new Set())];
-      const values = await batch(list.map((address) => ({ method: "memory.readbyte", params: { address } })));
-      const mem = new Map(list.map((a, i) => [a, values[i]]));
+      const mem = await readFor([...open.map((e) => e.when), ...(PROFILE?.defeat ? [PROFILE.defeat] : [])]);
+      if (PROFILE?.defeat) {
+        const down = holds(PROFILE.defeat, mem);
+        if (down && !dead) emit("game.over", { victory: false, label: "Game over" });
+        dead = down;
+      }
       for (const end of open) {
         if (!holds(end.when, mem)) continue;
         reached.add(end.id);
@@ -263,7 +284,8 @@ export default {
     await call("emu.pause");
     await call("savestate.loadfile", { path: hostPath(file) });
     log(`save ${name} loaded at frame ${await call("emu.framecount")}`);
-    return { readyAt: new Date() };
+    // A save made after an end shows it already: the harness then needs no agent session to see the goal.
+    return { readyAt: new Date(), reached: await endsShown() };
   },
   /** What someone needs to play the same thing: FCEUX and the bridge with their pins, and the ROM by its SHA-1. */
   async build() {

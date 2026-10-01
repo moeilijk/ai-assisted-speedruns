@@ -29,6 +29,14 @@ and their changes are listed here, with those made since.
   - An end an earlier session already told is not added or split again: LiveSplit split twice on a resume with a
     larger goal.
   - The session's end is saved also with `--no-autosave`, or the run could not be continued.
+- **BizHawk and FCEUX, Super Mario Bros.: a world counts when its castle is beaten.** "World N" only held once the
+  next world began, which an agent that stops after the axe never sees (the same fault as Slay the Spire's act end).
+  It now also holds in world N with `OperMode` 2, the victory the axe starts (the smb-autosplitter's own end signal).
+  A game over (`OperMode` 3) is a defeat the harness counts. The goal prompt says "until you have completed: World
+  N", not "until you reach", which read as arriving in it.
+- **BizHawk and FCEUX: a loaded save tells the ends it shows** (`reached`), so a run saved after its goal ends without
+  an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save written
+  over (`packages/core/src/logged-ends.mjs`, shared with the harness).
 - **Slay the Spire: a resume continues the named save.** The resume first went through `prepareRun`, which clicked
   Continue on whatever autosave the game had, before the named save was put in place. And a game that is already
   running counts as ready only once it has loaded, as after a start.

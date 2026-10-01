@@ -8,6 +8,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
+import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { call, rpc, url as mcpUrl } from "./mcp.mjs";
@@ -75,6 +76,21 @@ const buttonMap = (buttons) => (Array.isArray(buttons) ? Object.fromEntries(butt
 
 const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf8")}\n## This game\n\n${PROFILE ? `${PROFILE.name} (${PROFILE.system}).\n\nControls: ${PROFILE.controls}\n\nGoal: ${PROFILE.goal}\n` : "No profile chosen (AAS_BIZHAWK_PROFILE).\n"}`;
 
+/** A condition of the profile, read from the emulator now: one value (`equals` or `atLeast`), or `all` / `any` of such. */
+async function holds(w) {
+  if (w.all) { for (const c of w.all) if (!(await holds(c))) return false; return true; }
+  if (w.any) { for (const c of w.any) if (await holds(c)) return true; return false; }
+  const v = await call("read_memory", { address: w.address, domain: w.domain, width: w.width ?? 8 });
+  const value = Number(typeof v === "object" ? v.value : v);
+  return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
+}
+/** The ends the emulator shows now, as the milestones a playback would tell (for a save loaded after them). */
+async function endsShown() {
+  const out = [];
+  for (const end of ENDS) if (end.when && (await holds(end.when))) out.push({ label: end.label, split: end.split ?? end.label, end: end.id, chapter: true });
+  return out;
+}
+
 export default {
   id: "bizhawk",
   name: "BizHawk",
@@ -113,7 +129,7 @@ export default {
   gameConfig: [join(here, "UPSTREAM.json"), ...(PROFILE ? [join(here, "profiles", `${PROFILE.id}.json`)] : [])],
   documentation: documentation(),
   instructions: readFileSync(join(here, "AGENTS.md"), "utf8"),
-  goalPrompt: (end) => `You are playing ${PROFILE?.name ?? "a game"} on BizHawk; the game has been started and is paused. Read bizhawk_documentation, then play ${end && !end.final ? `until you reach: ${end.label}` : `until the goal is reached: ${PROFILE?.goal ?? "the game's end"}`}. Do not look up information about the game online.`,
+  goalPrompt: (end) => `You are playing ${PROFILE?.name ?? "a game"} on BizHawk; the game has been started and is paused. Read bizhawk_documentation, then play ${end && !end.final ? `until you have completed: ${end.label}` : `until the goal is reached: ${PROFILE?.goal ?? "the game's end"}`}. Do not look up information about the game online.`,
   category: {
     build: `BizHawk ${UPSTREAM.bizhawk.version} + bizhawk-mcp-native ${UPSTREAM.bizhawk_mcp_native.version}${PROFILE ? ` + ${PROFILE.name} (ROM SHA-1 ${PROFILE.rom.sha1})` : ""}`,
     observation: "full",
@@ -131,23 +147,23 @@ export default {
   async connect() {
     const emit = (event, data) => globalThis.aas?.event?.(event, data);
     const fps = fpsOf(PROFILE);
-    const reached = new Set();
+    // Ends already in the run's log (an earlier session, or this controller made again) are not told a second time.
+    const reached = endsInLog(process.env.AAS_RUN_DIR);
     let index = 0;
     let over = false;
+    let dead = false;
     // The run's goal, from its brief: the harness declares the victory when that end goes by, but it reads the event
     // log up to half a second later, and the next input may come before that (measured 2026-09-23: 100 frames after
     // World 2, counted in the game time). So after the goal's end the plugin takes no more input itself.
     const goal = (() => { try { return JSON.parse(readFileSync(join(process.env.AAS_RUN_DIR, "brief.json"), "utf8")).category?.goal ?? null; } catch { return null; } })();
     // After every playback: has the game reached one of its ends? The harness declares the victory for the goal.
-    // A condition of the profile: one value (`equals` or `atLeast`), or `all` / `any` of such conditions.
-    const holds = async (w) => {
-      if (w.all) { for (const c of w.all) if (!(await holds(c))) return false; return true; }
-      if (w.any) { for (const c of w.any) if (await holds(c)) return true; return false; }
-      const v = await call("read_memory", { address: w.address, domain: w.domain, width: w.width ?? 8 });
-      const value = Number(typeof v === "object" ? v.value : v);
-      return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
-    };
     const checkEnds = async () => {
+      // A defeat (the profile's `defeat`, e.g. SMB's game over): told once each time the game enters it.
+      if (PROFILE?.defeat) {
+        const down = await holds(PROFILE.defeat);
+        if (down && !dead) emit("game.over", { victory: false, label: "Game over" });
+        dead = down;
+      }
       for (const end of ENDS) {
         if (!end.when || reached.has(end.id)) continue;
         if (await holds(end.when)) {
@@ -241,7 +257,8 @@ export default {
     await call("load_state", { path: hostPath(file) });
     const info = await call("get_info");
     log(`save ${name} loaded at frame ${info.framecount}`);
-    return { readyAt: new Date() };
+    // A save made after an end shows it already: the harness then needs no agent session to see the goal.
+    return { readyAt: new Date(), reached: await endsShown() };
   },
   /** What someone needs to play the same thing: BizHawk and the tool with their pins, and the ROM by its SHA-1. */
   async build() {

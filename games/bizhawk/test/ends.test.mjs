@@ -1,0 +1,61 @@
+// SMB's ends as a real agent meets them (2026-10-02): a world counts when its castle is beaten (OperMode 2, the
+// victory), not only when the next world begins, which an agent that stops after the axe never sees; a save made
+// after an end shows it when it is loaded; an end in the run's log is not told again; a game over is a defeat.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { startFakeBizHawk } from "./fake-bizhawk-mcp.mjs";
+
+const fake = await startFakeBizHawk({ romHash: "33D23C2F2CFA4C9EFEC87F7BC1321CE3CE6C89BD" });
+const runDir = fs.mkdtempSync(join(tmpdir(), "aas-bizhawk-ends-"));
+fs.writeFileSync(join(runDir, "brief.json"), JSON.stringify({ id: "smb-ends-1", category: { game: "bizhawk", goal: "world2" } }));
+process.env.AAS_BIZHAWK_MCP_URL = fake.url;
+process.env.AAS_BIZHAWK_PROFILE = "smb";
+process.env.AAS_RUN_DIR = runDir;
+const { default: plugin } = await import("../plugin.mjs");
+
+const events = [];
+globalThis.aas = { event: (event, data) => events.push({ event, data }), emitImage: () => {} };
+test.after(() => { fs.rmSync(runDir, { recursive: true, force: true }); return fake.close(); });
+const milestones = () => events.filter((e) => e.event === "game.milestone").map((e) => e.data.end);
+const reset = () => { events.length = 0; fs.rmSync(join(runDir, "run.jsonl"), { force: true }); fake.onFrame = null; };
+
+test("World 1 counts at the axe of 1-4, while the game is still in world 1", async () => {
+  reset();
+  const emu = await plugin.connect();
+  fake.onFrame = (s) => { s.memory["RAM:1887"] = 0; s.memory["RAM:1904"] = s.framecount >= 300 ? 2 : 1; };
+  await emu.wait(400);
+  assert.deepEqual(milestones(), ["world1"]);
+});
+
+test("a save made after an end shows it when it is loaded", async () => {
+  reset();
+  fs.mkdirSync(join(runDir, "saves"), { recursive: true });
+  fs.writeFileSync(join(runDir, "saves", "after-1-4.State"), JSON.stringify({ framecount: 9000, memory: { "RAM:1887": 0, "RAM:1904": 2 } }));
+  const r = await plugin.loadState({ name: "after-1-4", runDir, log() {} });
+  assert.deepEqual(r.reached.map((m) => m.end), ["world1"]);
+  fs.writeFileSync(join(runDir, "saves", "in-1-2.State"), JSON.stringify({ framecount: 3000, memory: { "RAM:1887": 0, "RAM:1904": 1 } }));
+  assert.deepEqual((await plugin.loadState({ name: "in-1-2", runDir, log() {} })).reached, []);
+});
+
+test("an end the run's log already holds is not told again", async () => {
+  reset();
+  fs.writeFileSync(join(runDir, "run.jsonl"), JSON.stringify({ kind: "event", event: "game.milestone", data: { label: "World 1", end: "world1", chapter: true } }) + "\n");
+  const emu = await plugin.connect();
+  fake.onFrame = (s) => { s.memory["RAM:1887"] = 1; s.memory["RAM:1904"] = 1; };
+  await emu.wait(10);
+  assert.deepEqual(milestones(), []);
+});
+
+test("a game over is a defeat, told once while it lasts", async () => {
+  reset();
+  const emu = await plugin.connect();
+  fake.onFrame = (s) => { s.memory["RAM:1887"] = 0; s.memory["RAM:1904"] = 3; };
+  await emu.wait(10);
+  await emu.wait(10);
+  const over = events.filter((e) => e.event === "game.over");
+  assert.equal(over.length, 1);
+  assert.equal(over[0].data.victory, false);
+});

@@ -6,15 +6,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { closeAll } from "./close-all.mjs";
 import { goalReached } from "./goal.mjs";
-import { followEvents, inOrder, readRunLog } from "./events.mjs";
+import { followEvents, inOrder } from "./events.mjs";
+import { endsInLog } from "./logged-ends.mjs";
 import { renderAfterRun } from "./render.mjs";
 import { AUTOSAVE_MINUTES, createAutosave, writeRecordingSegment } from "./run.mjs";
 import { formatDuration } from "./videos.mjs";
 
-/** The ends the run's log already holds a milestone for, from earlier sessions: told once, not again. */
-export function endsInLog(runDir) {
-  return new Set(readRunLog(runDir).filter((r) => r.kind === "event" && r.event === "game.milestone" && r.data?.end).map((r) => r.data.end));
-}
+export { endsInLog };
 
 /**
  * `session({ ... })` → `{ outcome, recording }`. `segment` is null for a run's first session. `early` is the stop
