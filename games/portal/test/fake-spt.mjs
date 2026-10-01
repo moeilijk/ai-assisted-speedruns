@@ -2,13 +2,23 @@
 // (JSON frames terminated by NUL over TCP) well enough for a functional test:
 // observe, look_delta, tas_run, tas_abort and a 64x36 rgb8 screenshot.
 import net from "node:net";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const NUL = "\0";
 
-export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, readyDelayMs = 50, transitionAfterTicks = Infinity } = {}) {
-  const state = { pitch: 0, yaw: 90, roll: 0, x: -544, y: -368, z: 128, runActive: false, ready: true, demoDir: null, ticksPlayed: 0 };
+// With `gameRoot`, every level load prints the SPT build's own line to portal/console.log, as the game started with
+// -condebug does: `spt_pause_on_portal_start: level init <map>`. A playback past `transitionAfterTicks` loads
+// `transitionTo`; past `reloadAfterTicks` it reloads the map it is in (a death). Both abort with SPT's real reason,
+// "level shutdown" (portal-agent.patch). A save holds the map it was made on, and a load prints that map.
+export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, readyDelayMs = 50, transitionAfterTicks = Infinity, transitionTo = "testchmb_a_01", reloadAfterTicks = Infinity } = {}) {
+  const state = { pitch: 0, yaw: 90, roll: 0, x: -544, y: -368, z: 128, runActive: false, ready: true, demoDir: null, ticksPlayed: 0, map: "testchmb_a_00" };
+  const levelInit = (map) => {
+    state.map = map;
+    if (!gameRoot) return;
+    mkdirSync(join(gameRoot, "portal"), { recursive: true });
+    appendFileSync(join(gameRoot, "portal", "console.log"), `spt_pause_on_portal_start: level init ${map}\n`);
+  };
   const seen = [];
   const sockets = new Set();
   const write = (socket, message) => socket.write(`${JSON.stringify(message)}${NUL}`);
@@ -32,6 +42,7 @@ export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, r
           state.runActive = true;
           state.ready = false;
           state.ticksPlayed = 0;
+          levelInit("testchmb_a_00");
           if (gameRoot) {
             const dir = join(gameRoot, "portal", "agent_runs", new Date().toISOString().replace(/[-:]/g, "").replace(/\..*/, ""));
             mkdirSync(dir, { recursive: true });
@@ -42,14 +53,14 @@ export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, r
         } else if (/^save\s+\S+$/.test(cmd)) {
           const name = cmd.split(/\s+/)[1];
           state.saves = state.saves ?? {};
-          state.saves[name] = { x: state.x, y: state.y, z: state.z, yaw: state.yaw };
+          state.saves[name] = { x: state.x, y: state.y, z: state.z, yaw: state.yaw, map: state.map };
           if (gameRoot) {
             mkdirSync(join(gameRoot, "portal", "SAVE"), { recursive: true });
             writeFileSync(join(gameRoot, "portal", "SAVE", `${name}.sav`), Buffer.from(`fake save ${name}`));
           }
         } else if (/^load\s+\S+$/.test(cmd)) {
           const saved = state.saves?.[cmd.split(/\s+/)[1]];
-          if (saved) Object.assign(state, saved);
+          if (saved) { Object.assign(state, saved); levelInit(saved.map); }
           state.ready = false;
           setTimeout(() => (state.ready = true), readyDelayMs);
         } else if (/^(stop_run|y_spt_agent_stop_run)$/.test(cmd)) {
@@ -76,11 +87,18 @@ export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, r
           if (state.ticksPlayed >= transitionAfterTicks) {
             aborted = true;
             state.ticksPlayed = -Infinity;
+            levelInit(transitionTo);
+            break;
+          }
+          if (state.ticksPlayed >= reloadAfterTicks) {
+            aborted = true;
+            state.ticksPlayed = -Infinity;
+            levelInit(state.map);
             break;
           }
         }
         const done = { type: "tas_run_done", id: m.id, ok: true, aborted, ticks, angles: facing() };
-        if (aborted) done.reason = "level transition";
+        if (aborted) done.reason = "level shutdown";
         if (m.include_position) done.position = position();
         return write(socket, done);
       }

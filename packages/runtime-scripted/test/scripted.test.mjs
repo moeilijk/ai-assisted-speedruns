@@ -34,3 +34,14 @@ test("scripted runtime: the bot's decisions become tool calls until it is done",
   assert.equal(session.filter((x) => x.type === "assistant" && x.message.content.some((c) => c.type === "tool_use")).length, 3);
   assert.ok(session.some((x) => x.type === "user" && /\\"turn\\":\s*3/.test(JSON.stringify(x.message))), "the tool result with turn 3 is in the session log");
 });
+
+test("scripted runtime: a game that answers every step with an error ends the session, it is not retried until the budget", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-scripted-"));
+  const bot = join(dir, "bot.mjs");
+  writeFileSync(bot, `export function createBot() { return { next() { return { code: "throw new Error('refused by the broker')", note: "try" }; } }; }\n`);
+  writeFileSync(join(dir, "AGENTS.md"), "Play the fake game.\n");
+  const runDir = join(dir, "run-01");
+  const r = await run({ runtime: join(here, "..", "index.mjs"), game: join(here, "..", "..", "core", "test", "fake-game.mjs"), recorder: "null", "run-dir": runDir, bot, instructions: join(dir, "AGENTS.md"), "keep-open": true }, { log() {} });
+  assert.equal(r.outcome.status, "failed");
+  assert.match(r.outcome.notes, /10 steps in a row with an error, the last: .*refused by the broker/);
+});

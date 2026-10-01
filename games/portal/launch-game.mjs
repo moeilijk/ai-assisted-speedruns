@@ -43,7 +43,8 @@ console.log(`steam: ${await ensureSteam({ log: console.log })}`);
 // Optional quiet audio (the Windows default is the quiet device while the game opens its audio device, then
 // restored) and displays kept awake; stop-all ends the latter.
 const quiet = await beforeGameStart({ processName: "hl2.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
-const gameArgs = ["-game", "portal", "-novid", "-console", "-noborder", "-window", "-high", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0"];
+// -condebug: the engine writes portal/console.log, where the plugin reads which map loaded (SPT does not say).
+const gameArgs = ["-game", "portal", "-novid", "-console", "-condebug", "-noborder", "-window", "-high", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0"];
 console.log(`starting ${exe} ${gameArgs.join(" ")}`);
 const child = spawn(exe, gameArgs, { cwd: root, detached: true, stdio: "ignore" });
 child.on("error", (e) => { throw new Error(`could not start hl2.exe: ${e.message}`); });

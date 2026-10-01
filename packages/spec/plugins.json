@@ -36,7 +36,7 @@
       "name": "Scripted bot",
       "version": "0.34.5",
       "ai": false,
-      "sha256": "e5f98948e038b68e02d1156205cf343919cb217a2203a586befc391a27cd129d"
+      "sha256": "8b781a5bd1f81cac4b4b68e1442e3c2881c2b43dbd8b5f1b1c4750e397088fb5"
     },
     {
       "kind": "recorder",
@@ -138,9 +138,9 @@
       "dir": "games/portal",
       "id": "portal",
       "name": "Portal",
-      "version": "0.34.4",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "e7621e41c03990b6d9615cc6f01397cbbeb8b788e30f70a1d45b856e01c873ef"
+      "sha256": "d98d5cb80137dbe059c65d0467d88308d5d491ae0c3aec0f0903651e955e515f"
     },
     {
       "kind": "game",

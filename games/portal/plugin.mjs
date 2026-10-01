@@ -10,7 +10,8 @@
 //   AAS_PORTAL_SPT_HOST    SPT IPC host (default 127.0.0.1)
 //   AAS_PORTAL_SPT_PORT    SPT IPC port (default 27182, portal-agent's y_spt_ipc_port)
 import { readFileSync, existsSync, statSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
-import { CHAMBERS, createChamberTracker } from "./chambers.mjs";
+import { CHAMBERS, CHAMBER_MAPS, chamberAt, chamberIndex, createChamberTracker } from "./chambers.mjs";
+import { consoleLogPath, createConsoleMaps } from "./console-maps.mjs";
 import { execFileSync, spawn } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -160,7 +161,7 @@ export default {
     return rows;
   },
   name: "Portal",
-  version: "0.34.4",
+  version: "0.34.5",
   scopeName: "portal",
   capabilities: { turnBased: false, canPause: true, stateAccess: "none", inputRoute: "input", igt: false },
   // Source Unpack runs Portal as hl2.exe; used by the OBS recorder for window match and application audio.
@@ -168,7 +169,8 @@ export default {
   endpoints: [{ host: SPT_HOST, port: SPT_PORT }],
   /** The variables the controller reads inside the broker; nothing else of the environment reaches it. */
   env: ["AAS_PORTAL_GAME_ROOT", "AAS_PORTAL_AGENT_DIR", "AAS_PORTAL_SPT_HOST", "AAS_PORTAL_SPT_PORT"],
-  readable: [PORTAL_AGENT_DIR],
+  // The engine's console log too, where the controller reads which map loaded; nothing else of the game folder.
+  readable: [PORTAL_AGENT_DIR, ...(GAME_ROOT ? [consoleLogPath(GAME_ROOT)] : [])],
   // Published as game-config/ by `aas publish`.
   // His license travels with his files: game-config/LICENSE.
   gameConfig: [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json"), join(PORTAL_AGENT_DIR, "controller", "LICENSE")],
@@ -242,12 +244,19 @@ export default {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     const session = await sptSession({ host: SPT_HOST, port: SPT_PORT });
     try {
+      const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT));
       await consoleCommand(`load ${name}`, session);
       log(`load ${name} sent; waiting for the game`);
       await new Promise((r) => setTimeout(r, 1500));
       const { position } = await waitUntilReady(session);
       log(`restored: TAS-paused at ${JSON.stringify(position)}`);
-      return { position };
+      // The chambers the save stands in or past (its map from the console log, the chamber from the position): ends
+      // the run has reached, which the harness skips when its log holds them already.
+      const map = consoleMaps.read().at(-1) ?? null;
+      const m = map ? CHAMBER_MAPS.find((x) => x.map === map) : null;
+      const at = m ? chamberIndex(chamberAt(map, position) ?? m.chambers[0].id) : -1;
+      const reached = at > 0 ? CHAMBERS.slice(1, at + 1).map((id) => ({ label: `Chamber ${id}`, chamber: id, end: `chamber${id}`, map, chapter: true })) : [];
+      return { position, map, reached };
     } finally {
       session.close();
     }
@@ -309,6 +318,7 @@ export default {
     // `game.milestone` (map change). `aas timeline` turns these into timers,
     // splits and the cut list for the pauses.
     const run = controller.run.bind(controller);
+    const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT));
     let playbacks = 0;
     let transitions = 0;
     controller.run = async (steps, options = {}) => {
@@ -329,11 +339,14 @@ export default {
         }
         globalThis.aas?.event?.("game.playback", data);
         if (result.aborted && /transition|load|level|map/i.test(result.reason ?? "")) {
-          // SPT does not report the map name; assume the campaign order (a reload
-          // of the same map cannot advance the chamber, so it is harmless here).
+          // SPT says a level loaded, not which: the engine's console log names it. A reload of the map the run is in
+          // (a death, a load) is no progress. Only a game started without -condebug writes no log; then the campaign
+          // order is assumed, as before.
           transitions += 1;
-          const map = chambers.nextMap() ?? MAPS[transitions] ?? `transition ${transitions}`;
-          entered(chambers.enterMap(map), { index: transitions, reason: result.reason ?? null });
+          const loaded = consoleMaps.read().at(-1) ?? null;
+          const map = consoleMaps.available ? loaded : chambers.nextMap() ?? MAPS[transitions] ?? null;
+          if (map && map !== chambers.map) entered(chambers.enterMap(map), { index: transitions, reason: result.reason ?? null });
+          else if (map === chambers.map) entered(chambers.observe(result.position));
         } else entered(chambers.observe(result.position));
         return result;
       } catch (error) {

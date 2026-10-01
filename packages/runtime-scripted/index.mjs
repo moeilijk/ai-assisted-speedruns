@@ -49,7 +49,10 @@ export default {
     const client = startBroker({ gameModule: spec.gameModule, runDir, readable: spec.readable, endpoints: spec.endpoints, passThrough: spec.envNames ?? [], timeoutMs: 120000 });
     const session = [];
     const rec = (type, message, extra = {}) => session.push({ type, message, timestamp: new Date().toISOString(), uuid: `u${session.length}`, sessionId: "scripted", ...extra });
-    let steps = 0, status = "stopped", notes = "";
+    let steps = 0, status = "stopped", notes = "", errorsInRow = 0;
+    // A game that answers every step with an error ends the session: the bot would retry until its step budget
+    // (2026-10-02: a plugin refused by the broker's permissions kept a mock going for minutes).
+    const ERRORS_IN_ROW = 10;
     try {
       await client.initialize();
       rec("user", { role: "user", content: [{ type: "text", text: brief.goalPrompt ?? brief.instructions.split("\n")[0] }] });
@@ -67,6 +70,8 @@ export default {
         const text = r.content.filter((c) => c.type === "text").map((c) => c.text).join("\n");
         if (r.isError) result = { error: text };
         else { try { result = JSON.parse(text); } catch { result = { text }; } }
+        errorsInRow = r.isError ? errorsInRow + 1 : 0;
+        if (errorsInRow >= ERRORS_IN_ROW) { status = "failed"; notes = `the game answered ${errorsInRow} steps in a row with an error, the last: ${text.slice(0, 300)}`; break; }
         if (steps % 50 === 0) log(`${steps} steps${step.note ? `; last: ${step.note}` : ""}`);
         await checkpoint?.();
       }

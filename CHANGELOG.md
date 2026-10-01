@@ -37,6 +37,14 @@ and their changes are listed here, with those made since.
 - **BizHawk and FCEUX: a loaded save tells the ends it shows** (`reached`), so a run saved after its goal ends without
   an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save written
   over (`packages/core/src/logged-ends.mjs`, shared with the harness).
+- **Portal: the map a run is in comes from the engine's console log.** SPT reports that a level change aborted a
+  playback, not which map loaded, so the plugin assumed the next map of the campaign: a reload of the map the run is
+  in (a death, a load) counted as the next chamber. The game now starts with `-condebug`, and the plugin reads the map
+  from the line the SPT build prints at every level load (`spt_pause_on_portal_start: level init <map>`); the broker
+  may read that one file. A loaded save tells the chambers it stands in or past (`reached`). Tested against the fake
+  SPT; the real game's console log is still to be measured.
+- **The scripted runtime ends a session whose every step the game answers with an error** (10 in a row), instead of
+  retrying until its step budget.
 - **Portal 2: the goal "credits" is no longer taken when Finale 4 loads.** The credits end shared that map's split,
   and the goal matches a split too, so the victory came before the boss and the credits. The map a run is in is read
   from the console log after every call of the controller (also `play()`, `fastForward()`, a screenshot), from where
