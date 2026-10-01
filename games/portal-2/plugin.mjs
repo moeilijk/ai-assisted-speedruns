@@ -16,7 +16,8 @@ import fs, { existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { connectSar } from "./sar-client.mjs";
-import { MAPS, consoleLogPath, createMapTracker, mapName } from "./maps.mjs";
+import { MAPS, consoleLogPath, createMapTracker, mapIndex, mapName, mapsInLog } from "./maps.mjs";
+import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const UPSTREAM = JSON.parse(fs.readFileSync(join(here, "UPSTREAM.json"), "utf8"));
@@ -32,13 +33,14 @@ export const SEGMENTS = MAPS.map((m) => m.name);
 /** The game's ends: every map after the first, and the credits, which is the game's own end. */
 export const ENDS = [
   ...MAPS.slice(1).map((m) => ({ id: m.map, label: m.name, split: m.name })),
-  { id: "credits", label: "Credits", split: "Finale 4", final: true },
+  // No split: entering Finale 4 carries that split, and the goal would be taken there, before the boss and the credits.
+  { id: "credits", label: "Credits", final: true },
 ];
 
 export default {
   id: "portal_2",
   name: "Portal 2",
-  version: "0.34.4",
+  version: "0.34.5",
   scopeName: "portal2",
   segments: SEGMENTS,
   ends: ENDS,
@@ -165,12 +167,25 @@ export default {
   async loadState({ name, log = () => {} }) {
     // The name goes into the game's console: a plain name only, never a second command (";", a newline, a quote).
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
+    const logFile = consoleLogPath(GAME_ROOT);
+    const before = logFile && existsSync(logFile) ? statSync(logFile).size : 0;
     return this.withSar(async (sar) => {
       await sar.script(`version ${SCRIPT_VERSION}\nstart save ${name}\n+0>||||\n`, "aas_load");
       await sar.pause();
       const { position } = await sar.entity("player");
       log(`restored ${name}: paused at ${JSON.stringify(position)}`);
-      return { position };
+      // The map the save loaded, from what the engine printed while loading it: that map and every map before it are
+      // ends the run has reached (the harness skips those its log already holds).
+      let loaded = null;
+      if (logFile && existsSync(logFile) && statSync(logFile).size > before) {
+        const fd = fs.openSync(logFile, "r");
+        const buf = Buffer.alloc(statSync(logFile).size - before);
+        try { fs.readSync(fd, buf, 0, buf.length, before); } finally { fs.closeSync(fd); }
+        loaded = mapsInLog(buf.toString("utf8")).at(-1) ?? null;
+      }
+      const at = loaded ? mapIndex(loaded) : -1;
+      const reached = at > 0 ? MAPS.slice(1, at + 1).map((m) => ({ label: m.name, split: m.name, end: m.map, map: m.map, chapter: true })) : [];
+      return { position, map: loaded, reached };
     });
   },
 
@@ -191,7 +206,10 @@ export default {
    */
   async connect({ runDir } = {}) {
     const sar = await connectSar({ host: HOST, port: PORT });
-    const tracker = createMapTracker({ logFile: consoleLogPath(GAME_ROOT), from: sar.state.location?.split("/").pop()?.replace(/\.bsp$/, "") ?? null });
+    // The furthest map the run's log already holds (earlier sessions), else what SAR said at the connect; the console
+    // log is read from where it ends now, so nothing an earlier session or run printed comes back as new.
+    const told = [...endsInLog(process.env.AAS_RUN_DIR ?? runDir)].map((e) => mapIndex(e)).filter((i) => i >= 0);
+    const tracker = createMapTracker({ logFile: consoleLogPath(GAME_ROOT), fromEnd: true, from: told.length ? MAPS[Math.max(...told)].map : sar.state.location?.split("/").pop()?.replace(/\.bsp$/, "") ?? null });
     let playbacks = 0;
     // Every map the run enters is a milestone, and the ends are maps, so the harness declares the victory itself.
     const followMaps = () => {
@@ -205,7 +223,7 @@ export default {
       const files = fs.readdirSync(shotDir).filter((f) => /\.(jpe?g|tga)$/i.test(f)).map((f) => ({ f, t: fs.statSync(join(shotDir, f)).mtimeMs }));
       return files.length ? files.sort((a, b) => b.t - a.t)[0] : null;
     };
-    return {
+    const controller = {
       /** The map the run is in, from the engine's console log; null before the game has loaded one. */
       map() { followMaps(); return tracker.current; },
       /** The cheap readings in one call, the way every AAS controller offers them. */
@@ -270,5 +288,12 @@ export default {
       seconds: (s) => Math.round(s / TICK),
       close() { sar.close(); },
     };
+    // After every call the console log is read again: play(), fastForward() or a screenshot let the game load a map
+    // too, and an agent that stops after one of those would otherwise leave that end untold (2026-10-02).
+    for (const [k, fn] of Object.entries(controller)) {
+      if (typeof fn !== "function" || ["map", "seconds", "close"].includes(k)) continue;
+      controller[k] = async (...args) => { try { return await fn.apply(controller, args); } finally { followMaps(); } };
+    }
+    return controller;
   },
 };

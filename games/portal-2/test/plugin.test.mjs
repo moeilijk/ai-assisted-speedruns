@@ -144,3 +144,38 @@ test("prepareRun, save and load speak SAR's own script forms", async () => {
     delete process.env.AAS_PORTAL2_PORT;
   }
 });
+
+test("entering Finale 4 is not the goal 'credits', a map loaded during play() is told, and an old log is not", async () => {
+  // 2026-10-02 (found by reading the flow): the credits end shared Finale 4's split, so the goal was taken when that
+  // map loaded; map changes were read only after some calls; the log was read from its start, earlier sessions too.
+  const { goalReached } = await import("../../../packages/core/src/goal.mjs");
+  const { ENDS } = await import("../plugin.mjs");
+  const credits = ENDS.find((e) => e.id === "credits");
+  assert.equal(goalReached(credits, { event: "game.milestone", data: { label: "Finale 4", split: "Finale 4", end: "sp_a4_finale4", chapter: true } }), false);
+  const gameRoot = mkdtempSync(join(tmpdir(), "aas-p2-root-"));
+  const log = consoleLogPath(gameRoot);
+  mkdirSync(join(gameRoot, "portal2"), { recursive: true });
+  writeFileSync(log, 'Loading map "sp_a1_intro1"\nLoading map "sp_a2_laser_intro"\n'); // an earlier run on this install
+  const fake = await startFakeSar({ location: "portal2/maps/sp_a1_intro1", gameRoot });
+  process.env.AAS_PORTAL2_PORT = String(fake.port);
+  process.env.AAS_PORTAL2_GAME_ROOT = gameRoot;
+  const saved = process.env.AAS_RUN_DIR;
+  process.env.AAS_RUN_DIR = mkdtempSync(join(tmpdir(), "aas-p2-run-"));
+  const events = [];
+  globalThis.aas = { event: (event, data) => events.push({ event, data }) };
+  try {
+    const plugin = (await import(`../plugin.mjs?ends=${fake.port}`)).default;
+    const p2 = await plugin.connect({});
+    try {
+      await p2.observe(["map"]);
+      assert.deepEqual(events.filter((e) => e.event === "game.milestone"), [], "nothing from the earlier run's log");
+      appendFileSync(log, 'Loading map "sp_a1_intro2"\n'); // the game loads the next map while it plays
+      await p2.play();
+      assert.deepEqual(events.filter((e) => e.event === "game.milestone").map((e) => e.data.end), ["sp_a1_intro2"]);
+    } finally { p2.close(); }
+  } finally {
+    if (saved === undefined) delete process.env.AAS_RUN_DIR; else process.env.AAS_RUN_DIR = saved;
+    delete process.env.AAS_PORTAL2_GAME_ROOT;
+    fake.close();
+  }
+});

@@ -32,10 +32,12 @@ export function mapsInLog(text) {
  * Follows `portal2/console.log` from where it was, and reports each map the run moves into. Only forward progress
  * counts: a `map` command back to an earlier chamber is not a split.
  *
- * `read()` returns the maps entered since the previous call, each `{ map, name, index }`.
+ * `read()` returns the maps entered since the previous call, each `{ map, name, index }`. `fromEnd` starts at the end
+ * of the log as it is now: the engine appends to it across sessions, and what an earlier session or run printed is
+ * not this controller's news (2026-10-02, found by reading the flow).
  */
-export function createMapTracker({ logFile, from = null } = {}) {
-  let offset = 0;
+export function createMapTracker({ logFile, from = null, fromEnd = false } = {}) {
+  let offset = fromEnd && logFile && fs.existsSync(logFile) ? fs.statSync(logFile).size : 0;
   let highest = from ? mapIndex(from) : -1;
   return {
     get current() { return highest === -1 ? null : MAPS[highest].map; },

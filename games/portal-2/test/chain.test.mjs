@@ -1,6 +1,6 @@
 // Portal 2 through the whole harness against the fake SAR: a first segment on sp_a1_intro1 that ends when the player is
-// done (stopped), a resume from the engine's save after which the console log shows sp_a1_intro2, the goal, then the
-// bundle and its check (packages/core/test/chain.mjs says what every game must do).
+// done (stopped), a resume from an engine save made in sp_a1_intro2, the goal, which the save shows when it loads (so
+// no agent session is needed), then the bundle and its check (packages/core/test/chain.mjs says what every game must do).
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -23,7 +23,8 @@ test("Portal 2: a stopped first segment, resumed from the engine's save to sp_a1
   try {
     const r = await chainThroughHarness({
       game: path.join(here, "..", "plugin.mjs"), dir, goal: "sp_a1_intro2", bot: path.join(here, "chain-bot.mjs"), expectFirst: "stopped",
-      beforeResume: () => fs.appendFileSync(log, 'Loading map "sp_a1_intro2"\n'),
+      // The last save of the first segment, as if the player had entered sp_a1_intro2 before it was made.
+      beforeResume: () => { const save = fs.readdirSync(path.join(gameRoot, "portal2", "SAVE")).sort().at(-1); fs.writeFileSync(path.join(gameRoot, "portal2", "SAVE", save), JSON.stringify({ map: "sp_a1_intro2" })); },
     });
     const segment2 = r.events.slice(r.events.findLastIndex((e) => e.event === "run.started"));
     assert.ok(segment2.some((e) => e.event === "game.over" && e.data.victory && e.data.goal === "sp_a1_intro2"), "the second segment reached the goal");

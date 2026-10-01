@@ -147,9 +147,9 @@
       "dir": "games/portal-2",
       "id": "portal_2",
       "name": "Portal 2",
-      "version": "0.34.4",
+      "version": "0.34.5",
       "stub": false,
-      "sha256": "fe0076b95eab147ad624f818b4749440b676ddc27f61156737c1c7b075241eb2"
+      "sha256": "3951af5322e9b46a4279b8195e54d72f42c049645cd0c8353d686d7c674a49ad"
     },
     {
       "kind": "game",

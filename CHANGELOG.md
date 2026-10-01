@@ -37,6 +37,12 @@ and their changes are listed here, with those made since.
 - **BizHawk and FCEUX: a loaded save tells the ends it shows** (`reached`), so a run saved after its goal ends without
   an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save written
   over (`packages/core/src/logged-ends.mjs`, shared with the harness).
+- **Portal 2: the goal "credits" is no longer taken when Finale 4 loads.** The credits end shared that map's split,
+  and the goal matches a split too, so the victory came before the boss and the credits. The map a run is in is read
+  from the console log after every call of the controller (also `play()`, `fastForward()`, a screenshot), from where
+  the log ends when the controller is made (the engine appends to it across sessions, so an earlier run's maps came
+  back as new), and from the furthest map the run's log already holds. A loaded save tells the map it loaded and the
+  maps before it (`reached`). Tested against the fake SAR only: Portal 2 is not installed on this machine.
 - **Balatro: a loaded save tells the ends it shows** (every ante before the one it stands in, and the win), and an
   action whose answer fails after the game took it (a timeout) still has the game's state followed, so an ante it
   passed is told before the agent can stop.
