@@ -52,7 +52,7 @@
       "id": "obs",
       "name": "OBS Studio (video)",
       "version": "0.34.5",
-      "sha256": "52a33ce3b4922c120b5c1462f42e356ed0191f382fcfc3d42193e9051b42d3a2"
+      "sha256": "fe1ed424269861e0e775ee83dfe42e81ab81b3e1a531abe40320b2ea581f4338"
     },
     {
       "kind": "recorder",

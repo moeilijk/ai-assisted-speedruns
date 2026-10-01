@@ -379,6 +379,24 @@ export function createObsRecorder(options = {}) {
         default:
       }
     },
+    /**
+     * While the agent plays: OBS is asked every `watchSeconds` (15) whether it is still recording; the first time it is
+     * not, or does not answer, `onLost` is told why, once (2026-10-02: an OBS that stopped mid-run went unnoticed while
+     * the agent's tokens were spent on a run without a recording). Returns the function that stops the watch.
+     */
+    watch(onLost, { intervalMs = (options.watchSeconds ?? 15) * 1000 } = {}) {
+      let told = false;
+      const tick = async () => {
+        if (told) return;
+        let reason = null;
+        try { if (!(await (await connect()).call("GetRecordStatus")).outputActive) reason = "OBS is not recording any more"; }
+        catch (e) { reason = `OBS does not answer (${e?.message ?? e})`; }
+        if (reason && !told) { told = true; log(`recording lost: ${reason}`); onLost(reason); }
+      };
+      const timer = setInterval(() => { tick(); }, intervalMs);
+      timer.unref?.();
+      return () => clearInterval(timer);
+    },
     async stop() {
       const o = await connect();
       for (const t of timers) clearTimeout(t);

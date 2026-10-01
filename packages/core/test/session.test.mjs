@@ -118,3 +118,17 @@ test("a game that shows an end past the goal when it is ready has reached the go
   assert.equal(over.data.goal, "a");
   assert.equal(over.data.shown, "b");
 });
+
+test("a recording lost while the agent plays ends the session and says why", async () => {
+  let interrupted = null;
+  const ctx = bare({
+    id: "r",
+    interrupt(reason) { interrupted = reason; },
+    async start() { for (let i = 0; i < 100 && !interrupted; i += 1) await new Promise((r) => setTimeout(r, 10)); return { status: "stopped", notes: interrupted ?? "ran out" }; },
+  });
+  const recorder = { ...nullRecorder, watch(onLost) { const t = setTimeout(() => onLost("OBS is not recording any more"), 30); return () => clearTimeout(t); } };
+  const { outcome } = await session({ ...ctx, recorder, early: { release: () => null } });
+  assert.match(interrupted, /the recording was lost: OBS is not recording any more/);
+  assert.equal(outcome.status, "stopped");
+  assert.ok(eventsOf(ctx.runDir).some((e) => e.event === "recording.lost"));
+});

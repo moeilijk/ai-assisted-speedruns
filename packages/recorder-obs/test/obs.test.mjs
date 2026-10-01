@@ -176,3 +176,22 @@ test("close() resolves once the connection is really closed, so a caller that th
     await fake.close();
   }
 });
+
+test("recorder-obs: a recording that stops while the agent plays is reported once", async () => {
+  const obs = await startFakeObs();
+  try {
+    const rec = createObsRecorder({ url: obs.url, password: "secret", ...quiet, pictureSeconds: 0.05, writingSeconds: 0.3 });
+    await rec.preflight(brief, game);
+    await rec.start(brief, { runDir: "/tmp/not-a-mnt-path" });
+    const lost = [];
+    const unwatch = rec.watch((reason) => lost.push(reason), { intervalMs: 50 });
+    await new Promise((r) => setTimeout(r, 150));
+    assert.deepEqual(lost, [], "nothing while it records");
+    obs.state.recording = false; // OBS stopped on its own (a crash, a full disk, a person)
+    await new Promise((r) => setTimeout(r, 300));
+    unwatch();
+    assert.deepEqual(lost, ["OBS is not recording any more"]);
+  } finally {
+    await obs.close();
+  }
+});

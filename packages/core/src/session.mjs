@@ -91,11 +91,22 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
     outcome = { status: "stopped", endedAt: new Date().toISOString(), notes: `${stopReason}; no agent session was started` };
     log(outcome.notes);
   } else {
+    // A recording lost while the agent plays (the recorder's watch) ends the session: a run without a recording is no
+    // valid run, and the agent's turns would be spent for nothing.
+    const unwatch = recorder.watch?.((reason) => {
+      if (stopReason) return;
+      stopReason = `the recording was lost: ${reason}`;
+      events.append("recording.lost", { reason, ...seg });
+      log(`${stopReason}; stopping the session`);
+      runtime.interrupt?.(stopReason);
+    });
     try {
       outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush(), stopRequested: () => stopReason });
     } catch (error) {
       outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
       events.append("run.error", { message: outcome.notes, ...seg });
+    } finally {
+      unwatch?.();
     }
   }
   process.off("SIGINT", stopRequested);

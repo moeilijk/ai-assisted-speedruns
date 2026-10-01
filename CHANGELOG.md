@@ -83,6 +83,10 @@ and their changes are listed here, with those made since.
   moved to its display and OBS recorded the black loading screen, which the recorder refused. The launcher now waits
   for Communication Mod's first state, which it sends once the game stands ready, before it moves the window and the
   recording starts.
+- **A recording lost while the agent plays ends the session.** OBS was checked only at the start; one that stopped
+  recording or stopped answering mid-run went unnoticed while the agent's turns were spent on a run without a
+  recording. The OBS recorder now asks every 15 s (`watch`), and the session stops the agent the first time OBS is not
+  recording, with `recording.lost` and the reason in the log.
 - **A refused sign-in no longer costs a run its proof.** When the account's token cannot be renewed during a run, the
   heads go on with the ticket's own control secret instead of being missed; a ticket asked with a refused token fails
   at once instead of being asked three more times; and only one process at a time renews the sign-in (a lock next to
