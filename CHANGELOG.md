@@ -34,14 +34,14 @@ and their changes are listed here, with those made since.
   It now also holds in world N with `OperMode` 2, the victory the axe starts (the smb-autosplitter's own end signal).
   A game over (`OperMode` 3) is a defeat the harness counts. The goal prompt says "until you have completed: World
   N", not "until you reach", which read as arriving in it.
-- **BizHawk and FCEUX: a loaded save tells the ends it shows** (`reached`), so a run saved after its goal ends without
-  an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save written
-  over (`packages/core/src/logged-ends.mjs`, shared with the harness).
+- **BizHawk and FCEUX: a loaded save tells the furthest end it shows** (`reached`), so a run saved after its goal ends
+  without an agent session; and an end the run's log already holds is not told again, nor its FCEUX milestone save
+  written over (`packages/core/src/logged-ends.mjs`, shared with the harness).
 - **Portal: the map a run is in comes from the engine's console log.** SPT reports that a level change aborted a
   playback, not which map loaded, so the plugin assumed the next map of the campaign: a reload of the map the run is
   in (a death, a load) counted as the next chamber. The game now starts with `-condebug`, and the plugin reads the map
   from the line the SPT build prints at every level load (`spt_pause_on_portal_start: level init <map>`); the broker
-  may read that one file. A loaded save tells the chambers it stands in or past (`reached`). Tested against the fake
+  may read that one file. A loaded save tells the chamber it stands in (`reached`). Tested against the fake
   SPT; the real game's console log is still to be measured.
 - **The scripted runtime ends a session whose every step the game answers with an error** (10 in a row), instead of
   retrying until its step budget.
@@ -49,9 +49,9 @@ and their changes are listed here, with those made since.
   and the goal matches a split too, so the victory came before the boss and the credits. The map a run is in is read
   from the console log after every call of the controller (also `play()`, `fastForward()`, a screenshot), from where
   the log ends when the controller is made (the engine appends to it across sessions, so an earlier run's maps came
-  back as new), and from the furthest map the run's log already holds. A loaded save tells the map it loaded and the
-  maps before it (`reached`). Tested against the fake SAR only: Portal 2 is not installed on this machine.
-- **Balatro: a loaded save tells the ends it shows** (every ante before the one it stands in, and the win), and an
+  back as new), and from the furthest map the run's log already holds. A loaded save tells the map it loaded
+  (`reached`). Tested against the fake SAR only: Portal 2 is not installed on this machine.
+- **Balatro: a loaded save tells the furthest end it shows** (the ante before the one it stands in, or the win), and an
   action whose answer fails after the game took it (a timeout) still has the game's state followed, so an ante it
   passed is told before the agent can stop.
 - **Slay the Spire: an act end the run's log already holds is not told again** after a resume.
@@ -95,10 +95,10 @@ and their changes are listed here, with those made since.
   their example paths; they now use `D:\Runs`. The sound devices the GUI offers are, as before, the playback
   devices active on the machine that runs it (`list-audio.mjs`).
 - **A goal the game already shows when it is ready starts no agent session.** `prepareRun` and `loadState` may return
-  the milestones of ends the game state already shows (`reached`); when one is the goal, the harness records it and does
-  not start the agent. A run saved on the reward screen of the boss it had to beat is continued to its goal without a
-  turn. Measured on the real game with a copy of such a run and a stand-in `claude` that refuses any session: the copy
-  ended on Victory (Act 1 boss) and the stand-in was never called.
+  the milestone of the furthest end the game state already shows (`reached`); when it is the goal or an end after it,
+  the harness records the goal as reached and does not start the agent. A run saved on the reward screen of the boss
+  it had to beat is continued to its goal without a turn. Measured on the real game with a copy of such a run and a
+  stand-in `claude` that refuses any session: the copy ended on Victory (Act 1 boss) and the stand-in was never called.
 
 ## 0.34.4 — 2026-09-29
 
