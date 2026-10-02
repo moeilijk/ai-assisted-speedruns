@@ -85,3 +85,12 @@ test("the credits: in escape_02, the player taken to the outro scene far below i
     assert.ok(events.some((e) => e.event === "game.over" && e.data.victory && e.data.label === "Credits"));
   });
 });
+
+test("a chamber sign passed halfway through a long run is seen, not only where the run ends", { skip: !available && "portal-agent not checked out" }, async () => {
+  await withPortal({}, async ({ plugin, chambers }) => {
+    const portal = await plugin.connect();
+    Object.assign(globalThis.__portalSpt.state, { x: -1400, y: -800, z: 800 }); // just before chamber 01's sign
+    await portal.run(Array.from({ length: 12 }, () => ({ ticks: 50, keys: { forward: true } }))); // 600 ticks, ends at x = 1000
+    assert.deepEqual(chambers(), ["chamber01"], "the sign at x -1026 was passed in the first part");
+  });
+});

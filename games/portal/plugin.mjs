@@ -335,6 +335,30 @@ export default {
     const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT), CHAMBER_MAPS.map((m) => m.map));
     let playbacks = 0;
     let transitions = 0;
+    // A long run is played in parts at the agent's own step boundaries, never inside a step, and the position is looked
+    // at after each part: SPT reports it only at the end of a run, and a chamber sign passed halfway through a long run
+    // was never seen (2026-10-02, found by reading the flow). The game stays TAS-paused between the parts, so what
+    // plays is the same; the run is still one playback, with its ticks added up.
+    const PART_TICKS = 133; // about 2 s of game time
+    const runInParts = async (all, opts) => {
+      if (!Array.isArray(all)) return run(all, { ...opts, position: true });
+      const parts = [];
+      let current = [], n = 0;
+      for (const step of all) {
+        const t = Number(step?.ticks) || 0;
+        if (current.length && n + t > PART_TICKS) { parts.push(current); current = []; n = 0; }
+        current.push(step); n += t;
+      }
+      if (current.length) parts.push(current);
+      let total = 0, last = null;
+      for (const [i, part] of parts.entries()) {
+        last = await run(part, { ...opts, position: true });
+        total += Number(last?.ticks) || 0;
+        if (last?.aborted) break;
+        if (i < parts.length - 1) seen(last?.position);
+      }
+      return { ...last, ticks: total };
+    };
     controller.run = async (steps, options = {}) => {
       const ticks = Array.isArray(steps) ? steps.reduce((n, s) => n + (Number(s?.ticks) || 0), 0) : 0;
       const started = Date.now();
@@ -344,7 +368,7 @@ export default {
       globalThis.aas?.event?.("game.playback", { phase: "start", index: ++playbacks, planned_ticks: ticks, steps: plan });
       try {
         // Always ask for the position: the chamber tracker and the timeline need it.
-        const result = await run(steps, { ...options, position: true });
+        const result = await runInParts(steps, options);
         const data = { phase: "end", index: playbacks, ticks: result.ticks, seconds: Math.round(result.ticks * 15) / 1000, wall_ms: Date.now() - started };
         if (result.position) data.position = result.position;
         if (result.aborted) {

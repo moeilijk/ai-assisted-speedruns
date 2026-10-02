@@ -43,6 +43,10 @@ and their changes are listed here, with those made since.
   from the demo portal-agent records at every level load, named after the map (measured in the real game:
   `Recording to .\agent_runs\<time>\testchmb_a_01.dem...`, and `testchmb_a_01_1.dem` when the same map loads again);
   the broker may read that one file. A loaded save tells the chamber it stands in (`reached`).
+- **Portal: a chamber passed halfway through a long run is seen.** SPT reports the position only at the end of a run,
+  so a chamber sign the player passed on the way was not counted. A long run is now played in parts of about 2 s at
+  the agent's own step boundaries (never inside a step), with the position looked at after each; the game stays
+  TAS-paused between the parts, and the run is still one playback.
 - **Portal: the credits are detected.** "Credits" is the default goal of every AI run, and nothing told it: only the
   agent's own last message marked it. The plugin now takes it when, in escape_02, the player is taken to the outro
   scene far below the map's play space (below z -7000). Measured in portal-agent's own run to the credits (its
