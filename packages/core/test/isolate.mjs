@@ -8,6 +8,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+// What an earlier run that was killed (its exit handler never ran) left: its own kind of directory, over an hour old.
+for (const old of fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("aas-test-config-"))) {
+  try { if (Date.now() - fs.statSync(path.join(os.tmpdir(), old)).mtimeMs > 3600000) fs.rmSync(path.join(os.tmpdir(), old), { recursive: true, force: true }); } catch { /* another run's, in use or gone */ }
+}
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-test-config-"));
 fs.mkdirSync(path.join(dir, "tmp"));
 process.env.TMPDIR = path.join(dir, "tmp");

@@ -179,6 +179,7 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       const w = await archiveFetch(`${proofUrl()}/api/v1/e2e/`, { method: "DELETE", headers: { Accept: "application/json" } });
       log(`e2e account wiped: ${JSON.stringify((await w.json()).removed)}`);
     } catch (e) { log(`wipe failed: ${e.message}`); }
+    fs.rmSync(work, { recursive: true, force: true }); // its config, GUI note and checks: nothing stays in /tmp
   }
   const after = snapshot();
   assert.deepEqual(Object.keys(after).sort(), Object.keys(before).sort(), "no settings file appeared or went missing");
