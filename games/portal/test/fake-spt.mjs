@@ -7,17 +7,21 @@ import { join } from "node:path";
 
 const NUL = "\0";
 
-// With `gameRoot`, every level load prints the SPT build's own line to portal/console.log, as the game started with
-// -condebug does: `spt_pause_on_portal_start: level init <map>`. A playback past `transitionAfterTicks` loads
+// With `gameRoot`, every level load prints the demo autorecord's line to portal/console.log, as the game started with
+// -condebug does (measured 2026-10-02): `Recording to .\agent_runs\<time>\<map>.dem...`, and `<map>_<n>.dem` when the
+// same map loads again. A playback past `transitionAfterTicks` loads
 // `transitionTo`; past `reloadAfterTicks` it reloads the map it is in (a death). Both abort with SPT's real reason,
 // "level shutdown" (portal-agent.patch). A save holds the map it was made on, and a load prints that map.
 export async function startFakeSpt({ width = 64, height = 36, gameRoot = null, readyDelayMs = 50, transitionAfterTicks = Infinity, transitionTo = "testchmb_a_01", reloadAfterTicks = Infinity } = {}) {
   const state = { pitch: 0, yaw: 90, roll: 0, x: -544, y: -368, z: 128, runActive: false, ready: true, demoDir: null, ticksPlayed: 0, map: "testchmb_a_00" };
+  const loads = new Map();
   const levelInit = (map) => {
     state.map = map;
+    const n = loads.get(map) ?? 0;
+    loads.set(map, n + 1);
     if (!gameRoot) return;
     mkdirSync(join(gameRoot, "portal"), { recursive: true });
-    appendFileSync(join(gameRoot, "portal", "console.log"), `spt_pause_on_portal_start: level init ${map}\n`);
+    appendFileSync(join(gameRoot, "portal", "console.log"), `Demo recording started\nRecording to .\\agent_runs\\2026.10.02-02.10.11\\${n ? `${map}_${n}` : map}.dem...\n`);
   };
   const seen = [];
   const sockets = new Set();

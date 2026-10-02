@@ -15,8 +15,19 @@ const here = dirname(fileURLToPath(import.meta.url));
 const portalAgentDir = resolve(process.env.AAS_PORTAL_AGENT_DIR || join(here, "..", "..", "..", ".local", "portal-agent"));
 const available = existsSync(join(portalAgentDir, "controller", "index.mjs"));
 
-test("the console log's level loads are read as the SPT build prints them", () => {
-  assert.deepEqual(mapsInLog("x\nspt_pause_on_portal_start: level init testchmb_a_01\nLoading map \"testchmb_a_02\"\n"), ["testchmb_a_01", "testchmb_a_02"]);
+test("the console log's level loads are read as the real game prints them", () => {
+  // Lines of the real game's console.log, 2026-10-02 02:10: start_run, `map testchmb_a_01`, then a save loaded again.
+  const real = [
+    "Agent run starting: loading testchmb_a_00 and arming demo autorecord.",
+    "Demo recording started",
+    "Recording to .\\agent_runs\\2026.10.02-02.10.11\\testchmb_a_00.dem...",
+    "Completed demo, recording time 9.8, game frames 652.",
+    "Recording to .\\agent_runs\\2026.10.02-02.10.11\\testchmb_a_01.dem...",
+    "Loading game from //MOD/SAVE/testchmb_a_01.HL1...",
+    "Recording to .\\agent_runs\\2026.10.02-02.10.11\\testchmb_a_01_1.dem...",
+  ].join("\r\n");
+  const known = ["testchmb_a_00", "testchmb_a_01", "testchmb_a_02"];
+  assert.deepEqual(mapsInLog(real, known), ["testchmb_a_00", "testchmb_a_01", "testchmb_a_01"], "the reload is testchmb_a_01 again, not a map called testchmb_a_01_1");
 });
 
 async function withPortal(opts, fn) {

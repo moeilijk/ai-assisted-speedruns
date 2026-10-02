@@ -40,9 +40,9 @@ and their changes are listed here, with those made since.
 - **Portal: the map a run is in comes from the engine's console log.** SPT reports that a level change aborted a
   playback, not which map loaded, so the plugin assumed the next map of the campaign: a reload of the map the run is
   in (a death, a load) counted as the next chamber. The game now starts with `-condebug`, and the plugin reads the map
-  from the line the SPT build prints at every level load (`spt_pause_on_portal_start: level init <map>`); the broker
-  may read that one file. A loaded save tells the chamber it stands in (`reached`). Tested against the fake
-  SPT; the real game's console log is still to be measured.
+  from the demo portal-agent records at every level load, named after the map (measured in the real game:
+  `Recording to .\agent_runs\<time>\testchmb_a_01.dem...`, and `testchmb_a_01_1.dem` when the same map loads again);
+  the broker may read that one file. A loaded save tells the chamber it stands in (`reached`).
 - **The scripted runtime ends a session whose every step the game answers with an error** (10 in a row), instead of
   retrying until its step budget.
 - **Portal 2: the goal "credits" is no longer taken when Finale 4 loads.** The credits end shared that map's split,

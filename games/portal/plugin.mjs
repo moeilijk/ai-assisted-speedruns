@@ -244,7 +244,7 @@ export default {
     if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(name))) throw new Error(`save name ${JSON.stringify(String(name)).slice(0, 60)} is not a plain name (letters, digits, _ and -)`);
     const session = await sptSession({ host: SPT_HOST, port: SPT_PORT });
     try {
-      const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT));
+      const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT), CHAMBER_MAPS.map((m) => m.map));
       await consoleCommand(`load ${name}`, session);
       log(`load ${name} sent; waiting for the game`);
       await new Promise((r) => setTimeout(r, 1500));
@@ -318,7 +318,7 @@ export default {
     // `game.milestone` (map change). `aas timeline` turns these into timers,
     // splits and the cut list for the pauses.
     const run = controller.run.bind(controller);
-    const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT));
+    const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT), CHAMBER_MAPS.map((m) => m.map));
     let playbacks = 0;
     let transitions = 0;
     controller.run = async (steps, options = {}) => {
