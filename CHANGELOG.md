@@ -43,6 +43,11 @@ and their changes are listed here, with those made since.
   from the demo portal-agent records at every level load, named after the map (measured in the real game:
   `Recording to .\agent_runs\<time>\testchmb_a_01.dem...`, and `testchmb_a_01_1.dem` when the same map loads again);
   the broker may read that one file. A loaded save tells the chamber it stands in (`reached`).
+- **Portal: the credits are detected.** "Credits" is the default goal of every AI run, and nothing told it: only the
+  agent's own last message marked it. The plugin now takes it when, in escape_02, the player is taken to the outro
+  scene far below the map's play space (below z -7000). Measured in portal-agent's own run to the credits (its
+  evidence log): in escape_02 the player stood between z 384 and 3640, and at (-1372, -3203, -7344) from the moment
+  "Still Alive" began. That is one run's measurement; no run of ours has reached the credits.
 - **The scripted runtime ends a session whose every step the game answers with an error** (10 in a row), instead of
   retrying until its step budget.
 - **Portal 2: the goal "credits" is no longer taken when Finale 4 loads.** The credits end shared that map's split,

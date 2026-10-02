@@ -33,6 +33,7 @@ test("the console log's level loads are read as the real game prints them", () =
 async function withPortal(opts, fn) {
   const gameRoot = mkdtempSync(join(tmpdir(), "aas-portal-root-"));
   const spt = await startFakeSpt({ gameRoot, ...opts });
+  globalThis.__portalSpt = spt;
   Object.assign(process.env, { AAS_PORTAL_SPT_PORT: String(spt.port), AAS_PORTAL_GAME_ROOT: gameRoot, AAS_PORTAL_AGENT_DIR: portalAgentDir, AAS_RUN_DIR: mkdtempSync(join(tmpdir(), "aas-portal-run-")) });
   const { default: plugin } = await import(`../plugin.mjs?console=${spt.port}`);
   const events = [];
@@ -67,5 +68,20 @@ test("a save made in a later map tells the chamber it stands in when it is loade
     const r = await plugin.loadState({ name: "in_a01", log() {} });
     assert.equal(r.map, "testchmb_a_01");
     assert.deepEqual(r.reached.map((m) => m.end), ["chamber02"]);
+  });
+});
+
+test("the credits: in escape_02, the player taken to the outro scene far below its play space is the game's end, told once", { skip: !available && "portal-agent not checked out" }, async () => {
+  // The position portal-agent's own run reached when "Still Alive" began (its evidence, around sequence 6880).
+  await withPortal({ transitionAfterTicks: 5, transitionTo: "escape_02" }, async ({ plugin, events }) => {
+    const portal = await plugin.connect();
+    await portal.run([{ ticks: 10, keys: { forward: true } }]);
+    const ends = () => events.filter((e) => e.event === "game.milestone").map((e) => e.data.end);
+    assert.ok(!ends().includes("credits"), "not in escape_02's play space");
+    globalThis.__portalSpt.state.z = -7344.31;
+    await portal.observe(["position"]);
+    await portal.observe(["position"]);
+    assert.deepEqual(ends().filter((e) => e === "credits"), ["credits"], "told once");
+    assert.ok(events.some((e) => e.event === "game.over" && e.data.victory && e.data.label === "Credits"));
   });
 });

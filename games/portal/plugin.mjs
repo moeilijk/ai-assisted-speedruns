@@ -12,6 +12,7 @@
 import { readFileSync, existsSync, statSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { CHAMBERS, CHAMBER_MAPS, chamberAt, chamberIndex, createChamberTracker } from "./chambers.mjs";
 import { consoleLogPath, createConsoleMaps } from "./console-maps.mjs";
+import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { execFileSync, spawn } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -85,7 +86,7 @@ export default {
   // Segment names for the timer / splits file: one per chamber.
   segments: SPLITS,
   /** The game's ends: reaching each test chamber after the first (the chamber milestone marks it; owner 2026-09-17), and
-   *  the credits, the game's own end, which the completion marker in the agent's messages marks for now. */
+   *  the credits, the game's own end, seen from the player's position in the outro scene (see connect()). */
   ends: [
     ...CHAMBERS.slice(1).map((id) => ({ id: `chamber${id}`, label: `Chamber ${id}` })),
     { id: "credits", label: "Credits", final: true },
@@ -305,14 +306,27 @@ export default {
     const entered = (id, extra = {}) => {
       if (id) globalThis.aas?.event?.("game.milestone", { label: `Chamber ${id}`, chamber: id, end: `chamber${id}`, map: chambers.map, chapter: true, ...extra });
     };
+    // The credits, the game's own end: the ending takes the player out of escape_02's play space into the outro scene,
+    // far below it. Measured in portal-agent's own run to the credits (.local/portal-agent/evidence, around sequence
+    // 6880): in escape_02 the player stood between z 384 and 3640; when "Still Alive" began the position was
+    // (-1372, -3203, -7344), and stayed there until the credits ended. One run's measurement, not one of ours.
+    let credits = endsInLog(process.env.AAS_RUN_DIR).has("credits");
+    const seen = (pos) => {
+      entered(chambers.observe(pos));
+      if (!credits && chambers.map === "escape_02" && Number.isFinite(pos?.z) && pos.z < -7000) {
+        credits = true;
+        globalThis.aas?.event?.("game.milestone", { label: "Credits", end: "credits", map: "escape_02", chapter: true });
+        globalThis.aas?.event?.("game.over", { victory: true, label: "Credits" });
+      }
+    };
     const observe = controller.observe.bind(controller);
     controller.observe = async (fields = ["facing", "position"], options) => {
       const result = await observe(fields, options);
-      entered(chambers.observe(result?.position));
+      seen(result?.position);
       return result;
     };
     const position = controller.position?.bind(controller);
-    if (position) controller.position = async (...a) => { const r = await position(...a); entered(chambers.observe(r?.position ?? r)); return r; };
+    if (position) controller.position = async (...a) => { const r = await position(...a); seen(r?.position ?? r); return r; };
     // Every TAS playback is a `game.playback` event (the only time game time
     // advances); an aborted playback with a load/transition reason is a
     // `game.milestone` (map change). `aas timeline` turns these into timers,
@@ -346,8 +360,8 @@ export default {
           const loaded = consoleMaps.read().at(-1) ?? null;
           const map = consoleMaps.available ? loaded : chambers.nextMap() ?? MAPS[transitions] ?? null;
           if (map && map !== chambers.map) entered(chambers.enterMap(map), { index: transitions, reason: result.reason ?? null });
-          else if (map === chambers.map) entered(chambers.observe(result.position));
-        } else entered(chambers.observe(result.position));
+          else if (map === chambers.map) seen(result.position);
+        } else seen(result.position);
         return result;
       } catch (error) {
         globalThis.aas?.event?.("game.playback", { phase: "end", index: playbacks, error: String(error?.message ?? error), wall_ms: Date.now() - started });
