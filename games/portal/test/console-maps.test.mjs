@@ -4,12 +4,13 @@
 // not checked out (its controller talks to the fake SPT).
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { startFakeSpt } from "./fake-spt.mjs";
 import { mapsInLog } from "../console-maps.mjs";
+import { parseDemo, createDemoFollower } from "../demo-track.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const portalAgentDir = resolve(process.env.AAS_PORTAL_AGENT_DIR || join(here, "..", "..", "..", ".local", "portal-agent"));
@@ -71,26 +72,73 @@ test("a save made in a later map tells the chamber it stands in when it is loade
   });
 });
 
-test("the credits: in escape_02, the player taken to the outro scene far below its play space is the game's end, told once", { skip: !available && "portal-agent not checked out" }, async () => {
-  // The position portal-agent's own run reached when "Still Alive" began (its evidence, around sequence 6880).
+test("the credits: in escape_02, the view come to rest far below its play space is the game's end, told once", { skip: !available && "portal-agent not checked out" }, async () => {
+  // The positions portal-agent's own run reported (its evidence): the outro moving through core storage (6893, 6895),
+  // then at rest (6898, 6900), after which "Still Alive" had begun.
   await withPortal({ transitionAfterTicks: 5, transitionTo: "escape_02" }, async ({ plugin, events }) => {
     const portal = await plugin.connect();
     await portal.run([{ ticks: 10, keys: { forward: true } }]);
     const ends = () => events.filter((e) => e.event === "game.milestone").map((e) => e.data.end);
+    const at = (x, y, z) => Object.assign(globalThis.__portalSpt.state, { x, y, z });
     assert.ok(!ends().includes("credits"), "not in escape_02's play space");
-    globalThis.__portalSpt.state.z = -7344.31;
+    at(-1371.67, -3203.11, -7344.31);
+    await portal.run([{ ticks: 100 }]);
     await portal.observe(["position"]);
-    await portal.observe(["position"]);
-    assert.deepEqual(ends().filter((e) => e === "credits"), ["credits"], "told once");
+    assert.ok(!ends().includes("credits"), "the same position again while TAS-paused says nothing");
+    at(-649.69, -3505.52, -7376.17);
+    await portal.run([{ ticks: 100 }]);
+    assert.ok(!ends().includes("credits"), "the outro still moving through core storage");
+    at(-766.75, -3080.75, -7345);
+    await portal.run([{ ticks: 100 }]);
+    assert.ok(!ends().includes("credits"), "first seen at rest");
+    await portal.run([{ ticks: 100 }]);
+    await portal.run([{ ticks: 100 }]);
+    assert.deepEqual(ends().filter((e) => e === "credits"), ["credits"], "at rest after game time played, told once");
     assert.ok(events.some((e) => e.event === "game.over" && e.data.victory && e.data.label === "Credits"));
   });
 });
 
-test("a chamber sign passed halfway through a long run is seen, not only where the run ends", { skip: !available && "portal-agent not checked out" }, async () => {
+// A Source demo (protocol 3) as portal-agent records one: a header naming the map, then one packet frame per tick whose
+// cmdinfo holds the view origin.
+function demo(map, points) {
+  const head = Buffer.alloc(1072);
+  head.write("HL2DEMO\0", 0, "latin1");
+  head.writeInt32LE(3, 8);
+  head.write(map, 536, "latin1");
+  const frames = points.map(([tick, x, y, z]) => {
+    const f = Buffer.alloc(1 + 4 + 76 + 8 + 4);
+    f[0] = 2;
+    f.writeInt32LE(tick, 1);
+    f.writeFloatLE(x, 9); f.writeFloatLE(y, 13); f.writeFloatLE(z, 17);
+    return f;
+  });
+  return Buffer.concat([head, ...frames]);
+}
+
+test("a demo still being recorded is read up to its last whole frame, and every tick is given once", () => {
+  const dir = mkdtempSync(join(tmpdir(), "aas-portal-demos-"));
+  const file = join(dir, "testchmb_a_00.dem");
+  const whole = demo("testchmb_a_00", [[1, 1, 1, 1], [2, 2, 2, 2], [3, 3, 3, 3]]);
+  writeFileSync(file, whole.subarray(0, whole.length - 10)); // the engine has not written all of tick 3 yet
+  assert.deepEqual(parseDemo(file, { partial: true }).samples.map((s) => s.tick), [1, 2]);
+  assert.throws(() => parseDemo(file), /cut off/, "a finished demo that is cut off is an error");
+  const follower = createDemoFollower(dir);
+  assert.deepEqual(follower.read("testchmb_a_00").map((s) => s.tick), [1, 2]);
+  assert.deepEqual(follower.read("testchmb_a_01"), [], "a demo of another map waits");
+  writeFileSync(file, whole);
+  assert.deepEqual(follower.read("testchmb_a_00").map((s) => s.tick), [3], "only the tick that came in since");
+});
+
+test("a chamber sign passed halfway through a playback is seen from the demo, and the playback is played as one run", { skip: !available && "portal-agent not checked out" }, async () => {
   await withPortal({}, async ({ plugin, chambers }) => {
     const portal = await plugin.connect();
-    Object.assign(globalThis.__portalSpt.state, { x: -1400, y: -800, z: 800 }); // just before chamber 01's sign
-    await portal.run(Array.from({ length: 12 }, () => ({ ticks: 50, keys: { forward: true } }))); // 600 ticks, ends at x = 1000
-    assert.deepEqual(chambers(), ["chamber01"], "the sign at x -1026 was passed in the first part");
+    const spt = globalThis.__portalSpt;
+    const before = spt.seen.filter((m) => m.type === "tas_run").length;
+    // The demo shows the view passing chamber 01's sign (-1026, -800, 832) halfway; the playback ends far past it.
+    writeFileSync(join(spt.state.demoDir, "testchmb_a_00.dem"), demo("testchmb_a_00", [[10, -900, -700, 830], [20, -1026, -800, 850], [30, -1400, -800, 830]]));
+    Object.assign(spt.state, { x: -1400, y: -800, z: 800 });
+    await portal.run(Array.from({ length: 12 }, () => ({ ticks: 50, keys: { forward: true } }))); // 600 ticks
+    assert.deepEqual(chambers(), ["chamber01"], "the sign at x -1026 was passed halfway");
+    assert.equal(spt.seen.filter((m) => m.type === "tas_run").length - before, 1, "one tas_run, as the agent asked");
   });
 });

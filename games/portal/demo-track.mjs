@@ -9,31 +9,71 @@ import path from "node:path";
 import { createChamberTracker } from "./chambers.mjs";
 import { loadSettings } from "../../packages/core/src/settings.mjs";
 
-// This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
-loadSettings(import.meta.url);
-
-export function parseDemo(file) {
+/**
+ * `partial`: the demo is still being recorded, so its last frame may be cut off; parsing stops there instead of failing.
+ */
+export function parseDemo(file, { partial = false } = {}) {
   const d = fs.readFileSync(file);
-  if (d.subarray(0, 8).toString("latin1") !== "HL2DEMO\0") throw new Error(`${file}: not a Source demo`);
+  if (d.length < 1072 || d.subarray(0, 8).toString("latin1") !== "HL2DEMO\0") throw new Error(`${file}: not a Source demo`);
   const demoProtocol = d.readInt32LE(8);
   const map = d.subarray(536, 796).toString("latin1").split("\0")[0];
   const samples = [];
   let pos = 1072;
+  const fits = (n) => pos + n <= d.length;
+  const block = (skip) => { if (!fits(skip + 4)) return false; pos += skip; const size = d.readInt32LE(pos); pos += 4; if (!fits(size)) return false; pos += size; return true; };
   while (pos < d.length) {
     const cmd = d[pos]; pos += 1;
-    if (cmd === 1 || cmd === 2) { // signon / packet: tick, cmdinfo (76 bytes: flags + 6 vectors), sequences, size, data
-      const tick = d.readInt32LE(pos); pos += 4;
-      const x = d.readFloatLE(pos + 4), y = d.readFloatLE(pos + 8), z = d.readFloatLE(pos + 12);
-      pos += 76 + 8;
-      const size = d.readInt32LE(pos); pos += 4 + size;
-      if (x || y || z) samples.push({ tick, x, y, z });
-    } else if (cmd === 3) pos += 4; // synctick
-    else if (cmd === 4 || cmd === 6 || cmd === 8) { pos += 4; const size = d.readInt32LE(pos); pos += 4 + size; } // consolecmd, datatables, stringtables
-    else if (cmd === 5) { pos += 8; const size = d.readInt32LE(pos); pos += 4 + size; } // usercmd
-    else if (cmd === 7) break; // stop
-    else throw new Error(`${file}: unknown demo command ${cmd} at ${pos - 1}`);
+    if (cmd === 7) break; // stop (the file may end right after it)
+    if (!fits(4)) { if (partial) break; throw new Error(`${file}: cut off at ${pos}`); }
+    const tick = d.readInt32LE(pos); pos += 4;
+    let whole = true;
+    if (cmd === 1 || cmd === 2) { // signon / packet: cmdinfo (76 bytes: flags + 6 vectors), sequences, size, data
+      if (!fits(76 + 8 + 4)) whole = false;
+      else {
+        const x = d.readFloatLE(pos + 4), y = d.readFloatLE(pos + 8), z = d.readFloatLE(pos + 12);
+        whole = block(76 + 8);
+        if (whole && (x || y || z)) samples.push({ tick, x, y, z });
+      }
+    } else if (cmd === 3) {} // synctick
+    else if (cmd === 4 || cmd === 6 || cmd === 8) whole = block(0); // consolecmd, datatables, stringtables
+    else if (cmd === 5) whole = block(4); // usercmd
+    else if (partial) break;
+    else throw new Error(`${file}: unknown demo command ${cmd} at ${pos - 5}`);
+    if (!whole) { if (partial) break; throw new Error(`${file}: cut off at ${pos}`); }
   }
   return { file, map, demoProtocol, samples, ticks: samples.length ? samples.at(-1).tick - samples[0].tick : 0 };
+}
+
+/**
+ * Follows the demos of the run being recorded in `dir` (portal-agent's agent_runs/<time>/): `read(map)` gives the
+ * positions per tick of `map` not given before. The engine writes a demo in blocks of 64 KiB (measured 2026-10-02
+ * 19:26-19:27: the file grew by 65536 bytes about every 5 s of play), so the last seconds of a playback come at a
+ * later read. A demo of another map waits until the run is in that map; a demo that no longer grows and is not the
+ * newest is not read again.
+ */
+export function createDemoFollower(dir) {
+  const state = new Map(); // file -> { tick, size, done }
+  return {
+    read(map) {
+      if (!dir || !fs.existsSync(dir)) return [];
+      const files = fs.readdirSync(dir).filter((f) => f.endsWith(".dem")).map((f) => path.join(dir, f))
+        .sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
+      const out = [];
+      for (const file of files) {
+        const st = state.get(file) ?? { tick: -Infinity, size: -1, done: false };
+        if (st.done) continue;
+        const size = fs.statSync(file).size;
+        if (size === st.size) { if (file !== files.at(-1)) st.done = true; continue; }
+        let demo;
+        try { demo = parseDemo(file, { partial: true }); } catch { continue; } // its header is not written yet
+        if (demo.map !== map) continue;
+        for (const s of demo.samples) if (s.tick > st.tick) { out.push(s); st.tick = s.tick; }
+        st.size = size;
+        state.set(file, st);
+      }
+      return out;
+    },
+  };
 }
 
 /** Demo files of a run in recording order (name order within a folder). */
@@ -68,6 +108,9 @@ export function chamberEntries(files, { tracker = createChamberTracker() } = {})
 }
 
 if (process.argv[1]?.endsWith("demo-track.mjs")) {
+  // This game's own settings, then the machine's: the same two files every command reads (settings.mjs). Only as a
+  // command: the plugin imports this file inside the broker, which may not read them.
+  loadSettings(import.meta.url);
   const files = process.argv.slice(2).flatMap(demoFiles);
   if (!files.length) throw new Error("no .dem files");
   const { entries, played } = chamberEntries(files);

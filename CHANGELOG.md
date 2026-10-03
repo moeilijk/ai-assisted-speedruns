@@ -48,10 +48,31 @@ and their changes are listed here, with those made since.
   the agent's own step boundaries (never inside a step), with the position looked at after each; the game stays
   TAS-paused between the parts, and the run is still one playback.
 - **Portal: the credits are detected.** "Credits" is the default goal of every AI run, and nothing told it: only the
-  agent's own last message marked it. The plugin now takes it when, in escape_02, the player is taken to the outro
-  scene far below the map's play space (below z -7000). Measured in portal-agent's own run to the credits (its
-  evidence log): in escape_02 the player stood between z 384 and 3640, and at (-1372, -3203, -7344) from the moment
-  "Still Alive" began. That is one run's measurement; no run of ours has reached the credits.
+  agent's own last message marked it. The plugin now takes it when, in escape_02, the view has come to rest far below
+  the map's play space (below z -7000): the same position twice with game time played in between. Measured in
+  portal-agent's own run to the credits (its evidence log): in escape_02 the player stood between z 384 and 3640;
+  the ending then moved the view through the core storage room (sequences 6893 and 6895, below z -7340, the agent:
+  "The final scene is moving through the core storage room") and brought it to rest at (-767, -3081, -7345) (6898
+  and 6900, 600 ticks apart), after which the agent reported "Still Alive" begun. Taking the first position below
+  -7000, as a first version did, would have ended the session and the recording in the outro scene, before the
+  credits. The published TAS of the ending (lipsanen/source-tas, `e02_6-974.dem`, read with UntitledParser) holds the
+  player in the ending's vehicle around z -2405 before that, so that scene is not taken for the credits. One run's
+  measurement; no run of ours has reached the credits. Playing that published TAS on portal-agent's SPT build
+  desyncs within the first seconds (measured 2026-10-02 12:07, from its own save `e02_5`, with the game's default
+  movement settings): GLaDOS is not hit.
+- **Portal: a chamber sign passed halfway through a playback is seen from the demo, and the agent's plan is played as
+  one run again.** SPT reports the position only where a playback ends. The demo portal-agent records holds every
+  tick, and is read after every playback (`createDemoFollower` in `demo-track.mjs`; the engine writes it in blocks of
+  64 KiB, about every 5 s of play, so a sign passed in the last seconds counts at the next playback). An unreleased
+  first fix split long playbacks into parts; measured in the demos of the mock route, every boundary cost one tick,
+  so it changed what was played. It is gone. The broker may read the game's `agent_runs` folder for this, and
+  nothing else of it.
+- **`aas resume --run-dir` loads the settings of the run's own game.** The CLI loaded a game's settings only with
+  `--game`; a resume from the command line therefore did not know Portal's game folder, sent `start_run` over IPC,
+  which portal-agent refuses, and never became ready (measured 2026-10-02 19:41). A command on a run directory
+  without `--game` now takes the game from the run's brief (`gameOfCommand` in `settings.mjs`). The GUI passed
+  `--game` and was not affected.
+- **The log says when the agent session starts** (`the <runtime> session starts`).
 - **The scripted runtime ends a session whose every step the game answers with an error** (10 in a row), instead of
   retrying until its step budget.
 - **Portal 2: the goal "credits" is no longer taken when Finale 4 loads.** The credits end shared that map's split,

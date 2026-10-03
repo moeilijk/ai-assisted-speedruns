@@ -12,6 +12,7 @@
 import { readFileSync, existsSync, statSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
 import { CHAMBERS, CHAMBER_MAPS, chamberAt, chamberIndex, createChamberTracker } from "./chambers.mjs";
 import { consoleLogPath, createConsoleMaps } from "./console-maps.mjs";
+import { createDemoFollower } from "./demo-track.mjs";
 import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { execFileSync, spawn } from "node:child_process";
 import { dirname, join, relative, resolve } from "node:path";
@@ -170,8 +171,9 @@ export default {
   endpoints: [{ host: SPT_HOST, port: SPT_PORT }],
   /** The variables the controller reads inside the broker; nothing else of the environment reaches it. */
   env: ["AAS_PORTAL_GAME_ROOT", "AAS_PORTAL_AGENT_DIR", "AAS_PORTAL_SPT_HOST", "AAS_PORTAL_SPT_PORT"],
-  // The engine's console log too, where the controller reads which map loaded; nothing else of the game folder.
-  readable: [PORTAL_AGENT_DIR, ...(GAME_ROOT ? [consoleLogPath(GAME_ROOT)] : [])],
+  // The engine's console log too, where the controller reads which map loaded, and the demos portal-agent records
+  // (agent_runs), where it reads the position of every tick; nothing else of the game folder.
+  readable: [PORTAL_AGENT_DIR, ...(GAME_ROOT ? [consoleLogPath(GAME_ROOT), join(GAME_ROOT, "portal", "agent_runs")] : [])],
   // Published as game-config/ by `aas publish`.
   // His license travels with his files: game-config/LICENSE.
   gameConfig: [join(PORTAL_AGENT_DIR, "game-config"), join(PORTAL_AGENT_DIR, "spt", "UPSTREAM.json"), join(PORTAL_AGENT_DIR, "controller", "LICENSE")],
@@ -306,18 +308,27 @@ export default {
     const entered = (id, extra = {}) => {
       if (id) globalThis.aas?.event?.("game.milestone", { label: `Chamber ${id}`, chamber: id, end: `chamber${id}`, map: chambers.map, chapter: true, ...extra });
     };
-    // The credits, the game's own end: the ending takes the player out of escape_02's play space into the outro scene,
-    // far below it. Measured in portal-agent's own run to the credits (.local/portal-agent/evidence, around sequence
-    // 6880): in escape_02 the player stood between z 384 and 3640; when "Still Alive" began the position was
-    // (-1372, -3203, -7344), and stayed there until the credits ended. One run's measurement, not one of ours.
+    // The credits, the game's own end. Measured in portal-agent's own run to the credits (.local/portal-agent/evidence):
+    // in escape_02 the player stood between z 384 and 3640; after the fight the ending takes the view far below that
+    // play space, and it first moves through the core storage room (sequence 6893 at (-1372, -3203, -7344), 6895 at
+    // (-650, -3505, -7376); the agent: "The final scene is moving through the core storage room"), then comes to rest
+    // at (-767, -3081, -7345) (6898 and 6900, 600 ticks of play apart, the same position), and the agent reported
+    // "Still Alive" begun. So the credits are the view at rest below z -7000: the same position twice with game time
+    // played in between (an observe while TAS-paused always repeats the position, so that alone says nothing). The
+    // published TAS of this ending (lipsanen/source-tas, e02_6-974.dem) shows the player held in the ending's vehicle
+    // around z -2405 before that, so the outro scene itself is never taken for the credits. One run's measurement.
     let credits = endsInLog(process.env.AAS_RUN_DIR).has("credits");
+    let played = 0; // ticks of game time played in this session
+    let outro = null; // the last position below z -7000, and the ticks played when it was seen
+    const same = (a, b) => ["x", "y", "z"].every((k) => Math.abs(a[k] - b[k]) < 1);
     const seen = (pos) => {
       entered(chambers.observe(pos));
-      if (!credits && chambers.map === "escape_02" && Number.isFinite(pos?.z) && pos.z < -7000) {
+      if (credits || chambers.map !== "escape_02" || !Number.isFinite(pos?.z) || pos.z >= -7000) return;
+      if (outro && played > outro.played && same(pos, outro.pos)) {
         credits = true;
         globalThis.aas?.event?.("game.milestone", { label: "Credits", end: "credits", map: "escape_02", chapter: true });
         globalThis.aas?.event?.("game.over", { victory: true, label: "Credits" });
-      }
+      } else if (!outro || !same(pos, outro.pos)) outro = { pos: { x: pos.x, y: pos.y, z: pos.z }, played };
     };
     const observe = controller.observe.bind(controller);
     controller.observe = async (fields = ["facing", "position"], options) => {
@@ -331,34 +342,22 @@ export default {
     // advances); an aborted playback with a load/transition reason is a
     // `game.milestone` (map change). `aas timeline` turns these into timers,
     // splits and the cut list for the pauses.
-    const run = controller.run.bind(controller);
+    const runOnce = controller.run.bind(controller);
+    const run = async (...a) => { const r = await runOnce(...a); played += Number(r?.ticks) || 0; return r; };
     const consoleMaps = createConsoleMaps(consoleLogPath(GAME_ROOT), CHAMBER_MAPS.map((m) => m.map));
     let playbacks = 0;
     let transitions = 0;
-    // A long run is played in parts at the agent's own step boundaries, never inside a step, and the position is looked
-    // at after each part: SPT reports it only at the end of a run, and a chamber sign passed halfway through a long run
-    // was never seen (2026-10-02, found by reading the flow). The game stays TAS-paused between the parts, so what
-    // plays is the same; the run is still one playback, with its ticks added up.
-    const PART_TICKS = 133; // about 2 s of game time
-    const runInParts = async (all, opts) => {
-      if (!Array.isArray(all)) return run(all, { ...opts, position: true });
-      const parts = [];
-      let current = [], n = 0;
-      for (const step of all) {
-        const t = Number(step?.ticks) || 0;
-        if (current.length && n + t > PART_TICKS) { parts.push(current); current = []; n = 0; }
-        current.push(step); n += t;
-      }
-      if (current.length) parts.push(current);
-      let total = 0, last = null;
-      for (const [i, part] of parts.entries()) {
-        last = await run(part, { ...opts, position: true });
-        total += Number(last?.ticks) || 0;
-        if (last?.aborted) break;
-        if (i < parts.length - 1) seen(last?.position);
-      }
-      return { ...last, ticks: total };
-    };
+    // Chamber signs passed during a playback: SPT reports the position only where a playback ends, so a sign passed
+    // halfway was never seen (2026-10-02, found by reading the flow). The demo portal-agent records holds the position
+    // of every tick; it is read after every playback. Splitting a playback into parts to look in between, as a first
+    // version did, changed what was played: every boundary between parts cost one tick (measured in the demos of the
+    // mock route, 2026-10-02: mock-10 started walking in playback 6 at tick 5092, one tick after mock-09, and two
+    // ticks behind after playback 7, the two playbacks that were split), so the agent's plan is played as one run,
+    // the way portal-agent plays it.
+    const agentRuns = GAME_ROOT ? join(GAME_ROOT, "portal", "agent_runs") : null;
+    const runFolder = agentRuns && existsSync(agentRuns) ? readdirSync(agentRuns).filter((f) => statSync(join(agentRuns, f)).isDirectory()).sort().at(-1) : null;
+    const demos = createDemoFollower(runFolder ? join(agentRuns, runFolder) : null);
+    const fromDemos = () => { for (const s of demos.read(chambers.map)) entered(chambers.observe(s)); };
     controller.run = async (steps, options = {}) => {
       const ticks = Array.isArray(steps) ? steps.reduce((n, s) => n + (Number(s?.ticks) || 0), 0) : 0;
       const started = Date.now();
@@ -368,7 +367,7 @@ export default {
       globalThis.aas?.event?.("game.playback", { phase: "start", index: ++playbacks, planned_ticks: ticks, steps: plan });
       try {
         // Always ask for the position: the chamber tracker and the timeline need it.
-        const result = await runInParts(steps, options);
+        const result = await run(steps, { ...options, position: true });
         const data = { phase: "end", index: playbacks, ticks: result.ticks, seconds: Math.round(result.ticks * 15) / 1000, wall_ms: Date.now() - started };
         if (result.position) data.position = result.position;
         if (result.aborted) {
@@ -381,11 +380,13 @@ export default {
           // (a death, a load) is no progress. Only a game started without -condebug writes no log; then the campaign
           // order is assumed, as before.
           transitions += 1;
+          fromDemos(); // the map being left: its demo is complete now
           const loaded = consoleMaps.read().at(-1) ?? null;
           const map = consoleMaps.available ? loaded : chambers.nextMap() ?? MAPS[transitions] ?? null;
           if (map && map !== chambers.map) entered(chambers.enterMap(map), { index: transitions, reason: result.reason ?? null });
           else if (map === chambers.map) seen(result.position);
-        } else seen(result.position);
+          fromDemos();
+        } else { fromDemos(); seen(result.position); }
         return result;
       } catch (error) {
         globalThis.aas?.event?.("game.playback", { phase: "end", index: playbacks, error: String(error?.message ?? error), wall_ms: Date.now() - started });
