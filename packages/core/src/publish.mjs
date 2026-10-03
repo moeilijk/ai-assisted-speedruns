@@ -46,7 +46,7 @@ const readPublishedTimeline = (outDir) => {
 /** The marker in every published bundle's manifest: this is a public AAS bundle, not a run directory. */
 export const BUNDLE_KIND = "aas-public";
 /** The draft of packages/spec/SPEC.md this tooling writes bundles for; SPEC.md carries the same number. */
-export const SPEC_VERSION = "0.44";
+export const SPEC_VERSION = "0.45";
 export { BUNDLE_VERSION, SUMMARY_SCHEMA };
 
 export function writeManifest(dir, { runId = path.basename(dir).replace(/-public$/, ""), runUid = null, revision = 1 } = {}) {
@@ -258,11 +258,13 @@ async function publishInto(runDir, outDir, { session, completionMarker, log = co
   };
   // What in this bundle shows that a model played it, all of it countable from the published timeline itself, so
   // a reader checks the run instead of the word `mock` (SPEC §3). `human_turns` is the other side of the same
-  // question: the harness sends one prompt per segment, and every further message from a user is someone typing.
+  // question: the harness sends one prompt per segment, and one notice per `session.continued` (the agent ended its
+  // session while the game did not show the goal, SPEC 0.45); every further message from a user is someone typing.
   const published = readPublishedTimeline(outDir);
   const segmentsStarted = published.filter((r) => r.kind === "event" && r.event === "run.started").length;
+  const continued = published.filter((r) => r.kind === "event" && r.event === "session.continued").length;
   const userMessages = published.filter((r) => r.kind === "message" && r.role === "user").length;
-  const humanTurns = Math.max(0, userMessages - Math.max(segmentsStarted, 1));
+  const humanTurns = Math.max(0, userMessages - Math.max(segmentsStarted, 1) - continued);
   summary.ai_evidence = {
     assistant_records: published.filter((r) => r.kind === "message" && r.role === "assistant").length,
     tool_calls: published.filter((r) => r.kind === "tool_call").length,

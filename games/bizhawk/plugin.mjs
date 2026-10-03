@@ -94,7 +94,7 @@ async function endsShown() {
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.34.5",
+  version: "0.35.0",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",

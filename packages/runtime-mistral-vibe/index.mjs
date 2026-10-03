@@ -93,7 +93,7 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Mistral Vibe",
-  version: "0.34.5",
+  version: "0.35.0",
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "vibe",
   /** The Setup tab's button: Mistral's own installer (it installs uv, pinned and checked by sha256, then mistral-vibe). */
@@ -243,6 +243,6 @@ export default {
     const stopped = timedOut || Boolean(gameOver) || limited;
     const status = code === 0 && !stopped ? "completed" : stopped ? "stopped" : "failed";
     const notes = `vibe exited with ${code}; ${messages} agent messages, ${toolCalls} tool calls${lastError ? `; ${lastError}` : ""}${timedOut ? `; time budget of ${minutes} min reached` : ""}${gameOver ? `; ${gameOver}` : ""}`;
-    return { status, endedAt: new Date().toISOString(), notes, sessionId, privateLog: streamOf(runDir) };
+    return { status, endedAt: new Date().toISOString(), notes, sessionId, privateLog: streamOf(runDir), turns: toolCalls };
   },
 };

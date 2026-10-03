@@ -1,4 +1,4 @@
-# AI Assisted Speedruns (AAS) — Specification, draft 0.44
+# AI Assisted Speedruns (AAS) — Specification, draft 0.45
 
 Status: draft 0.44, 2026-09-27. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
@@ -126,7 +126,7 @@ Per kind:
 - `message`: `role` (`user` or `assistant`), `channel` (string or null), `text`.
 - `tool_call`: `call` (sequential id `call-00001`), `name`, `input` (string or object).
 - `tool_result`: `call`, `output`: an array of content parts `{type: "text", text}` (schema 2 also `input_text`, Codex's name) or `{type: "image_omitted"}`; schema 2 also allows a plain string.
-- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `proof.ticket`, `proof.missed`, `proof.off`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.goal`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`.
+- `event`: `event` (name), `data` (object). Reserved names: `run.started`, `run.ended`, `run.wait`, `run.error`, `run.human`, `proof.ticket`, `proof.missed`, `proof.off`, `game.phase`, `game.playback`, `game.turn`, `game.milestone`, `game.over`, `game.attempt`, `game.goal`, `game.highlight`, `recording.started`, `recording.stopped`, `recording.chapter`, `recording.highlight_saved`, `session.continued`.
 
 `run.started` carries the `goal` that holds for that segment, and `tooling`: the `version` of the harness that ran the segment, its `commit` (null outside a git clone) and whether its tracked files were `modified` (null when unknown); `allowed_breaking` lists the breaking releases the runner chose to go past on that resume; `overlay` says whether the harness's overlay was in the picture. A resumed run may have segments from different releases: never from an older release than an earlier segment. `game.goal` (`from`, `to`) marks a resume that extended the goal to a later end. `game.over` (`victory`, `label`, `deaths`, plus game-specific fields) marks the end of an attempt inside the game. With `victory: true` the goal is reached: the harness ends the agent session, the timer stops (the milestone before it did the final split) and the run's status is `completed`. With `victory: false` the agent died: that run is over, but not the session (no ironman rule). The game plugin offers a restart from the beginning (a new game with the same seed where the game has one), and the next run begins with `game.attempt` (`phase: start`, `attempt` N, `seed`). Every run is its own attempt: the timer resets and takes its own splits, and `timeline.json` lists the runs under `attempts` (start, end, outcome `death`/`victory`/`stopped`, IGT). The session's RTA keeps running over all runs; `aas render --attempt last` cuts the last run on its own. Deaths are counted in the outcome. A session that ends without a victory is `stopped` and may be resumed.
 
@@ -236,9 +236,11 @@ Schema version 2 is portal-agent's format and remains valid. Schema version 3 ad
 `mock`, `ai_evidence`, `harness.plugins.runtime.sha256`, `category.goal_prompt` and `brief` are the bundle's answer to
 "did a model play this, and what was it told" (§3). `ai_evidence` counts, in this bundle's own timeline:
 `assistant_records` (messages the model wrote), `tool_calls`, `models` (how many answered) and `output_tokens` as the
-runtime reported them, plus `human_turns`. The harness sends one prompt per segment, the one in `category.goal_prompt`;
-every further message from a user in the timeline is someone typing into a running session, which is help whatever it
-said, so `human_turns` above zero forces `human` to `assisted` (§8.3). `brief.instructions_sha256` is the sha256 of the
+runtime reported them, plus `human_turns`. The harness sends one prompt per segment, the one in `category.goal_prompt`,
+and one notice for every `session.continued` event: the agent ended its session while the game did not show the goal,
+and the harness told it so in the same session. Every further message from a user in the timeline is someone typing
+into a running session, which is help whatever it said, so `human_turns` (user messages, less one per segment and one
+per `session.continued`) above zero forces `human` to `assisted` (§8.3). `brief.instructions_sha256` is the sha256 of the
 published `AGENTS.md` and `brief.goal_prompt_sha256` the sha256 of `category.goal_prompt` in UTF-8: a reader recomputes
 both from the bundle. `harness.plugins.runtime.sha256`
 is the runtime plugin as it ran, null when the publisher's tooling could not read it, which an archive reads as a
@@ -407,3 +409,4 @@ Every change to this text is a draft of its own. A bundle's `spec_version` names
 | 0.42 | 2026-09-23 | §8: point 9 of draft 0.41 removed; 10 and 11 become 9 (the prompt in the bundle) and 10 (every input came from a tool call) |
 | 0.43 | 2026-09-23 | §8.11: the logs are fixed while the run goes on, by heads the archive signs at the start of every segment, every hour and at its end (owner, 2026-09-23). §4: `proof.json`. §7a: the private part of the upload, used only for the check and deleted after the decision. §5: `proof.ticket`, `proof.missed`, `proof.off` |
 | 0.44 | 2026-09-27 | §7a: a published run yields two zips that say what they are: `<run_id>-public.zip`, the bundle alone, to share anywhere, and `<run_id>-upload.zip`, for the archive only, with `UPLOAD-ONLY.txt` and the private part; an archive takes only the upload zip and refuses the other, or a zip without the note that carries `private/` (owner, 2026-09-27) |
+| 0.45 | 2026-10-03 | §5: `session.continued` (`reason`, `shown`, `n`): the agent ended its session while the game did not show the goal, and the harness continued the same session with one notice of what the game showed. §6: `human_turns` does not count those notices. A session the agent ended before the goal is `stopped`, not `completed` |

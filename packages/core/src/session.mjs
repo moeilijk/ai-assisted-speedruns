@@ -14,6 +14,36 @@ import { formatDuration } from "./videos.mjs";
 
 export { endsInLog };
 
+/** How often the harness lets an agent that ended its session before the goal go on in that session. */
+export const CONTINUES = 3;
+
+/** The last progress the game showed in this run's log (the label of its last milestone), or null. */
+export function lastProgress(runDir) {
+  let label = null;
+  try {
+    for (const line of fs.readFileSync(path.join(runDir, "run.jsonl"), "utf8").split("\n")) {
+      if (!line.includes('"game.milestone"')) continue;
+      try { const e = JSON.parse(line); if (e.event === "game.milestone" && e.data?.label) label = e.data.label; } catch { /* a line being written */ }
+    }
+  } catch { /* no log yet */ }
+  return label;
+}
+
+/**
+ * Whether the session goes on after the agent ended it: only when the agent ended it itself (completed), the game
+ * does not show the goal, nothing stopped it, the runtime gave its session, the session is headless, fewer than
+ * CONTINUES continuations were made, and the run's time and turn budget leave room. Returns the prompt and the budget
+ * that is left, or null.
+ */
+export function continuation({ outcome, over, stopReason, goal, brief, continued, turns, elapsedMs, interactive, shown }) {
+  if (over || stopReason || outcome?.status !== "completed" || !outcome.sessionId || !goal?.end || interactive || continued >= CONTINUES) return null;
+  const budget = { ...(brief.budget ?? {}) };
+  if (budget.minutes) { budget.minutes = Number(budget.minutes) - elapsedMs / 60000; if (budget.minutes < 1) return null; }
+  if (budget.toolCalls) { budget.toolCalls = Number(budget.toolCalls) - turns; if (budget.toolCalls < 1) return null; }
+  const prompt = `The harness checked the game: your goal, ${goal.end.label}, has not been reached${shown ? `; the last progress the game showed is ${shown}` : ""}. Keep playing towards the goal.`;
+  return { prompt, budget, shown };
+}
+
 /**
  * `session({ ... })` → `{ outcome, recording }`. `segment` is null for a run's first session. `early` is the stop
  * catcher of the start (earlyStop); a stop it caught means no agent session. `ready` is what the game side returned
@@ -102,7 +132,23 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
     });
     try {
       log(`the ${runtime.id} session starts`);
-      outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush(), stopRequested: () => stopReason });
+      // The game decides whether the goal is reached, not the agent's word. An agent that ends its own session while
+      // the game does not show the goal (2026-10-03: Haiku called a fight on floor 5 "the Act 1 boss" and ended) is
+      // told what the game shows and goes on in the same session: the same segment, recording, timer and proof, so
+      // the run connects without a gap of its own. At most CONTINUES times, within the run's own time and turn budget.
+      const began = Date.now();
+      let turns = 0;
+      let attempt = brief;
+      for (let continued = 0; ; continued += 1) {
+        outcome = await runtime.start(runDir, attempt, { checkpoint: () => follower.flush(), stopRequested: () => stopReason });
+        await follower.flush();
+        turns += Number(outcome.turns) || 0;
+        const next = continuation({ outcome, over, stopReason, goal, brief, continued, turns, elapsedMs: Date.now() - began, interactive: !(brief.headless === true || !process.stdin.isTTY), shown: lastProgress(runDir) });
+        if (!next) break;
+        log(`the agent ended its session, but the game does not show the goal (${next.shown ?? "no progress yet"}); the same session goes on (${continued + 1} of ${CONTINUES})`);
+        events.append("session.continued", { reason: "the agent ended its session before the goal", shown: next.shown ?? null, n: continued + 1, ...seg });
+        attempt = { ...brief, resume: { ...(brief.resume ?? {}), sessionId: outcome.sessionId, prompt: next.prompt }, budget: next.budget };
+      }
     } catch (error) {
       outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };
       events.append("run.error", { message: outcome.notes, ...seg });
@@ -121,6 +167,9 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
     autosave?.stop();
     // What the game said up to the end of the session decides the outcome: a victory in its last frames included.
     await follower.flush();
+    // A session the agent ended itself is complete only when the game shows the goal; otherwise it is stopped, and the
+    // run can be continued.
+    if (outcome.status === "completed" && !over && goal.end) outcome = { ...outcome, status: "stopped", notes: `${outcome.notes}; the agent ended its session before the goal (${goal.end.label}); the game showed ${lastProgress(runDir) ?? "no progress"}` };
     if (outcome.status !== "failed") outcome = { ...outcome, deaths: deathsBefore + deaths, ...(over ? { status: "completed", over, notes: [outcome.notes, `game over: ${over.label}`].filter((n, i, all) => n && !(i > 0 && String(all[0] ?? "").includes(n))).join("; ") } : {}) };
     // A final save state, so a stopped run can be resumed from exactly here; also without the timed autosave.
     if (plugin.saveState && outcome.status !== "failed") {

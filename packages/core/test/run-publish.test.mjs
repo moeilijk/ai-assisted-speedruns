@@ -119,7 +119,10 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
       assert.match(t.commit, /^[0-9a-f]{40}$/);
       assert.equal(typeof t.modified, "boolean");
     }
-    assert.equal(resumed.outcome.status, "completed");
+    // The stub ends its session itself, before the credits: the game decides, so the session is stopped, not completed.
+    assert.equal(resumed.outcome.status, "stopped");
+    assert.match(resumed.outcome.notes, /the agent ended its session before the goal \(Credits\)/);
+    assert.equal(readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"session.continued"')).length, 3, "told three times what the game showed, in the same session");
     const stops = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"recording.stopped"'));
     assert.equal(stops.length, 2, "each segment's recording is logged as stopped, the resumed one too");
     assert.ok(spt.seen.some((m) => m.type === "cmd" && /^load aas_/.test(m.cmd)), "load sent");
@@ -172,7 +175,7 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.match(p.summary.harness.plugins.runtime.sha256, /^[0-9a-f]{64}$/, "which runtime drove this run, as a number an archive can place");
   assert.equal(p.summary.brief.instructions_sha256, createHash("sha256").update(readFileSync(join(outDir, "AGENTS.md"))).digest("hex"));
   assert.equal(p.summary.brief.goal_prompt_sha256, p.summary.category.goal_prompt === null ? null : createHash("sha256").update(Buffer.from(p.summary.category.goal_prompt, "utf8")).digest("hex"));
-  assert.equal(p.summary.ai_evidence.human_turns, 0, "nobody typed into this session");
+  assert.equal(p.summary.ai_evidence.human_turns, 0, "nobody typed into this session: the harness's three notices are not counted");
   assert.equal(p.summary.category.human, "restart-only", "it was resumed once, and nothing else was given to it");
   if (savedSignKey === undefined) delete process.env.AAS_SIGN_KEY; else process.env.AAS_SIGN_KEY = savedSignKey;
 

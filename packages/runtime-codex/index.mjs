@@ -151,7 +151,7 @@ export default {
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "codex",
   setup: { group: "Agents" },
-  version: "0.34.5",
+  version: "0.35.0",
   /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
   async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
@@ -305,6 +305,6 @@ export default {
     const stopped = timedOut || Boolean(gameOver) || Boolean(budgetHit);
     const status = code === 0 && !stopped ? "completed" : stopped ? "stopped" : "failed";
     const notes = `${notesBase}${timedOut ? `; time budget of ${minutes} min reached` : ""}${budgetHit ? `; Codex plan budget ${codexMax()}% reached` : ""}${gameOver ? `; ${gameOver}` : ""}`;
-    return { status, endedAt: new Date().toISOString(), notes, sessionId: threadId, privateLog };
+    return { status, endedAt: new Date().toISOString(), notes, sessionId: threadId, privateLog, turns };
   },
 };

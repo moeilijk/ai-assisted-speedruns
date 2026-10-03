@@ -5,30 +5,30 @@
     {
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "77a5d1ddded5816b81f03f248f992c6ccd1f0c37493059d200bf81e7c803a3d2"
+      "sha256": "857c02f427e7d90335da6ed1829f839a1116915f0cf6234d010bf667e06eeb85"
     },
     {
       "id": "codex",
       "name": "Codex",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "4944f9a4465b95f6e0b9fd9dd06400294b05d3c0910750e2ab2ede7aad7272ce"
+      "sha256": "043099be3face0cd2866995f52b271776b74af17f6f665b540b6b882945896a1"
     },
     {
       "id": "mistral-vibe",
       "name": "Mistral Vibe",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "b118cff54c07b5adefcb35d1448957bc912d1865bc0e662a01f70c0a7b675a1e"
+      "sha256": "5c929d925223815fbe32e8e9031537925d26d9083c050ede66424c3281450398"
     },
     {
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": false,
-      "sha256": "8b781a5bd1f81cac4b4b68e1442e3c2881c2b43dbd8b5f1b1c4750e397088fb5"
+      "sha256": "69df609d809cd48b11dec02ff788d46cd49d0a0f704210a9f319cdb8db2b63f4"
     }
   ]
 }

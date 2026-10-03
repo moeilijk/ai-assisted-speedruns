@@ -69,7 +69,7 @@ function endsShown(s) {
 export default {
   id: "balatro",
   name: "Balatro",
-  version: "0.34.5",
+  version: "0.35.0",
   scopeName: "bal",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_BALATRO_PROCESS || "Balatro.exe",

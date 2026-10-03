@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 import { run } from "../src/run.mjs";
 import { resume } from "../src/resume.mjs";
 import { configure } from "../src/configure.mjs";
-import { session } from "../src/session.mjs";
+import { session, continuation, CONTINUES } from "../src/session.mjs";
 import { createEventLog } from "../src/events.mjs";
 import { resolveGoal } from "../src/goal.mjs";
 
@@ -131,4 +131,51 @@ test("a recording lost while the agent plays ends the session and says why", asy
   assert.match(interrupted, /the recording was lost: OBS is not recording any more/);
   assert.equal(outcome.status, "stopped");
   assert.ok(eventsOf(ctx.runDir).some((e) => e.event === "recording.lost"));
+});
+
+test("an agent that ends its session before the goal goes on in the same session, told what the game shows", async () => {
+  const p = { id: "p", ends: [{ id: "boss", label: "Act 1 boss" }, { id: "end", label: "End", final: true }], async saveState({ name }) { return { name }; } };
+  const calls = [];
+  let ctx;
+  const runtime = {
+    id: "r",
+    async start(runDir, brief) {
+      calls.push(brief.resume ?? null);
+      // The first session ends at floor 5 believing it won; the continued one reaches the boss.
+      if (calls.length === 1) { ctx.events.append("game.milestone", { label: "Floor 5", floor: 5 }); return { status: "completed", sessionId: "s1", turns: 40 }; }
+      ctx.events.append("game.milestone", { label: "Act 1 boss", end: "boss", chapter: true });
+      return { status: "completed", sessionId: "s1", turns: 30 };
+    },
+  };
+  ctx = bare(runtime);
+  const { outcome } = await session({ ...ctx, plugin: p, goal: resolveGoal(p, "boss"), brief: { id: "s", headless: true, budget: { toolCalls: 100 } }, early: { release: () => null } });
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].sessionId, "s1", "the same session goes on");
+  assert.match(calls[1].prompt, /your goal, Act 1 boss, has not been reached; the last progress the game showed is Floor 5/);
+  assert.equal(outcome.status, "completed");
+  assert.ok(eventsOf(ctx.runDir).some((e) => e.event === "session.continued"));
+});
+
+test("a session the agent keeps ending before the goal is stopped after CONTINUES tries, with what the game showed", async () => {
+  const p = { id: "p", ends: [{ id: "boss", label: "Act 1 boss" }, { id: "end", label: "End", final: true }], async saveState({ name }) { return { name }; } };
+  let n = 0;
+  const ctx = bare({ id: "r", async start() { n += 1; return { status: "completed", sessionId: "s1", turns: 1 }; } });
+  ctx.events.append("game.milestone", { label: "Floor 5", floor: 5 });
+  const { outcome } = await session({ ...ctx, plugin: p, goal: resolveGoal(p, "boss"), brief: { id: "s", headless: true }, early: { release: () => null } });
+  assert.equal(n, 1 + CONTINUES);
+  assert.equal(outcome.status, "stopped");
+  assert.match(outcome.notes, /the agent ended its session before the goal \(Act 1 boss\); the game showed Floor 5/);
+});
+
+test("the continuation keeps to the run's budget, and never follows a stop, a victory or an interactive session", () => {
+  const goal = { id: "boss", end: { id: "boss", label: "Act 1 boss" } };
+  const base = { outcome: { status: "completed", sessionId: "s" }, over: null, stopReason: null, goal, brief: { budget: { minutes: 30, toolCalls: 100 } }, continued: 0, turns: 60, elapsedMs: 10 * 60000, interactive: false, shown: "Floor 5" };
+  assert.deepEqual(continuation(base).budget, { minutes: 20, toolCalls: 40 }, "what is left of the budget");
+  assert.equal(continuation({ ...base, turns: 100 }), null, "no turns left");
+  assert.equal(continuation({ ...base, elapsedMs: 30 * 60000 }), null, "no time left");
+  assert.equal(continuation({ ...base, stopReason: "stopped by the user" }), null);
+  assert.equal(continuation({ ...base, over: { victory: true } }), null);
+  assert.equal(continuation({ ...base, interactive: true }), null);
+  assert.equal(continuation({ ...base, outcome: { status: "stopped", sessionId: "s" } }), null, "a budget or limit stop is not continued");
+  assert.equal(continuation({ ...base, continued: CONTINUES }), null);
 });

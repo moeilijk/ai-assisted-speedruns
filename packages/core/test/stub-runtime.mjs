@@ -28,8 +28,11 @@ export default {
   sessionLogs(runDir) { const f = path.join(runDir, "session.jsonl"); return fs.existsSync(f) ? [f] : []; },
   async start(runDir, brief, { stopRequested = null } = {}) {
     const spec = JSON.parse(fs.readFileSync(path.join(runDir, ".stub-broker.json"), "utf8"));
-    const codesFile = path.join(runDir, brief.resume ? "stub-codes-resume.json" : "stub-codes.json");
-    const codes = fs.existsSync(codesFile) ? JSON.parse(fs.readFileSync(codesFile, "utf8")) : ["return await game.observe()"];
+    // A session the harness continues because the game does not show the goal plays stub-codes-continue.json (none
+    // when it is absent: the stub still believes it is done).
+    const continued = /^The harness checked the game/.test(brief.resume?.prompt ?? "");
+    const codesFile = path.join(runDir, continued ? "stub-codes-continue.json" : brief.resume ? "stub-codes-resume.json" : "stub-codes.json");
+    const codes = fs.existsSync(codesFile) ? JSON.parse(fs.readFileSync(codesFile, "utf8")) : continued ? [] : ["return await game.observe()"];
     const client = startBroker({ gameModule: spec.gameModule, runDir, readable: spec.readable, endpoints: spec.endpoints, passThrough: spec.envNames ?? [], timeoutMs: 60000 });
     interrupted = stopRequested?.() ?? null;
     const session = [];

@@ -1,1 +1,1 @@
-{ "name": "@aas/runtime-scripted", "version": "0.34.5", "type": "module", "private": true, "main": "index.mjs" }
+{ "name": "@aas/runtime-scripted", "version": "0.35.0", "type": "module", "private": true, "main": "index.mjs" }

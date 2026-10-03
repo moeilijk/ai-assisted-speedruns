@@ -40,7 +40,7 @@ export const ENDS = [
 export default {
   id: "portal_2",
   name: "Portal 2",
-  version: "0.34.5",
+  version: "0.35.0",
   scopeName: "portal2",
   segments: SEGMENTS,
   ends: ENDS,

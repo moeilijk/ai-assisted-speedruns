@@ -270,7 +270,7 @@ export default {
   async exportSession(session, outDir, opts) { return exportClaudeSession(session, outDir, opts); },
   /** The harness ends the session (game over): interrupted like Ctrl-C, the same way as the budgets. */
   interrupt(reason) { interruptChild?.(reason); },
-  version: "0.34.5",
+  version: "0.35.0",
   async configure(runDir, broker, brief) {
     const mcp = path.join(runDir, ".mcp.json");
     const settings = path.join(runDir, ".claude", "settings.json");
@@ -442,6 +442,6 @@ export default {
     const stopped = timedOut || Boolean(budgetHit) || Boolean(gameOver) || last?.subtype === "error_max_turns" || limitHit;
     const status = ignoredRules ? "failed" : code === 0 && !stopped ? "completed" : stopped ? "stopped" : "failed";
     const notes = `${notesBase}${ignoredRules ? `; Claude Code ignored permission rules: ${ignoredRules}` : ""}${timedOut ? `; time budget of ${minutes} min reached` : ""}${budgetHit ? `; weekly budget ${weeklyMax()}% reached` : ""}${gameOver ? `; ${gameOver}` : ""}${limitHit ? `; ${resultText.split("\n")[0].slice(0, 120)}` : ""}`;
-    return { status, endedAt: new Date().toISOString(), notes, sessionId: last?.session_id ?? null, privateLog: null };
+    return { status, endedAt: new Date().toISOString(), notes, sessionId: last?.session_id ?? null, privateLog: null, turns };
   },
 };

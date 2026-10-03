@@ -7,36 +7,36 @@
       "dir": "packages/runtime-claude-code",
       "id": "claude-code",
       "name": "Claude Code",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "77a5d1ddded5816b81f03f248f992c6ccd1f0c37493059d200bf81e7c803a3d2"
+      "sha256": "857c02f427e7d90335da6ed1829f839a1116915f0cf6234d010bf667e06eeb85"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "4944f9a4465b95f6e0b9fd9dd06400294b05d3c0910750e2ab2ede7aad7272ce"
+      "sha256": "043099be3face0cd2866995f52b271776b74af17f6f665b540b6b882945896a1"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-mistral-vibe",
       "id": "mistral-vibe",
       "name": "Mistral Vibe",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": true,
-      "sha256": "b118cff54c07b5adefcb35d1448957bc912d1865bc0e662a01f70c0a7b675a1e"
+      "sha256": "5c929d925223815fbe32e8e9031537925d26d9083c050ede66424c3281450398"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-scripted",
       "id": "scripted",
       "name": "Scripted bot",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "ai": false,
-      "sha256": "8b781a5bd1f81cac4b4b68e1442e3c2881c2b43dbd8b5f1b1c4750e397088fb5"
+      "sha256": "69df609d809cd48b11dec02ff788d46cd49d0a0f704210a9f319cdb8db2b63f4"
     },
     {
       "kind": "recorder",
@@ -51,8 +51,8 @@
       "dir": "packages/recorder-obs",
       "id": "obs",
       "name": "OBS Studio (video)",
-      "version": "0.34.5",
-      "sha256": "fe1ed424269861e0e775ee83dfe42e81ab81b3e1a531abe40320b2ea581f4338"
+      "version": "0.35.0",
+      "sha256": "cb5de3241f79aabd927cb8f95139978e56d618cd96c205e26dbc46d638567d51"
     },
     {
       "kind": "recorder",
@@ -67,26 +67,26 @@
       "dir": "packages/timer-livesplit",
       "id": "livesplit",
       "name": "LiveSplit",
-      "version": "0.34.5",
-      "sha256": "91d4c1b2ac66d6554ac9e70a92991e1a19d0303dff04ba884cf923ffffd86176"
+      "version": "0.35.0",
+      "sha256": "c2ce94252e2094dd2483b3a6c455fb1be44d340dbfce137e7a12fdcf9a05afd3"
     },
     {
       "kind": "game",
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "5383a993b91cc1aefb1ca86fa54ab44bd1320738d37fc13a88ea8cc9134af07a"
+      "sha256": "ad7a4d6f4cae627125dc6a9a1fde6c0cdf5ca67b1d2091c07d09e434004f1925"
     },
     {
       "kind": "game",
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "2553732cf858925a669b3f6a758d3d10c98b47ef8af519f9c02eb761cf97d472"
+      "sha256": "9c2678f432f6b568b9004060e3b17b433402a6978671270784851242fb8d3090"
     },
     {
       "kind": "game",
@@ -102,9 +102,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "615340dc09a620549f2e12f2aed8d4ee367363c95ce560b24c82735c343bcd5a"
+      "sha256": "b143e69ccb7b983801e1e2655cfb512025e02124ec445e747fa6d3e7d91cc206"
     },
     {
       "kind": "game",
@@ -138,27 +138,27 @@
       "dir": "games/portal",
       "id": "portal",
       "name": "Portal",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "ff68e6081e231b0e65af3a65e09355f973cd9c873eb8fcd3f281c525121563e5"
+      "sha256": "50d798ecb526195de564583d3fbce2d89c9fbd51470254f81ccfc98c2af3c804"
     },
     {
       "kind": "game",
       "dir": "games/portal-2",
       "id": "portal_2",
       "name": "Portal 2",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "ee3eb99f0e46bbbb5ba45ca8759372700b26ecc7b21aae2cae2c77e7e4acc792"
+      "sha256": "1272b84d56f36b177529b52fd98ed327ad807828084b966f0f7b157bc07654a1"
     },
     {
       "kind": "game",
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "0.34.5",
+      "version": "0.35.0",
       "stub": false,
-      "sha256": "db7d1213519c0a9253a4894f190af57c06a0466284eec6583acbc8032b888994"
+      "sha256": "dc37ae977e0424229a0437b1e1b9d3460637f4c233b52843d242ff05670e4fee"
     },
     {
       "kind": "game",

@@ -89,7 +89,7 @@ async function endsShown() {
 export default {
   id: "fceux",
   name: "FCEUX",
-  version: "0.34.5",
+  version: "0.35.0",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "fceux64.exe",

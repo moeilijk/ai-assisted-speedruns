@@ -12,10 +12,21 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
-## 0.34.5 — not released
+## 0.35.0 — not released
 
 Versions 1.0.0 and 1.0.1 (2026-10-01) were withdrawn on 2026-10-02 (the maintainer): their releases and tags are gone,
-and their changes are listed here, with those made since.
+and their changes are listed here, with those made since. SPEC draft 0.45, hence a minor version.
+
+- **The game decides whether the goal is reached, not the agent's word.** A Haiku run to act 1 (2026-10-03) ended its
+  own session on floor 5, calling a fight "the Act 1 boss", and the harness recorded it as completed. Now an agent that
+  ends its session while the game does not show the goal goes on in the same session (same segment, recording, timer
+  and proof), told once what the game shows: "The harness checked the game: your goal, <goal>, has not been reached;
+  the last progress the game showed is <last milestone>. Keep playing towards the goal." At most 3 times
+  (`CONTINUES`), only headless, never after a stop, a budget or a limit, and within what is left of the run's time
+  and turn budget (the runtimes now return their `turns`). Each is a `session.continued` event. A session that still
+  ends before the goal is `stopped`, with what the game showed in its notes, and can be continued; `completed` now
+  means the game showed the goal. SPEC 0.45: `session.continued` is a reserved event name, and `human_turns` does not
+  count its notices, so a continued run is not `assisted`.
 
 - **One session for run and resume** (`packages/core/src/session.mjs`). The two had their own copy of everything from
   the game's start to the end, and the resume had kept faults the run no longer had. In the shared session:
