@@ -11,7 +11,31 @@ import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
 import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { call, rpc, url as mcpUrl } from "./mcp.mjs";
+import { call as mcpCall, rpc, url as mcpUrl } from "./mcp.mjs";
+
+// Memory is read once a frame: the first 8-bit read of a domain fetches the whole domain with one read_bulk, and every
+// further read until the next frame is answered from it. A read was one call each (about 0.1 s through the bridge), and
+// after every playback the profile's ends alone took some twenty, so a script stepping one frame at a time played 1.6
+// frames a second (2026-10-04, Super Mario Bros). Any call that is not a read (frames, input, a state) starts afresh.
+const READS = new Set(["read_memory", "read_range", "read_bulk", "get_info", "get_joypad", "list_memory_domains", "screenshot", "list_states"]);
+const frameMemory = new Map(); // domain -> bytes of this frame
+const endianness = new Map(); // domain -> what read_memory says for it
+let domainSizes = null;
+export async function call(name, args) {
+  if (!READS.has(name)) frameMemory.clear();
+  return mcpCall(name, args);
+}
+/** read_memory as the tool answers it, from this frame's copy of the domain where it can be. */
+export async function readMemory(address, { domain, width = 8 } = {}) {
+  const exact = () => call("read_memory", { address, domain, width });
+  if (width !== 8 || typeof domain !== "string" || !Number.isInteger(address) || address < 0) return exact();
+  if (!endianness.has(domain)) { const v = await exact(); endianness.set(domain, v?.endianness ?? null); return v; }
+  if (!domainSizes) { const l = await call("list_memory_domains"); domainSizes = new Map(Object.entries(l?.domains ?? {}).map(([k, d]) => [k, d?.size])); }
+  const size = domainSizes.get(domain);
+  if (!Number.isInteger(size) || size > 65536 || address >= size) return exact();
+  if (!frameMemory.has(domain)) { const r = await call("read_bulk", { address: 0, length: size, domain }); frameMemory.set(domain, Buffer.from(r.base64, "base64")); }
+  return { value: frameMemory.get(domain)[address], requested: address, address, endianness: endianness.get(domain) };
+}
 import { bizhawkDir, hostPath } from "./paths.mjs";
 import { trustState } from "./trust.mjs";
 
@@ -80,7 +104,7 @@ const documentation = () => `${readFileSync(join(here, "documentation.md"), "utf
 async function holds(w) {
   if (w.all) { for (const c of w.all) if (!(await holds(c))) return false; return true; }
   if (w.any) { for (const c of w.any) if (await holds(c)) return true; return false; }
-  const v = await call("read_memory", { address: w.address, domain: w.domain, width: w.width ?? 8 });
+  const v = await readMemory(w.address, { domain: w.domain, width: w.width ?? 8 });
   const value = Number(typeof v === "object" ? v.value : v);
   return w.equals !== undefined ? value === w.equals : w.atLeast !== undefined ? value >= w.atLeast : false;
 }
@@ -214,7 +238,7 @@ export default {
       press: (buttons, frames = 1) => play(`press ${Object.keys(buttonMap(buttons)).join("+") || "nothing"} ${frames}`, [{ buttons, frames }]),
       sequence: (steps) => play(`sequence of ${steps.length}`, steps),
       wait: (frames) => play(`wait ${frames}`, [{ frames }]),
-      async read(address, { domain, width = 8 } = {}) { return call("read_memory", { address, domain, width }); },
+      async read(address, { domain, width = 8 } = {}) { return readMemory(address, { domain, width }); },
       async readRange(address, length, domain) { return call("read_range", { address, length, domain }); },
       async domains() { return call("list_memory_domains"); },
       /** The frame as the tool renders it, read back as its own MCP resource: no file passes through the broker. */

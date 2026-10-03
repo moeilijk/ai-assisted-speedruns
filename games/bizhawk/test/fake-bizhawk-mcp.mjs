@@ -32,7 +32,10 @@ export async function startFakeBizHawk({ romHash = "8FCC5798252370C63A98E7421131
       }
       return `advanced ${total} frame(s) (was paused; pause restored)`;
     },
-    read_memory: (a) => ({ value: state.memory[`${a.domain}:${a.address}`] ?? 0, requested: a.address, address: a.address }),
+    read_memory: (a) => ({ value: state.memory[`${a.domain}:${a.address}`] ?? 0, requested: a.address, address: a.address, endianness: "little" }),
+    // As the real tool (v0.3.2): sizes per domain, and a range of a domain as base64 in one call. The NES's RAM is 2 KiB.
+    list_memory_domains: () => ({ domains: { RAM: { size: 2048 }, "System Bus": { size: 65536 } } }),
+    read_bulk: (a) => ({ address: a.address, length: a.length, base64: Buffer.from(Array.from({ length: a.length }, (_, i) => state.memory[`${a.domain}:${a.address + i}`] ?? 0)).toString("base64") }),
     get_joypad: () => ({ buttons: { "P1 Up": false, "P1 Down": false, "P1 Left": false, "P1 Right": false, "P1 Start": false, "P1 Select": false, "P1 B": false, "P1 A": false, Reset: false, Power: false } }),
     screenshot: () => ({ path: "C:/temp/shot.png", resource: "bizhawk://shot-1" }),
     // A savestate is the frame count and the memory, written where the plugin asks (a Windows path under WSL).

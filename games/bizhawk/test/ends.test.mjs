@@ -59,3 +59,23 @@ test("a game over is a defeat, told once while it lasts", async () => {
   assert.equal(over.length, 1);
   assert.equal(over[0].data.victory, false);
 });
+
+test("memory is read once a frame: a playback that checks every end, and a script's reads, cost one read of the RAM", async () => {
+  reset();
+  const emu = await plugin.connect();
+  await emu.read(1904, { domain: "RAM" }); // the domain's first read goes to the tool as it is (its endianness)
+  fake.memory["RAM:1904"] = 1;
+  await emu.wait(1);
+  const before = fake.calls.length;
+  await emu.wait(1); // a frame: get_info, and the profile's ends and its defeat, some twenty values
+  const values = [];
+  for (const a of [1904, 1887, 1884, 0x6d, 0x86]) values.push((await emu.read(a, { domain: "RAM", width: 8 })).value);
+  const calls = fake.calls.slice(before);
+  assert.deepEqual(calls.filter((c) => c === "read_memory"), [], "no read goes to the tool one value at a time");
+  assert.equal(calls.filter((c) => c === "read_bulk").length, 1, `one read of the RAM for the frame: ${calls.join(", ")}`);
+  assert.deepEqual(values, [1, 0, 0, 0, 0]);
+  fake.onFrame = (s) => { s.memory["RAM:1904"] = 3; };
+  await emu.wait(1);
+  assert.equal((await emu.read(1904, { domain: "RAM" })).value, 3, "the next frame is read afresh");
+  assert.deepEqual(Object.keys(await emu.read(1904, { domain: "RAM" })).sort(), ["address", "endianness", "requested", "value"], "the same answer as the tool's");
+});

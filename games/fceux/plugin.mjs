@@ -13,7 +13,21 @@ import { readZipEntries } from "../../packages/core/src/zip-read.mjs";
 import { endsInLog } from "../../packages/core/src/logged-ends.mjs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { batch, call, HOST as BRIDGE_HOST, PORT as BRIDGE_PORT } from "./bridge.mjs";
+import { batch as bridgeBatch, call as bridgeCall, HOST as BRIDGE_HOST, PORT as BRIDGE_PORT } from "./bridge.mjs";
+
+// The agent's reads of the NES's RAM ($0000-$07FF) come from one copy a frame, read with one readbyterange: a read was
+// one call each through the bridge, and a script stepping one frame at a time spent most of its time on them (measured
+// in BizHawk, 2026-10-04: 1.6 frames a second). Above $07FF are the registers, where a read can change something, so
+// those still go to the emulator. Any call that is not a read (a frame, input, a state) starts afresh.
+const isRead = (method) => /^(memory\.read|rom\.|emu\.(framecount|lagcount|emulating|paused)$|joypad\.get|gui\.screen$|ping$)/.test(method);
+let frameRam = null;
+const call = (method, params, opts) => { if (!isRead(method)) frameRam = null; return bridgeCall(method, params, opts); };
+const batch = (calls, opts) => { if (calls.some((c) => !isRead(c.method))) frameRam = null; return bridgeBatch(calls, opts); };
+export async function readByte(address) {
+  if (!(Number.isInteger(address) && address >= 0 && address < 0x800)) return call("memory.readbyte", { address });
+  frameRam ??= await call("memory.readbyterange", { address: 0, length: 0x800 });
+  return frameRam[address];
+}
 import { fceuxDir, hostPath } from "./paths.mjs";
 import { rgbToPng } from "./png.mjs";
 
@@ -235,7 +249,7 @@ export default {
       sequence: (steps) => play(`sequence of ${steps.length}`, steps),
       wait: (frames) => play(`wait ${frames}`, [{ frames }]),
       async read(address, { width = 8 } = {}) {
-        if (width === 8) return call("memory.readbyte", { address });
+        if (width === 8) return readByte(address);
         if (width === 16) return call("memory.readword", { address });
         throw new Error("width is 8 or 16 bits");
       },

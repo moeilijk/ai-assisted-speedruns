@@ -27,6 +27,12 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   ends before the goal is `stopped`, with what the game showed in its notes, and can be continued; `completed` now
   means the game showed the goal. SPEC 0.45: `session.continued` is a reserved event name, and `human_turns` does not
   count its notices, so a continued run is not `assisted`.
+- **BizHawk and FCEUX read the RAM once a frame.** An agent that stepped Super Mario Bros one frame at a time and read
+  the RAM to steer (Opus 5.5, 2026-10-04) played 1.6 frames a second: every read was one call through the bridge, and
+  after every playback the profile's ends alone took some twenty. BizHawk now answers 8-bit reads of a domain from one
+  `read_bulk` a frame, FCEUX the RAM ($0000-$07FF) from one `readbyterange` a frame; any call that is not a read starts
+  afresh. Measured on BizHawk 2.11.1 with the same loop (a 1-frame press and five reads): 2.4 frames a second before,
+  14.6 after. The mocks play hundreds of frames a call and read no RAM, so they never met this.
 - **A plugin's folder setting is `__ENV__` in the published runtime config.** Portal's broker may read the game's
   `console.log` and `agent_runs`, and those paths, built from `AAS_PORTAL_GAME_ROOT`, went into
   `runtime-config/mcp.template.json` as this machine's paths; the privacy scan then refused the bundle of every Portal

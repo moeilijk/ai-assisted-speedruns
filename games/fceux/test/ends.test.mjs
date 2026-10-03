@@ -59,3 +59,21 @@ test("a game over is a defeat, told once while it lasts", async () => {
   assert.equal(over.length, 1);
   assert.equal(over[0].data.victory, false);
 });
+
+test("the agent's reads of the RAM come from one read a frame; a register above $07FF still goes to the emulator", async () => {
+  reset();
+  const emu = await plugin.connect();
+  fake.onFrame = (s) => { s.memory[1904] = 1; s.memory[0x6d] = 2; };
+  await emu.wait(1);
+  const before = fake.calls.length;
+  const values = [];
+  for (const a of [1904, 1887, 0x6d, 0x86, 0x75f]) values.push(await emu.read(a));
+  const calls = fake.calls.slice(before);
+  assert.deepEqual(values, [1, 0, 2, 0, 0]);
+  assert.deepEqual(calls, ["memory.readbyterange"], `one read of the RAM for five values: ${calls.join(", ")}`);
+  await emu.read(0x2002);
+  assert.equal(fake.calls.at(-1), "memory.readbyte", "a PPU register is read from the emulator itself");
+  fake.onFrame = (s) => { s.memory[1904] = 3; };
+  await emu.wait(1);
+  assert.equal(await emu.read(1904), 3, "the next frame is read afresh");
+});
