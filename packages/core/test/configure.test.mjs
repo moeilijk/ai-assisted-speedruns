@@ -71,3 +71,14 @@ test("claude-code configure writes .mcp.json with only the broker and denies oth
   const claudeConfig = JSON.parse(readFileSync(join(process.env.CLAUDE_CONFIG_DIR, ".claude.json"), "utf8"));
   assert.equal(claudeConfig.projects[runDir].hasTrustDialogAccepted, true);
 });
+
+test("a file the broker may read inside a plugin's own folder setting is published as __ENV__, not the machine's path", async () => {
+  // 2026-10-04: Portal's --allow-fs-read named the game folder (AAS_PORTAL_GAME_ROOT), so the bundle was refused.
+  const { publicPath } = await import("../src/public-path.mjs");
+  const runDir = mkdtempSync(join(tmpdir(), "aas-run-"));
+  const env = { AAS_PORTAL_GAME_ROOT: "/mnt/d/Games/Portal", AAS_RUN_DIR: runDir, AAS_PORTAL_SPT_HOST: "127.0.0.1" };
+  assert.equal(publicPath("--allow-fs-read=/mnt/d/Games/Portal/portal/agent_runs", { runDir, env }), "--allow-fs-read=__ENV__/portal/agent_runs");
+  assert.equal(publicPath("D:\\Games\\Portal\\portal", { runDir, env: { G: "D:\\Games\\Portal" } }), "__ENV__\\portal", "a Windows path too");
+  assert.equal(publicPath(`--allow-fs-write=${runDir}`, { runDir, env }), "--allow-fs-write=__RUN_DIR__", "the harness's own variables keep their own token");
+  assert.equal(publicPath("127.0.0.1:27182", { runDir, env }), "127.0.0.1:27182", "what is not a path stays");
+});

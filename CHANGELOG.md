@@ -27,6 +27,11 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   ends before the goal is `stopped`, with what the game showed in its notes, and can be continued; `completed` now
   means the game showed the goal. SPEC 0.45: `session.continued` is a reserved event name, and `human_turns` does not
   count its notices, so a continued run is not `assisted`.
+- **A plugin's folder setting is `__ENV__` in the published runtime config.** Portal's broker may read the game's
+  `console.log` and `agent_runs`, and those paths, built from `AAS_PORTAL_GAME_ROOT`, went into
+  `runtime-config/mcp.template.json` as this machine's paths; the privacy scan then refused the bundle of every Portal
+  run with a model since 2026-10-02 (found on the first one, 2026-10-04; the mock runs use no such config).
+  `publicPath` replaces a plugin setting that is a path the way the published `env` already did.
 - **LiveSplit's game time no longer jumps back.** It ran free during every playback and was set to the exact value at
   its end; the timer hears a playback's start and end through the run log, read every half second, so LiveSplit's own
   clock had often run on past the playback and was put back (seen by the maintainer during a run, 2026-10-03; the game
