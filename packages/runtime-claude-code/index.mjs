@@ -442,6 +442,8 @@ export default {
     const stopped = timedOut || Boolean(budgetHit) || Boolean(gameOver) || last?.subtype === "error_max_turns" || limitHit;
     const status = ignoredRules ? "failed" : code === 0 && !stopped ? "completed" : stopped ? "stopped" : "failed";
     const notes = `${notesBase}${ignoredRules ? `; Claude Code ignored permission rules: ${ignoredRules}` : ""}${timedOut ? `; time budget of ${minutes} min reached` : ""}${budgetHit ? `; weekly budget ${weeklyMax()}% reached` : ""}${gameOver ? `; ${gameOver}` : ""}${limitHit ? `; ${resultText.split("\n")[0].slice(0, 120)}` : ""}`;
-    return { status, endedAt: new Date().toISOString(), notes, sessionId: last?.session_id ?? null, privateLog: null, turns };
+    // The turns as Claude Code counts them for --max-turns (its result's num_turns), not the assistant records of the
+    // stream, which are about three per turn (2026-10-03: 312 records, num_turns 105), so a budget is spent as it counts.
+    return { status, endedAt: new Date().toISOString(), notes, sessionId: last?.session_id ?? null, privateLog: null, turns: Number.isInteger(last?.num_turns) ? last.num_turns : turns };
   },
 };

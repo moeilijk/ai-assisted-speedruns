@@ -27,6 +27,9 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   ends before the goal is `stopped`, with what the game showed in its notes, and can be continued; `completed` now
   means the game showed the goal. SPEC 0.45: `session.continued` is a reserved event name, and `human_turns` does not
   count its notices, so a continued run is not `assisted`.
+- **Claude Code's turns are counted as it counts them.** The runtime returned the assistant records of the stream,
+  about three per turn, so a Haiku run (2026-10-03, `--max-turns 300`) that had used 105 turns looked as if it had
+  spent 312 and was not continued after it ended its session on a death. It now returns the result's `num_turns`.
 
 - **One session for run and resume** (`packages/core/src/session.mjs`). The two had their own copy of everything from
   the game's start to the end, and the resume had kept faults the run no longer had. In the shared session:
