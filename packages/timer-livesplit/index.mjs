@@ -2,11 +2,14 @@
 // (TCP, default 127.0.0.1:16834, one command per line). LiveSplit shows RTA
 // and Game Time on screen, which the recorder captures, and keeps the splits.
 //
-// Mapping of run events (paused-think model: game time advances only while
-// a playback runs):
+// Mapping of run events (paused-think model: game time advances only by what a
+// playback played). Game time stays paused and is set at the end of every
+// playback: it used to run free during a playback, but the timer hears a
+// playback's start and end through the run log, read every half second, so
+// LiveSplit's own clock ran on past the playback and the exact value set at
+// its end put it back (2026-10-03, seen by the owner during a run).
 //   run.started            starttimer, initgametime, pausegametime
-//   game.playback start    unpausegametime
-//   game.playback end      setgametime <IGT from ticks>, pausegametime
+//   game.playback end      setgametime <IGT from ticks>
 //   game.milestone chapter split
 //   game.over victory      pause (the goal is reached; the milestone before it did the final split)
 //   game.over defeat       nothing yet (the death screen is still the dead run)
@@ -139,11 +142,9 @@ export function createLiveSplitTimer(options = {}) {
     async onEvent(event) {
       switch (event.event) {
         case "game.playback":
-          if (event.data?.phase === "start") send("unpausegametime");
-          else if (event.data?.phase === "end") {
+          if (event.data?.phase === "end") {
             igt += playbackSeconds(event.data);
             send(`setgametime ${igt.toFixed(3)}`);
-            send("pausegametime");
           }
           break;
         case "game.milestone":

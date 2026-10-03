@@ -27,6 +27,12 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   ends before the goal is `stopped`, with what the game showed in its notes, and can be continued; `completed` now
   means the game showed the goal. SPEC 0.45: `session.continued` is a reserved event name, and `human_turns` does not
   count its notices, so a continued run is not `assisted`.
+- **LiveSplit's game time no longer jumps back.** It ran free during every playback and was set to the exact value at
+  its end; the timer hears a playback's start and end through the run log, read every half second, so LiveSplit's own
+  clock had often run on past the playback and was put back (seen by the maintainer during a run, 2026-10-03; the game
+  time each playback reported matched its wall time in all 166 playbacks of that run). Game time now stays paused and
+  is set at the end of every playback, so it only goes forward. The splits and the published times were exact before
+  and are unchanged.
 - **Claude Code's turns are counted as it counts them.** The runtime returned the assistant records of the stream,
   about three per turn, so a Haiku run (2026-10-03, `--max-turns 300`) that had used 105 turns looked as if it had
   spent 312 and was not continued after it ended its session on a death. It now returns the result's `num_turns`.
