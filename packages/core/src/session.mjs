@@ -101,6 +101,7 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
       runtime.interrupt?.(stopReason);
     });
     try {
+      log(`the ${runtime.id} session starts`);
       outcome = await runtime.start(runDir, brief, { checkpoint: () => follower.flush(), stopRequested: () => stopReason });
     } catch (error) {
       outcome = { status: "failed", endedAt: new Date().toISOString(), notes: String(error?.message ?? error) };

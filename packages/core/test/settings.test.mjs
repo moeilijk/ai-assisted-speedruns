@@ -9,7 +9,7 @@ const dir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-settings-"));
 process.env.AAS_ENV_FILE = path.join(dir, ".env");
 process.env.AAS_GAME_ENV_DIR = path.join(dir, "games");
 fs.mkdirSync(process.env.AAS_GAME_ENV_DIR, { recursive: true });
-const { ENV_FILE, GAME_ENV_DIR, gameEnvFile, gameName, loadSettings, readSettings } = await import("../src/settings.mjs");
+const { ENV_FILE, GAME_ENV_DIR, gameEnvFile, gameName, gameOfCommand, loadSettings, readSettings } = await import("../src/settings.mjs");
 
 test("a game's settings file is named after the folder its plugin is in", () => {
   assert.equal(gameName("games/portal/plugin.mjs"), "portal");
@@ -44,4 +44,13 @@ test("readSettings shows what a run would see, from every game at once", () => {
   assert.equal(all.AAS_ONLY_MACHINE, "machine");
   assert.equal(all.AAS_BALATRO_GAME_ROOT, "/games/balatro");
   assert.equal(all.AAS_SHARED, "from-game", "a game's file wins here too");
+});
+
+test("a command on a run directory without --game is about the run's own game", () => {
+  const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "aas-run-"));
+  fs.writeFileSync(path.join(runDir, "brief.json"), JSON.stringify({ gameModule: "/repo/games/portal/plugin.mjs" }));
+  assert.equal(gameOfCommand(null, runDir), "/repo/games/portal/plugin.mjs");
+  assert.equal(gameOfCommand("games/balatro/plugin.mjs", runDir), "games/balatro/plugin.mjs", "--game wins");
+  assert.equal(gameOfCommand(null, fs.mkdtempSync(path.join(os.tmpdir(), "aas-run-"))), null, "no brief: no game");
+  assert.equal(gameOfCommand(null, null), null);
 });

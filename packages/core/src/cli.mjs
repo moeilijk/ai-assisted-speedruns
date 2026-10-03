@@ -8,7 +8,7 @@
 //   aas stop --run-dir <dir> | aas login | aas logout | aas tickets [extend|revoke|delete <ticket>] | aas upload <bundle.zip>
 import fs from "node:fs";
 import path from "node:path";
-import { loadSettings } from "./settings.mjs";
+import { gameOfCommand, loadSettings } from "./settings.mjs";
 import { pathToFileURL } from "node:url";
 import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
@@ -18,7 +18,11 @@ export { brokerSpec, configure };
 
 // Settings come from two files: the game's own (.local/games/<game>.env) and the machine's (.env). The CLI loads
 // them itself, so the same command works from any shell; see settings.mjs for the order and why.
-const gameArg = (() => { const i = process.argv.indexOf("--game"); return i === -1 ? null : process.argv[i + 1]; })();
+// A command on a run directory without --game (`aas resume --run-dir`, `aas publish --run-dir`) loads the settings of
+// the run's own game, from its brief: without them a resumed Portal run did not know the game folder, sent start_run
+// where the game refuses it, and never became ready (2026-10-02).
+const argOf = (name) => { const i = process.argv.indexOf(name); return i === -1 ? null : process.argv[i + 1]; };
+const gameArg = gameOfCommand(argOf("--game"), argOf("--run-dir"));
 loadSettings(gameArg);
 // A module whose `archiveFetch` authenticates every request to the Archive itself (useArchiveFetch), for a machine
 // whose account is reached that way. Everything the CLI sends to the Archive, and every CLI the GUI starts, uses it.

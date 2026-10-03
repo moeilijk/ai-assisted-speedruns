@@ -46,6 +46,14 @@ export function readSettings() {
   return out;
 }
 
+/** The game a command is about: its --game, else the game of the run directory it names (that run's brief). */
+export function gameOfCommand(game, runDir) {
+  if (game) return game;
+  const brief = runDir ? path.join(path.resolve(runDir), "brief.json") : null;
+  if (!brief || !fs.existsSync(brief)) return null;
+  try { return JSON.parse(fs.readFileSync(brief, "utf8")).gameModule ?? null; } catch { return null; }
+}
+
 /**
  * Loads the settings for a command. `game` is a plugin path, a game folder or a game name; without it only the
  * machine's own `.env` is loaded. Call it before anything reads process.env.
