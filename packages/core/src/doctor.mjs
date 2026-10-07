@@ -7,6 +7,20 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer } from "./plugins.mjs";
 
+/**
+ * The game's endpoints that do not answer: a run that starts while the game is not up records a capture of nothing
+ * (BizHawk 2026-10-06: OBS kept the old window title, the picture check refused after 20 s). Each connect has a
+ * deadline, because under WSL a connect to a closed local port can hang for minutes.
+ */
+export async function unreachableEndpoints(plugin) {
+  const down = [];
+  for (const ep of plugin.endpoints ?? []) {
+    const r = await probe(ep.host, ep.port);
+    if (r !== "open") down.push(`${ep.host}:${ep.port} (${r})`);
+  }
+  return down;
+}
+
 function probe(host, port, ms = 2500) {
   return new Promise((res) => {
     const s = net.connect(port, host);

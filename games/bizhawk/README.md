@@ -6,6 +6,11 @@ that serves the emulator over HTTP on `127.0.0.1:8767`. The plugin keeps the emu
 moves; the game runs only while the agent's buttons play, frame by frame, so in-game time is the frames played divided
 by the system's frame rate as BizHawk counts it.
 
+The agent plays the way Portal's agent does: each `bizhawk_exec` call plays one plan (`emu.tas()`, `emu.sequence`,
+`emu.press` or `emu.wait`) in one go at the game's own speed, and the frame it ended on comes back as a screenshot. A
+second plan in the same call is refused, so the agent looks, plans and plays, and cannot steer frame by frame from a
+script; the recording shows the game at its own speed.
+
 One plugin, one profile per game (`profiles/<id>.json`, chosen with `AAS_BIZHAWK_PROFILE`). A profile names:
 
 - the ROM by its SHA-1, with its maker, license and source. ROMs are never in this repository: put yours in

@@ -86,7 +86,7 @@
       "name": "BizHawk",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "16376a3111aaa32d2548a28baa22316a09b7a72efbb1cd00398c526e18b2742b"
+      "sha256": "ff9503a34fcfaf5100738ad9e1660403baab4dc95ca3f8fc94651b02ba42a4dd"
     },
     {
       "kind": "game",
@@ -104,7 +104,7 @@
       "name": "FCEUX",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "cb9698310f1a3817d9d975433a1190877e5bb5429c7c28d9ad26033802ebbf66"
+      "sha256": "0b696488aa24e579414c1da1c77da8d74fbd5533572fed9bd8302f36ecd379fe"
     },
     {
       "kind": "game",

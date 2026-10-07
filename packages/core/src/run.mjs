@@ -12,6 +12,7 @@ import { startSegmentProof } from "./proof-run.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { COST_TEXT } from "./cost-text.mjs";
 import { session } from "./session.mjs";
+import { unreachableEndpoints } from "./doctor.mjs";
 
 /**
  * Autosave: a save state after every chapter milestone and every
@@ -171,6 +172,13 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
   }
 
+  // The game is started before the run (its launcher, or the GUI's Start step); one that does not answer stops the run
+  // here, before a proof ticket is taken and before anything is recorded.
+  const down = await unreachableEndpoints(plugin);
+  if (down.length) {
+    early.release();
+    throw new Error(`the game does not answer at ${down.join(", ")}. Not starting: start the game first (its launcher, or the GUI's Start step).`);
+  }
   // Proof, before anything is recorded: a run that wants it and cannot get a ticket does not start.
   const proof = await startSegmentProof({ runDir, segment: 1, runtime, events, opts, log });
 

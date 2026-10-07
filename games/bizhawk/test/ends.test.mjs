@@ -79,3 +79,31 @@ test("memory is read once a frame: a playback that checks every end, and a scrip
   assert.equal((await emu.read(1904, { domain: "RAM" })).value, 3, "the next frame is read afresh");
   assert.deepEqual(Object.keys(await emu.read(1904, { domain: "RAM" })).sort(), ["address", "endianness", "requested", "value"], "the same answer as the tool's");
 });
+
+test("one plan per exec call, as Portal plays: a second playback in the same call is refused, the next call plays, and the plan's last frame comes back as a screenshot", async () => {
+  reset();
+  const images = [];
+  globalThis.aas.emitImage = (url) => images.push(url);
+  try {
+    const emu = await plugin.connect();
+    globalThis.aas.exec = 101;
+    const r = await emu.tas().hold(["Right", "B"], 30).tap("A").wait(10).run();
+    assert.equal(r.frames, 43, "hold 30 + tap 3 + wait 10");
+    assert.equal(images.length, 1, "the frame the plan ended on comes back");
+    await assert.rejects(emu.press(["A"], 1), /one plan per call/);
+    await assert.rejects(emu.wait(1), /one plan per call/);
+    assert.equal(typeof (await emu.read(0x0e, { domain: "RAM" })).value, "number", "looking at the memory is allowed after the plan");
+    globalThis.aas.exec = 102;
+    await emu.wait(5);
+    globalThis.aas.exec = 103;
+    await assert.rejects(emu.wait(0), /between 1 and 36000/);
+    await emu.wait(1);
+    assert.throws(() => emu.tas().run(), /the plan is empty/);
+    delete globalThis.aas.exec;
+    await emu.wait(1);
+    await emu.wait(1);
+  } finally {
+    delete globalThis.aas.exec;
+    globalThis.aas.emitImage = () => {};
+  }
+});

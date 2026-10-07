@@ -115,6 +115,24 @@ async function endsShown() {
   return furthest ? [{ label: furthest.label, split: furthest.split ?? furthest.label, end: furthest.id, chapter: true }] : [];
 }
 
+/**
+ * A plan, built the way Portal's `portal.tas()` builds one: nothing plays until `run()`, which plays the steps in one
+ * go. `hold` holds buttons for some frames, `tap` presses for a few frames (3 unless given), `wait` plays frames with
+ * nothing pressed.
+ */
+export function planBuilder(run) {
+  const one = (buttons) => (typeof buttons === "string" ? [buttons] : buttons);
+  const b = {
+    steps: [],
+    get totalFrames() { return b.steps.reduce((n, s) => n + s.frames, 0); },
+    hold(buttons, frames) { b.steps.push({ buttons: one(buttons), frames }); return b; },
+    tap(buttons, frames = 3) { b.steps.push({ buttons: one(buttons), frames }); return b; },
+    wait(frames) { b.steps.push({ frames }); return b; },
+    run() { if (!b.steps.length) throw new Error("the plan is empty"); const steps = b.steps; b.steps = []; return run(steps); },
+  };
+  return b;
+}
+
 export default {
   id: "bizhawk",
   name: "BizHawk",
@@ -198,11 +216,19 @@ export default {
         }
       }
     };
+    // One plan per tool call, as Portal plays: the agent looks while the game stands still, plans, and the plan plays
+    // in one go at the game's own speed. A script that played a frame, read the RAM and played the next (Opus 5.5,
+    // 2026-10-07: 97% of 43,419 playbacks were one frame) paused the game some 70 ms after every frame, so the
+    // recording showed the game at a fifth of its speed, and it steered frame by frame where a player plans.
+    let playedIn = null;
     const play = async (label, steps) => {
       if (over) throw new Error("the game has reached its end; no further input");
+      const exec = globalThis.aas?.exec;
+      if (exec && playedIn === exec) throw new Error("one plan per call: this call has played its plan. Look at the result and plan the next move in a new call.");
       const i = ++index;
       const frames = steps.reduce((n, s) => n + Math.max(0, Math.floor(s.frames ?? 1)), 0);
       if (frames < 1 || frames > 36000) throw new Error("frames must be between 1 and 36000 per call");
+      if (exec) playedIn = exec;
       const started = Date.now();
       emit("game.playback", { phase: "start", index: i, command: label, frames });
       try {
@@ -229,15 +255,18 @@ export default {
       const info = await call("get_info");
       emit("game.playback", { phase: "end", index: i, command: label, frames, seconds: fps ? frames / fps : null, framecount: info.framecount ?? null, wall_ms: Date.now() - started, error: null });
       await checkEnds();
+      // The frame the plan ended on comes back with the result, as Portal's run does.
+      if (globalThis.aas?.exec) await controller.screenshot().catch(() => {});
       return { frames, framecount: info.framecount ?? null };
     };
-    return {
+    const controller = {
       async info() { const i = await call("get_info"); return { system: i.system_id, rom: i.rom_name, rom_sha1: i.rom_hash, framecount: i.framecount, paused: i.paused, profile: PROFILE?.id ?? null }; },
       async observe() { return this.info(); },
       async buttons() { const j = await call("get_joypad"); return Object.keys(j.buttons ?? j).map((b) => b.replace(/^P1 /, "")).filter((b) => !["Power", "Reset"].includes(b)); },
       press: (buttons, frames = 1) => play(`press ${Object.keys(buttonMap(buttons)).join("+") || "nothing"} ${frames}`, [{ buttons, frames }]),
       sequence: (steps) => play(`sequence of ${steps.length}`, steps),
       wait: (frames) => play(`wait ${frames}`, [{ frames }]),
+      tas: () => planBuilder((steps) => play(`plan of ${steps.length}`, steps)),
       async read(address, { domain, width = 8 } = {}) { return readMemory(address, { domain, width }); },
       async readRange(address, length, domain) { return call("read_range", { address, length, domain }); },
       async domains() { return call("list_memory_domains"); },
@@ -253,6 +282,7 @@ export default {
       },
       close() {},
     };
+    return controller;
   },
 
   /** The profile's ROM, checked by its SHA-1, from power-on and paused, so the recording begins at the first frame. */

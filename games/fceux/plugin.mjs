@@ -18,7 +18,10 @@ import { batch as bridgeBatch, call as bridgeCall, HOST as BRIDGE_HOST, PORT as 
 // The agent's reads of the NES's RAM ($0000-$07FF) come from one copy a frame, read with one readbyterange: a read was
 // one call each through the bridge, and a script stepping one frame at a time spent most of its time on them (measured
 // in BizHawk, 2026-10-04: 1.6 frames a second). Above $07FF are the registers, where a read can change something, so
-// those still go to the emulator. Any call that is not a read (a frame, input, a state) starts afresh.
+// those still go to the emulator. Any call that is not a read (a frame, input, a state) starts afresh. A playback brings
+// the copy along in the same batch as its frames: the bridge answers once a pass of FCEUX's loop, about 50 ms whatever a
+// batch holds (measured 2026-10-07: a ping, ten pings, or a frame and the RAM each took 50-52 ms), so a frame, the check
+// of the ends and the agent's reads took three of those (4.8 frames a second stepping one frame) and now take one.
 const isRead = (method) => /^(memory\.read|rom\.|emu\.(framecount|lagcount|emulating|paused)$|joypad\.get|gui\.screen$|ping$)/.test(method);
 let frameRam = null;
 const call = (method, params, opts) => { if (!isRead(method)) frameRam = null; return bridgeCall(method, params, opts); };
@@ -27,6 +30,18 @@ export async function readByte(address) {
   if (!(Number.isInteger(address) && address >= 0 && address < 0x800)) return call("memory.readbyte", { address });
   frameRam ??= await call("memory.readbyterange", { address: 0, length: 0x800 });
   return frameRam[address];
+}
+/** `length` bytes from `address`: from the frame's copy of the RAM when they all lie in it. */
+async function readBytes(address, length) {
+  if (!(Number.isInteger(address) && address >= 0 && address + length <= 0x800)) return call("memory.readbyterange", { address, length });
+  frameRam ??= await call("memory.readbyterange", { address: 0, length: 0x800 });
+  return frameRam.slice(address, address + length);
+}
+/** Frames played, with the RAM after them read in the same batch; returns the framecount the step reports. */
+async function stepWithRam(steps, opts) {
+  const [framecount, ram] = await batch([{ method: "emu.step", params: { steps } }, { method: "memory.readbyterange", params: { address: 0, length: 0x800 } }], opts);
+  frameRam = ram;
+  return framecount;
 }
 import { fceuxDir, hostPath } from "./paths.mjs";
 import { rgbToPng } from "./png.mjs";
@@ -89,7 +104,8 @@ function holds(w, mem) {
 async function readFor(conditions) {
   const list = [...conditions.reduce((s, w) => addresses(w, s), new Set())];
   if (!list.length) return new Map();
-  const values = await batch(list.map((address) => ({ method: "memory.readbyte", params: { address } })));
+  const values = [];
+  for (const address of list) values.push(await readByte(address));
   return new Map(list.map((a, i) => [a, values[i]]));
 }
 /** The furthest end the emulator shows now, as the milestone a playback would tell (for a save loaded after it). */
@@ -98,6 +114,24 @@ async function endsShown() {
   const mem = await readFor(ends.map((e) => e.when));
   const furthest = ends.filter((e) => holds(e.when, mem)).at(-1);
   return furthest ? [{ label: furthest.label, split: furthest.split ?? furthest.label, end: furthest.id, chapter: true }] : [];
+}
+
+/**
+ * A plan, built the way Portal's `portal.tas()` builds one: nothing plays until `run()`, which plays the steps in one
+ * go. `hold` holds buttons for some frames, `tap` presses for a few frames (3 unless given), `wait` plays frames with
+ * nothing pressed.
+ */
+export function planBuilder(run) {
+  const one = (buttons) => (typeof buttons === "string" ? [buttons] : buttons);
+  const b = {
+    steps: [],
+    get totalFrames() { return b.steps.reduce((n, s) => n + s.frames, 0); },
+    hold(buttons, frames) { b.steps.push({ buttons: one(buttons), frames }); return b; },
+    tap(buttons, frames = 3) { b.steps.push({ buttons: one(buttons), frames }); return b; },
+    wait(frames) { b.steps.push({ frames }); return b; },
+    run() { if (!b.steps.length) throw new Error("the plan is empty"); const steps = b.steps; b.steps = []; return run(steps); },
+  };
+  return b;
 }
 
 export default {
@@ -205,11 +239,19 @@ export default {
         emit("game.save_failed", { end: end.id, error: String(error?.message ?? error) });
       }
     };
+    // One plan per tool call, as Portal plays: the agent looks while the game stands still, plans, and the plan plays
+    // in one go at the game's own speed. A script that played a frame, read the RAM and played the next (Opus 5.5 on
+    // BizHawk, 2026-10-07: 97% of 43,419 playbacks were one frame) paused the game after every frame, so the recording
+    // showed the game at a fifth of its speed, and it steered frame by frame where a player plans.
+    let playedIn = null;
     const play = async (label, steps) => {
       if (over) throw new Error("the game has reached its end; no further input");
+      const exec = globalThis.aas?.exec;
+      if (exec && playedIn === exec) throw new Error("one plan per call: this call has played its plan. Look at the result and plan the next move in a new call.");
       const parsed = steps.map((s) => ({ ...parseButtons(s.buttons), frames: Math.max(0, Math.floor(s.frames ?? 1)) }));
       const frames = parsed.reduce((n, s) => n + s.frames, 0);
       if (frames < 1 || frames > 36000) throw new Error("frames must be between 1 and 36000 per call");
+      if (exec) playedIn = exec;
       const i = ++index;
       const started = Date.now();
       emit("game.playback", { phase: "start", index: i, command: label, frames });
@@ -219,7 +261,7 @@ export default {
         // short step cut the game's sound up (measured 2026-09-23 in an OBS recording: calls of one frame leave 33-43
         // ms of silence every ~51 ms, calls of 600 one gap of ~30 ms per call).
         let chunk = [], inChunk = 0;
-        const flush = async () => { if (chunk.length) framecount = await call("emu.step", { steps: chunk }, { timeoutMs: 60000 }); chunk = []; inChunk = 0; };
+        const flush = async () => { if (chunk.length) framecount = await stepWithRam(chunk, { timeoutMs: 60000 }); chunk = []; inChunk = 0; };
         for (const s of parsed) {
           let left = s.frames, first = true;
           while (left > 0) {
@@ -236,9 +278,11 @@ export default {
       }
       emit("game.playback", { phase: "end", index: i, command: label, frames, seconds: fps ? frames / fps : null, framecount, wall_ms: Date.now() - started, error: null });
       await checkEnds();
+      // The frame the plan ended on comes back with the result, as Portal's run does.
+      if (globalThis.aas?.exec) await controller.screenshot().catch(() => {});
       return { frames, framecount };
     };
-    return {
+    const controller = {
       async info() {
         const [rom, md5, framecount, paused] = await batch([{ method: "rom.getfilename" }, { method: "rom.gethash", params: { type: "md5" } }, { method: "emu.framecount" }, { method: "emu.paused" }]);
         return { system: PROFILE?.system ?? "NES", rom, rom_md5: md5, framecount, paused, profile: PROFILE?.id ?? null };
@@ -248,6 +292,7 @@ export default {
       press: async (buttons, frames = 1) => play(`press ${Object.keys(parseButtons(buttons).buttons).join("+") || "nothing"} ${frames}`, [{ buttons, frames }]),
       sequence: (steps) => play(`sequence of ${steps.length}`, steps),
       wait: (frames) => play(`wait ${frames}`, [{ frames }]),
+      tas: () => planBuilder((steps) => play(`plan of ${steps.length}`, steps)),
       async read(address, { width = 8 } = {}) {
         if (width === 8) return readByte(address);
         if (width === 16) return call("memory.readword", { address });
@@ -255,7 +300,7 @@ export default {
       },
       async readRange(address, length) {
         if (!(length >= 1 && length <= 4096)) throw new Error("length is 1 to 4096 bytes");
-        return call("memory.readbyterange", { address, length });
+        return readBytes(address, length);
       },
       /**
        * The emulated frame, before FCEUX draws anything over it (gui.gdscreenshot(true) in the bridge): FCEUX's own
@@ -270,6 +315,7 @@ export default {
       },
       close() {},
     };
+    return controller;
   },
 
   /** The profile's ROM, checked by the MD5 FCEUX reports, from power-on and paused, so the recording begins at the first frame. */

@@ -6,6 +6,11 @@ inside FCEUX that answers on `127.0.0.1:9999`. The plugin keeps FCEUX paused bet
 only while the agent's buttons play, frame by frame, so in-game time is the frames played divided by FCEUX's own NTSC
 frame rate (1008307711 / 2^24, about 60.0988 a second).
 
+The agent plays the way Portal's agent does: each `fceux_exec` call plays one plan (`emu.tas()`, `emu.sequence`,
+`emu.press` or `emu.wait`) in one go at the game's own speed, and the frame it ended on comes back as a screenshot. A
+second plan in the same call is refused, so the agent looks, plans and plays, and cannot steer frame by frame from a
+script; the recording shows the game at its own speed.
+
 One plugin, one profile per game (`profiles/<id>.json`, chosen with `AAS_FCEUX_PROFILE`). A profile names:
 
 - the ROM by its SHA-1 (the whole file, which the doctor checks) and by the MD5 FCEUX itself reports (its PRG and CHR

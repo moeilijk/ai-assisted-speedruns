@@ -32,7 +32,25 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   after every playback the profile's ends alone took some twenty. BizHawk now answers 8-bit reads of a domain from one
   `read_bulk` a frame, FCEUX the RAM ($0000-$07FF) from one `readbyterange` a frame; any call that is not a read starts
   afresh. Measured on BizHawk 2.11.1 with the same loop (a 1-frame press and five reads): 2.4 frames a second before,
-  14.6 after. The mocks play hundreds of frames a call and read no RAM, so they never met this.
+  14.6 after. The mocks play hundreds of frames a call and read no RAM, so they never met this. FCEUX's bridge answers
+  once a pass of FCEUX's loop, about 50 ms whatever a batch holds, so there a frame now brings the RAM along in the
+  same batch, and the check of the ends and the agent's reads after it ask nothing more: measured on FCEUX 2.6.6 with a
+  1-frame press and four reads, 4.8 frames a second before, 18.5 after.
+- **BizHawk and FCEUX play one plan per call, as Portal does.** An Opus 5.5 run to World 1 (2026-10-07) wrote a script
+  that played one frame, read the RAM and played the next: 97% of its 43,419 playbacks were one frame, about 85 ms
+  apart, so the recording showed Super Mario Bros at a fifth of its speed with a pause after every frame, and the agent
+  steered frame by frame where a player plans. Now each `<game>_exec` call plays one plan, in one go at the game's own
+  speed, and the frame it ended on comes back as a screenshot, as Portal's `run()` does; a second plan in the same
+  call is refused ("one plan per call"), and reading the memory while the game stands still is allowed before and
+  after it. `emu.tas()` builds a plan the way `portal.tas()` does (`hold`, `tap`, `wait`, `run`); `emu.sequence`,
+  `emu.press` and `emu.wait` are plans of their own. The broker numbers each exec call (`globalThis.aas.exec`) so a
+  plugin can tell. Measured through the broker on BizHawk 2.11.1 and FCEUX 2.6.6: a second plan refused, a plan of
+  600 frames played in 10.1 and 10.2 s, the screenshot back with it.
+- **A run or resume whose game does not answer stops at once.** `aas run` does not start the game (its launcher or
+  the GUI's Start step does), and a BizHawk run started without it (2026-10-06) recorded OBS's capture of a window
+  that was not there, until the picture check refused after 20 s with a proof ticket taken. Now the game's endpoints
+  are tried first, each with a deadline, and a game that does not answer stops the run before the ticket and the
+  recording: "the game does not answer at <host:port>. Not starting: start the game first".
 - **A plugin's folder setting is `__ENV__` in the published runtime config.** Portal's broker may read the game's
   `console.log` and `agent_runs`, and those paths, built from `AAS_PORTAL_GAME_ROOT`, went into
   `runtime-config/mcp.template.json` as this machine's paths; the privacy scan then refused the bundle of every Portal

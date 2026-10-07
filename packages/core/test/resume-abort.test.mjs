@@ -102,3 +102,34 @@ export default { ...stub, async budget() { return { ok: false, detail: "week 71%
   const again = await run({ runtime, game: s.game, recorder: s.recorder(false), "run-dir": runDir, "keep-open": true, "ignore-budget": true }, { log() {} });
   assert.equal(again.outcome.status, "stopped", "the directory could be used again");
 });
+
+test("a run or resume whose game does not answer stops before the proof ticket and the recording", async () => {
+  const s = setup();
+  // A local port that is closed: a server takes one and lets it go again.
+  const { createServer } = await import("node:net");
+  const port = await new Promise((res) => { const srv = createServer().listen(0, "127.0.0.1", () => { const p = srv.address().port; srv.close(() => res(p)); }); });
+  const game = join(s.dir, "game-down.mjs");
+  writeFileSync(game, `import fake from ${JSON.stringify(join(here, "fake-game.mjs"))};
+export default { ...fake, instructions: "test", async saveState({ name }) { return { name }; }, async loadState() { return { readyAt: new Date() }; },
+  get endpoints() { return process.env.AAS_TEST_GAME_DOWN ? [{ host: "127.0.0.1", port: ${port} }] : []; } };
+`);
+  const runDir = join(s.dir, "down");
+  await configure({ runtime: join(here, "stub-runtime.mjs"), game, "run-dir": runDir }, { log() {} });
+  writeFileSync(join(runDir, "stub-codes.json"), JSON.stringify(["return await game.observe()"]));
+  process.env.AAS_TEST_GAME_DOWN = "1";
+  try {
+    writeFileSync(s.calls, "");
+    await assert.rejects(run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: s.recorder(false), "run-dir": runDir, "keep-open": true }, { log() {} }), new RegExp(`does not answer at 127\\.0\\.0\\.1:${port}.*start the game first`));
+    assert.equal(readFileSync(s.calls, "utf8"), "", "nothing was recorded");
+    assert.ok(!existsSync(join(runDir, "run.jsonl")) || !eventsOf(runDir).some((e) => e.event.startsWith("proof.")), "no proof ticket was taken");
+    delete process.env.AAS_TEST_GAME_DOWN;
+    const r = await run({ runtime: join(here, "stub-runtime.mjs"), game, recorder: s.recorder(false), "run-dir": runDir, "keep-open": true }, { log() {} });
+    assert.equal(r.outcome.status, "stopped");
+    process.env.AAS_TEST_GAME_DOWN = "1";
+    writeFileSync(s.calls, "");
+    await assert.rejects(resume({ "run-dir": runDir, runtime: join(here, "stub-runtime.mjs"), recorder: s.recorder(false), "keep-open": true }, { log() {} }), /does not answer.*start the game first/);
+    assert.equal(readFileSync(s.calls, "utf8"), "", "the resume recorded nothing");
+  } finally {
+    delete process.env.AAS_TEST_GAME_DOWN;
+  }
+});

@@ -60,20 +60,51 @@ test("a game over is a defeat, told once while it lasts", async () => {
   assert.equal(over[0].data.victory, false);
 });
 
-test("the agent's reads of the RAM come from one read a frame; a register above $07FF still goes to the emulator", async () => {
+test("a frame brings the RAM along in its own batch: the ends and the agent's reads ask nothing more; a register above $07FF still goes to the emulator", async () => {
   reset();
   const emu = await plugin.connect();
   fake.onFrame = (s) => { s.memory[1904] = 1; s.memory[0x6d] = 2; };
+  const start = fake.calls.length;
   await emu.wait(1);
+  assert.deepEqual(fake.calls.slice(start), ["emu.step:1", "memory.readbyterange"], `a frame and the check of its ends: ${fake.calls.slice(start).join(", ")}`);
   const before = fake.calls.length;
   const values = [];
   for (const a of [1904, 1887, 0x6d, 0x86, 0x75f]) values.push(await emu.read(a));
+  assert.deepEqual(await emu.readRange(0x6c, 3), [0, 2, 0], "a range in the RAM comes from the same copy");
   const calls = fake.calls.slice(before);
   assert.deepEqual(values, [1, 0, 2, 0, 0]);
-  assert.deepEqual(calls, ["memory.readbyterange"], `one read of the RAM for five values: ${calls.join(", ")}`);
+  assert.deepEqual(calls, [], `the reads after a frame ask the emulator nothing: ${calls.join(", ")}`);
   await emu.read(0x2002);
   assert.equal(fake.calls.at(-1), "memory.readbyte", "a PPU register is read from the emulator itself");
   fake.onFrame = (s) => { s.memory[1904] = 3; };
   await emu.wait(1);
   assert.equal(await emu.read(1904), 3, "the next frame is read afresh");
+});
+
+test("one plan per exec call, as Portal plays: a second playback in the same call is refused, the next call plays, and the plan's last frame comes back as a screenshot", async () => {
+  reset();
+  const images = [];
+  globalThis.aas.emitImage = (url) => images.push(url);
+  try {
+    const emu = await plugin.connect();
+    globalThis.aas.exec = 101;
+    const r = await emu.tas().hold(["Right", "B"], 30).tap("A").wait(10).run();
+    assert.equal(r.frames, 43, "hold 30 + tap 3 + wait 10");
+    assert.equal(images.length, 1, "the frame the plan ended on comes back");
+    await assert.rejects(emu.press(["A"], 1), /one plan per call/);
+    await assert.rejects(emu.wait(1), /one plan per call/);
+    assert.equal(typeof (await emu.read(0x0e)), "number", "looking at the memory is allowed after the plan");
+    globalThis.aas.exec = 102;
+    await emu.wait(5);
+    globalThis.aas.exec = 103;
+    await assert.rejects(emu.wait(0), /between 1 and 36000/);
+    await emu.wait(1);
+    assert.throws(() => emu.tas().run(), /the plan is empty/);
+    delete globalThis.aas.exec;
+    await emu.wait(1);
+    await emu.wait(1);
+  } finally {
+    delete globalThis.aas.exec;
+    globalThis.aas.emitImage = () => {};
+  }
 });

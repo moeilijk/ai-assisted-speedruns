@@ -19,6 +19,7 @@ import { session } from "./session.mjs";
 import { playbackSeconds } from "./igt.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { resumeToolingCheck } from "./tooling-check.mjs";
+import { unreachableEndpoints } from "./doctor.mjs";
 
 export async function resume(opts, { log = (t) => process.stderr.write(`[aas resume] ${t}\n`) } = {}) {
   if (!opts["run-dir"]) throw new Error("--run-dir is required");
@@ -101,6 +102,13 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("budget.checked", { runtime: runtime.id, ok: b.ok, percent: b.percent, max_percent: b.max, ...(b.data ?? {}) });
     if (!b.ok) early.release();
     if (!b.ok) throw new Error(`${runtime.id} plan budget reached: ${b.detail}. Not starting; raise the runtime's budget setting or pass --ignore-budget.`);
+  }
+  // The game is started before the run (its launcher, or the GUI's Start step); one that does not answer stops the run
+  // here, before a proof ticket is taken and before anything is recorded.
+  const down = await unreachableEndpoints(plugin);
+  if (down.length) {
+    early.release();
+    throw new Error(`the game does not answer at ${down.join(", ")}. Not starting: start the game first (its launcher, or the GUI's Start step).`);
   }
   const segment = (fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")).segments?.length ?? 1 : 0) + 1;
   // Proof, before anything is recorded: every segment has its own ticket, and the chain goes on from the last head.

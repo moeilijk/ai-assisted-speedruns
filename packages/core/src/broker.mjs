@@ -187,6 +187,7 @@ function dropController() {
 // a module-global because tool calls are serialized through `callQueue`.
 
 let capturedImages = [];
+let execCounter = 0;
 
 globalThis.aas = {
   emitImage(url) {
@@ -203,6 +204,9 @@ globalThis.aas = {
   write(text) {
     process.stderr.write(`[${TOOL.exec}] ${text}\n`);
   },
+  // The number of the <game>_exec call that is running: a plugin that allows one plan per call (BizHawk, FCEUX, as
+  // Portal plays) tells a second playback in the same call by it.
+  exec: 0,
 };
 globalThis.nodeRepl = globalThis.aas;
 
@@ -240,6 +244,7 @@ async function runExec({ code }) {
   globalThis.game = game;
   if (SCOPE) globalThis[SCOPE] = game;
   capturedImages = [];
+  globalThis.aas.exec = ++execCounter;
 
   const fn = SCOPE
     ? new AsyncFunction("game", SCOPE, `"use strict";\n${code}`)
