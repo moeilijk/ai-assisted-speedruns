@@ -11,6 +11,10 @@ The agent plays the way Portal's agent does: each `bizhawk_exec` call plays one 
 second plan in the same call is refused, so the agent looks, plans and plays, and cannot steer frame by frame from a
 script; the recording shows the game at its own speed.
 
+On a machine with a display chosen for the games (`AAS_BIZHAWK_WINDOW_POS`, the GUI's display choice, off by default),
+the launcher measures the displays at every start and puts EmuHawk's game window at that display's top left, with its
+other windows (the tool's form) beside it.
+
 One plugin, one profile per game (`profiles/<id>.json`, chosen with `AAS_BIZHAWK_PROFILE`). A profile names:
 
 - the ROM by its SHA-1, with its maker, license and source. ROMs are never in this repository: put yours in

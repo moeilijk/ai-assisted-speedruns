@@ -3,13 +3,20 @@
 // and Game Time on screen, which the recorder captures, and keeps the splits.
 //
 // Mapping of run events (paused-think model: game time advances only by what a
-// playback played). Game time stays paused and is set at the end of every
-// playback: it used to run free during a playback, but the timer hears a
-// playback's start and end through the run log, read every half second, so
-// LiveSplit's own clock ran on past the playback and the exact value set at
-// its end put it back (2026-10-03, seen by the owner during a run).
+// playback played). Game time runs while the game plays and stands still while
+// the agent thinks. The timer hears a playback's start and end through the run
+// log, read every half second, so it does not wait for the end to stop the
+// clock: a playback that says how long it plays (`seconds`, `planned_ticks`)
+// runs game time from the moment in its start event, and the timer pauses it
+// itself at the planned end, on the exact value. LiveSplit's clock can then not
+// run on past a playback and be put back at its end (2026-10-03, seen by the
+// owner), and does not stand still while the game plays and jump at the end
+// (2026-10-08, seen by the owner). A playback that does not say how long it
+// plays (Slay the Spire's and Balatro's commands) moves game time at its end.
 //   run.started            starttimer, initgametime, pausegametime
-//   game.playback end      setgametime <IGT from ticks>
+//   game.playback start    setgametime <IGT so far + time already played>, unpausegametime; pausegametime and
+//                          setgametime <IGT + planned> at the planned end
+//   game.playback end      pausegametime, setgametime <IGT from ticks>
 //   game.milestone chapter split
 //   game.over victory      pause (the goal is reached; the milestone before it did the final split)
 //   game.over defeat       nothing yet (the death screen is still the dead run)
@@ -25,6 +32,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { setup, setupRows } from "./setup.mjs";
 import { playbackSeconds } from "../core/src/igt.mjs";
+
+/** How long a playback plays, from its start event: `seconds`, or `planned_ticks` at 15 ms a tick (Portal); 0 when it does not say. */
+export function plannedSeconds(data) {
+  if (typeof data?.seconds === "number" && Number.isFinite(data.seconds) && data.seconds > 0) return data.seconds;
+  if (typeof data?.planned_ticks === "number" && Number.isFinite(data.planned_ticks) && data.planned_ticks > 0) return Math.round(data.planned_ticks * 15) / 1000;
+  return 0;
+}
 
 export function connectLiveSplit({ host = "127.0.0.1", port = 16834 } = {}, timeoutMs = 3000) {
   return new Promise((resolve, reject) => {
@@ -84,6 +98,8 @@ export function createLiveSplitTimer(options = {}) {
   const port = Number(options.port ?? process.env.AAS_LIVESPLIT_PORT ?? 16834);
   let ls = null;
   let igt = 0;
+  let playing = null;
+  const stopPlaying = () => { if (playing) { clearTimeout(playing); playing = null; } };
   let over = false;
   const sent = [];
   // What LiveSplit did not do as asked (its timer not running after the start, a split that did not move on): kept
@@ -142,7 +158,24 @@ export function createLiveSplitTimer(options = {}) {
     async onEvent(event) {
       switch (event.event) {
         case "game.playback":
+          if (event.data?.phase === "start") {
+            const planned = plannedSeconds(event.data);
+            if (planned > 0) {
+              const startedAt = Date.parse(event.timestamp ?? "");
+              const played = Number.isFinite(startedAt) ? Math.min(planned, Math.max(0, (Date.now() - startedAt) / 1000)) : 0;
+              stopPlaying();
+              if (played < planned) {
+                send(`setgametime ${(igt + played).toFixed(3)}`);
+                send("unpausegametime");
+                const end = igt + planned;
+                playing = setTimeout(() => { playing = null; send("pausegametime"); send(`setgametime ${end.toFixed(3)}`); }, (planned - played) * 1000);
+                playing.unref?.();
+              }
+            }
+          }
           if (event.data?.phase === "end") {
+            stopPlaying();
+            send("pausegametime");
             igt += playbackSeconds(event.data);
             send(`setgametime ${igt.toFixed(3)}`);
           }
@@ -156,18 +189,20 @@ export function createLiveSplitTimer(options = {}) {
           }
           break;
         case "game.over":
-          if (event.data?.victory) { over = true; send("pause"); }
+          if (event.data?.victory) { stopPlaying(); over = true; send("pause"); }
           break;
         case "game.attempt":
-          if (event.data?.phase === "start") { igt = 0; send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send("setgametime 0.000"); }
+          if (event.data?.phase === "start") { stopPlaying(); igt = 0; send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send("setgametime 0.000"); }
           break;
         case "run.ended":
+          stopPlaying();
           if (!over) send("pause");
           break;
         default:
       }
     },
     async stop() {
+      stopPlaying();
       let times = null;
       if (ls) {
         try {

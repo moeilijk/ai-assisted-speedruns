@@ -3,6 +3,9 @@
 // until the tool answers on 127.0.0.1:8767. An EmuHawk that already answers is left alone, so tests can run one after
 // another against it. The first start ever asks whether to trust the tool: that answer is the person's (BizHawk keeps it).
 // Env: AAS_BIZHAWK_DIR (install folder), AAS_BIZHAWK_ROM (the ROM of the run; a profile names which one it expects).
+// Optional, per machine (off by default): AAS_BIZHAWK_WINDOW_POS (a point on the display to play on, as the GUI's display
+// choice writes it: EmuHawk's game window goes to that display's top left, measured at every start, and its other
+// windows, the tool's form among them, beside it on the same display).
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
@@ -10,6 +13,8 @@ import { loadSettings } from "../../packages/core/src/settings.mjs";
 import { bizhawkDir, hostPath } from "./paths.mjs";
 import { ping } from "./mcp.mjs";
 import { trustState } from "./trust.mjs";
+import { placeWindows } from "../../packages/core/src/windows/move-window.mjs";
+import { displayOf } from "../../packages/core/src/windows/displays.mjs";
 import { spawnSync } from "node:child_process";
 
 loadSettings(import.meta.url);
@@ -61,6 +66,8 @@ let up = false;
 while (!up && Date.now() < deadline) { up = await ping(); if (!up) await new Promise((r) => setTimeout(r, 1000)); }
 if (!up) throw new Error("EmuHawk did not answer within 3 minutes: the tool did not load.");
 console.log("EmuHawk is up; bizhawk-mcp-native answers on 127.0.0.1:8767.");
+const display = displayOf(process.env.AAS_BIZHAWK_WINDOW_POS, { setting: "AAS_BIZHAWK_WINDOW_POS", log: console.log });
+if (display) placeWindows({ processName: "EmuHawk", main: "(^| - )BizHawk$", display, log: console.log });
 if (quietName) {
   await new Promise((r) => setTimeout(r, 2000));
   const r = spawnSync(process.execPath, [path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../packages/core/src/windows/audio-route.mjs"), "--check", "--process", "EmuHawk.exe"], { encoding: "utf8", env: process.env });

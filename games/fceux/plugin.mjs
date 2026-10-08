@@ -163,6 +163,7 @@ export default {
     install: join(here, "install-fceux.mjs"),
     installs: `Download FCEUX ${UPSTREAM.fceux.version} and fceux-mcp ${UPSTREAM.fceux_mcp.version} (our fork; both pinned)`,
     launch: join(here, "launch-game.mjs"),
+    displayEnv: "AAS_FCEUX_WINDOW_POS",
     stop: join(here, "stop-all.mjs"),
     bot: join(here, "bot.mjs"),
     splits: PROFILE ? Object.fromEntries(ENDS.map((e) => [e.id, join(here, "splits", `${PROFILE.id}-${e.id}.lss`)])) : {},
@@ -254,7 +255,7 @@ export default {
       if (exec) playedIn = exec;
       const i = ++index;
       const started = Date.now();
-      emit("game.playback", { phase: "start", index: i, command: label, frames });
+      emit("game.playback", { phase: "start", index: i, command: label, frames, seconds: fps ? frames / fps : null });
       let framecount = null;
       try {
         // All steps go in as few calls as possible, 600 frames each: FCEUX stands still between calls, and a call per

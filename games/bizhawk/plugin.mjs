@@ -161,6 +161,7 @@ export default {
     installs: "Download BizHawk 2.11.1 and bizhawk-mcp-native v0.3.2 (our fork; both pinned), then let BizHawk ask once whether it may load the tool",
     fixes: { allow: { script: join(here, "allow-tool.mjs"), label: "Let BizHawk ask whether it may load the tool (once per version)" } },
     launch: join(here, "launch-game.mjs"),
+    displayEnv: "AAS_BIZHAWK_WINDOW_POS",
     stop: join(here, "stop-all.mjs"),
     bot: join(here, "bot.mjs"),
     splits: PROFILE ? Object.fromEntries(ENDS.map((e) => [e.id, join(here, "splits", `${PROFILE.id}-${e.id}.lss`)])) : {},
@@ -230,7 +231,7 @@ export default {
       if (frames < 1 || frames > 36000) throw new Error("frames must be between 1 and 36000 per call");
       if (exec) playedIn = exec;
       const started = Date.now();
-      emit("game.playback", { phase: "start", index: i, command: label, frames });
+      emit("game.playback", { phase: "start", index: i, command: label, frames, seconds: fps ? frames / fps : null });
       try {
         // All steps go in as few calls as the tool takes (600 frames each): between calls the emulator stands still,
         // and a call per short step cut the game's sound up (measured 2026-09-23: 15.2 silences a second with calls

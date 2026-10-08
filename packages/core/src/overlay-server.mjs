@@ -45,7 +45,7 @@ es.onmessage=(m)=>{const r=JSON.parse(m.data);const d=r.data||{};const st=docume
  if(r.kind==="event"){
   if(r.event==="run.started"){t0=Date.parse(r.timestamp);st.textContent="run started"}
   if(r.event==="recording.started"&&d.t0)t0=Date.parse(d.t0);
-  if(r.event==="game.playback"&&d.phase==="start"){document.getElementById("keys").hidden=!(d.steps&&d.steps.length);playing={t:Date.now(),steps:d.steps||[],total:(d.planned_ticks||0)*0.015};st.textContent=d.command?"playing: "+d.command:"playing "+((d.planned_ticks||0)*0.015).toFixed(1)+" s"}
+  if(r.event==="game.playback"&&d.phase==="start"){document.getElementById("keys").hidden=!(d.steps&&d.steps.length);playing={t:Date.now(),steps:d.steps||[],total:(d.planned_ticks||0)*0.015||d.seconds||0};st.textContent=d.command?"playing: "+d.command:"playing "+((d.planned_ticks||0)*0.015).toFixed(1)+" s"}
   if(r.event==="game.playback"&&d.phase==="end"){playing=null;setKeys([]);if(typeof d.ticks==="number")igt+=d.ticks*0.015;else if(typeof d.seconds==="number")igt+=d.seconds;st.textContent="thinking…"}
   if(r.event==="game.milestone"&&d.chapter){section=d.label;document.getElementById("section").textContent=section}
   if(r.event==="game.attempt"&&d.phase==="start"){st.textContent="attempt "+d.attempt}

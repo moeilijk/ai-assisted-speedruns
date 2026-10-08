@@ -68,7 +68,7 @@
       "id": "livesplit",
       "name": "LiveSplit",
       "version": "0.35.0",
-      "sha256": "4e003356cc0facca603a0a934b3dc112328d2e85068f806dce3f90e07489338d"
+      "sha256": "d8268182a4c79a760a80f98aaa368596f109f916d12f8c17d0f166f833eb9c35"
     },
     {
       "kind": "game",
@@ -86,7 +86,7 @@
       "name": "BizHawk",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "ff9503a34fcfaf5100738ad9e1660403baab4dc95ca3f8fc94651b02ba42a4dd"
+      "sha256": "a70a514522a08e2b0af11f6bb0512c2e5516c23cae96e4e0180837e8b52ad587"
     },
     {
       "kind": "game",
@@ -104,7 +104,7 @@
       "name": "FCEUX",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "0b696488aa24e579414c1da1c77da8d74fbd5533572fed9bd8302f36ecd379fe"
+      "sha256": "05ce68516afe9e27b231c13574e8c8fe0c35389a54687e19627c9d1a0282341b"
     },
     {
       "kind": "game",
@@ -140,7 +140,7 @@
       "name": "Portal",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "50d798ecb526195de564583d3fbce2d89c9fbd51470254f81ccfc98c2af3c804"
+      "sha256": "465a18902927059d8b8f152843f41ab9110f289ed72a7485ffee821acae41f87"
     },
     {
       "kind": "game",
@@ -149,7 +149,7 @@
       "name": "Portal 2",
       "version": "0.35.0",
       "stub": false,
-      "sha256": "1272b84d56f36b177529b52fd98ed327ad807828084b966f0f7b157bc07654a1"
+      "sha256": "37f66a3dd68bd417fb62372e6e7c193d1e6192da19cdab0fdc523641d90464d9"
     },
     {
       "kind": "game",

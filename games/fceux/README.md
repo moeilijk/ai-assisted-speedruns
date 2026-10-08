@@ -95,8 +95,11 @@ FCEUX is closed:
 - `goptions` without "confirm exit" (2): closing FCEUX asks nothing.
 - `sicon 0`: no status icon over the game (a red pause sign whenever FCEUX is paused, which is between every two moves).
 - `frame_display`, `rerecord_display`, `input_display`, `lagCounterDisplay`, `Show_FPS` off; `newppu 0`, `dendy 0`.
-- `MainWindow_wndx`, `MainWindow_wndy`: only when `AAS_FCEUX_WINDOW_POS` is set (per machine, off by default), for a
-  window on another display.
+- `directDrawModeWindowed 1`: FCEUX's default, DirectDraw in emulation, shows OBS's window capture nothing when FCEUX
+  starts on a display other than the primary one (measured 2026-10-08).
+- `MainWindow_wndx`, `MainWindow_wndy`: only when `AAS_FCEUX_WINDOW_POS` is set (per machine, off by default, the
+  display chosen in the GUI): the top left of that display as measured at the start. Once FCEUX runs, its window and
+  its Lua Script window (the bridge) are placed side by side at that display's top left.
 
 FCEUX for Windows has no setting for its messages over the game ("Power on", "Reset"). The run powers the game on by
 reloading the ROM, which clears them, and the agent's tools cause none; the mock's reset on frame 0 shows "Reset".

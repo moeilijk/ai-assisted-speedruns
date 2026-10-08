@@ -7,7 +7,7 @@ import net from "node:net";
 import { createLiveSplitTimer } from "../index.mjs";
 
 function startFakeLiveSplit({ segments = 2, deafConnections = 0 } = {}) {
-  const state = { phase: "NotRunning", index: -1, connections: 0 };
+  const state = { phase: "NotRunning", index: -1, connections: 0, commands: [] };
   const sockets = new Set();
   const server = net.createServer((socket) => {
     sockets.add(socket);
@@ -23,6 +23,7 @@ function startFakeLiveSplit({ segments = 2, deafConnections = 0 } = {}) {
         const cmd = buf.slice(0, at).replace(/\r$/, "").trim();
         buf = buf.slice(at + 1);
         if (deaf) continue;
+        state.commands.push(cmd);
         if (cmd === "reset") { state.phase = "NotRunning"; state.index = -1; }
         else if (cmd === "starttimer") { state.phase = "Running"; state.index = 0; }
         else if (cmd === "split" && state.phase === "Running") { state.index += 1; if (state.index >= segments) state.phase = "Ended"; }
@@ -69,5 +70,39 @@ test("a run does not start when LiveSplit does not take the start twice", async 
   const ls = await startFakeLiveSplit({ deafConnections: 5 });
   const timer = createLiveSplitTimer({ port: ls.port, windows: async () => ["LiveSplit"] });
   await assert.rejects(timer.start(brief), /LiveSplit did not start its timer \(phase no answer; LiveSplit's windows: LiveSplit\)/);
+  await ls.close();
+});
+
+test("game time runs while a playback plays and stands still while the agent thinks, on the exact value, never going back", async () => {
+  const ls = await startFakeLiveSplit({ segments: 2 });
+  const timer = createLiveSplitTimer({ port: ls.port, windows: async () => ["LiveSplit"] });
+  await timer.start(brief);
+  const clock = () => ls.state.commands.filter((c) => /^(unpausegametime|pausegametime|setgametime)/.test(c));
+  const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+  let n = clock().length;
+  // A playback of 0.3 s heard at once: game time runs, and the timer stops it itself at 0.300.
+  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 1, frames: 18, seconds: 0.3 } });
+  await settle(100);
+  assert.deepEqual(clock().slice(n), ["setgametime 0.000", "unpausegametime"]);
+  await settle(400);
+  assert.deepEqual(clock().slice(n + 2), ["pausegametime", "setgametime 0.300"], "paused at the planned end, before the end is heard");
+  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 1, frames: 18, seconds: 0.3 } });
+  await settle(50);
+  assert.deepEqual(clock().slice(n + 4), ["pausegametime", "setgametime 0.300"], "the end sets the same value: no jump");
+  // A playback heard after it was already over: nothing runs, the end sets it.
+  n = clock().length;
+  await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 2000).toISOString(), data: { phase: "start", index: 2, frames: 30, seconds: 0.5 } });
+  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 2, frames: 30, seconds: 0.5 } });
+  await settle(50);
+  assert.deepEqual(clock().slice(n), ["pausegametime", "setgametime 0.800"]);
+  // A command that does not say how long it plays (Slay the Spire): game time moves at its end.
+  n = clock().length;
+  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 3, command: "play 1" } });
+  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 3, seconds: 1 } });
+  await settle(50);
+  assert.deepEqual(clock().slice(n), ["pausegametime", "setgametime 1.800"]);
+  const set = clock().filter((c) => c.startsWith("setgametime")).map((c) => Number(c.split(" ")[1]));
+  assert.ok(set.every((v, i) => i === 0 || v >= set[i - 1]), `never back: ${set.join(", ")}`);
+  await timer.stop();
   await ls.close();
 });

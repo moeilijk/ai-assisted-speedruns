@@ -195,7 +195,7 @@ capture shows black. See [packages/recorder-obs/README.md](../packages/recorder-
 Install LiveSplit, put `ServerStartup=1` in its `settings.cfg` (next to the executable) so its TCP server
 starts with it, and set `AAS_LIVESPLIT_EXE` in `.env`. `npm run livesplit:launch -- games/<game>/splits/<file>.lss`
 starts it with the game's splits (it closes a LiveSplit that has other splits open first), waits for its server and
-moves its window to `AAS_LIVESPLIT_POS` when that is set. Without LiveSplit, leave
+puts its window at the top right of the display `AAS_LIVESPLIT_POS` names when that is set. Without LiveSplit, leave
 `--timer livesplit` off: `aas publish` still writes `splits.lss` from the timeline.
 
 ## 8. Check the whole chain before your first run

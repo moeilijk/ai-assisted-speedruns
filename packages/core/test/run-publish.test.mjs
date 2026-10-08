@@ -143,7 +143,9 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
   assert.deepEqual(ls.commands.slice(0, 5), ["reset", "initgametime", "starttimer", "pausegametime", "setgametime 0.000"]);
   assert.ok(ls.commands.filter((c) => c === "split").length >= 1);
   assert.equal(ls.commands.filter((c) => !c.startsWith("get")).at(-1), "pause");
-  assert.equal(ls.commands.filter((c) => c === "unpausegametime").length, 0, "game time never runs free: it only moves when it is set, so it never goes back");
+  const clock = ls.commands.filter((c) => c === "unpausegametime" || c === "pausegametime");
+  assert.ok(clock.includes("unpausegametime"), "game time runs while a playback plays");
+  assert.equal(clock.at(-1), "pausegametime", "and stands still after it");
   const set = ls.commands.filter((c) => c.startsWith("setgametime ")).map((c) => Number(c.split(" ")[1]));
   assert.ok(set.every((v, i) => i === 0 || v >= set[i - 1] || v === 0), `game time only goes forward within an attempt: ${set.join(", ")}`);
   assert.ok(ls.commands.includes("setgametime 3.000"), ls.commands.join(","));

@@ -10,6 +10,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { connectLiveSplit, createLiveSplitTimer } from "./index.mjs";
 import { selectSplits } from "./select-splits.mjs";
+import { displayOf } from "../core/src/windows/displays.mjs";
+import { placeWindows } from "../core/src/windows/move-window.mjs";
 
 const exe = process.env.AAS_LIVESPLIT_EXE;
 if (!exe || !fs.existsSync(exe)) throw new Error(`AAS_LIVESPLIT_EXE does not point at LiveSplit.exe (${exe ?? "not set"})`);
@@ -43,11 +45,8 @@ let up = false;
 for (let i = 0; i < 15 && !up; i += 1) { up = await reachable(); if (!up) await new Promise((r) => setTimeout(r, 2000)); }
 if (!up) throw new Error(`LiveSplit Server does not answer on ${host}:${port} after 30 s (settings.cfg: ServerStartup=1, or right-click → Control → Start Server)`);
 console.log(`LiveSplit Server answers on ${host}:${port}`);
-const pos = process.env.AAS_LIVESPLIT_POS;
-if (pos) {
-  const [x, y] = pos.split(",").map(Number);
-  console.log(ps(`
-Add-Type -Namespace X -Name W -MemberDefinition '[DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr a, int x, int y, int cx, int cy, uint f);'
-$p = Get-Process LiveSplit -ErrorAction SilentlyContinue | Where-Object { $_.MainWindowHandle -ne 0 } | Select-Object -First 1
-if ($p) { [X.W]::SetWindowPos($p.MainWindowHandle, [IntPtr]::Zero, ${x}, ${y}, 0, 0, 0x0015) | Out-Null; 'window: moved to ${x},${y}' } else { 'window: not found' }`));
-}
+// AAS_LIVESPLIT_POS is a point on the display LiveSplit goes on (the GUI writes one on the display chosen for the
+// games): LiveSplit goes to that display's top right, measured at this start, so it stays clear of the game at the
+// top left.
+const display = displayOf(process.env.AAS_LIVESPLIT_POS, { setting: "AAS_LIVESPLIT_POS", log: console.log });
+if (display) placeWindows({ processName: "LiveSplit", main: "LiveSplit", display, align: "right", log: console.log });

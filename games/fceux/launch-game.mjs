@@ -5,14 +5,18 @@
 // powers the game on again (prepareRun). A FCEUX that already answers is left alone, so tests can run one after
 // another against it.
 // Env: AAS_FCEUX_DIR (install folder), AAS_FCEUX_ROM (the ROM of the run; a profile names which one it expects).
-// Optional, per machine (all off by default): AAS_FCEUX_WINDOW_POS (X,Y of FCEUX's window, e.g. on a secondary display,
-// through FCEUX's own MainWindow_wndx/MainWindow_wndy), AAS_QUIET_AUDIO_DEVICE, AAS_KEEP_DISPLAYS_AWAKE=1.
+// Optional, per machine (all off by default): AAS_FCEUX_WINDOW_POS (a point on the display to play on, as the GUI's
+// display choice writes it: FCEUX's window goes to that display's top left, measured at every start, through FCEUX's
+// own MainWindow_wndx/MainWindow_wndy and then placed; its Lua Script window, which runs the bridge, goes beside it on
+// the same display), AAS_QUIET_AUDIO_DEVICE, AAS_KEEP_DISPLAYS_AWAKE=1.
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { loadSettings } from "../../packages/core/src/settings.mjs";
 import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
+import { placeWindows } from "../../packages/core/src/windows/move-window.mjs";
+import { displayOf } from "../../packages/core/src/windows/displays.mjs";
 import { fceuxDir, hostPath } from "./paths.mjs";
 import { call, disconnect, ping } from "./bridge.mjs";
 
@@ -42,17 +46,23 @@ if (await ping()) {
 // - frame_display, rerecord_display, input_display, lagCounterDisplay, Show_FPS: FCEUX's counters over the game, off.
 // - sicon: FCEUX's status icon over the game, a red pause sign whenever it is paused (drawing.cpp
 //   FCEU_DrawRecordingStatus), which is between every two moves of the agent (seen in the recording 2026-09-23), off.
+// - directDrawModeWindowed 1 (DIRECTDRAW_MODE_SURFACE_IN_RAM): the default, 0, is DirectDraw in emulation
+//   (DDCREATE_EMULATIONONLY, drivers/win/video.cpp), and a FCEUX started that way on a display other than the primary
+//   one showed OBS's window capture nothing (measured 2026-10-08: brightness 0.0 for 20 s on a 1920x1080 display left
+//   of the primary; 151.2 with mode 1 and with mode 2; 125.1 with mode 0 on the primary display).
 // - newppu 0 and dendy 0: the NTSC NES the profiles' movies were made on (FCEUX's defaults, written so a changed
 //   setting does not carry over).
 // FCEUX has no setting on Windows for its other messages over the game ("Power on", "Reset"): vidGuiMsgEna is on and
 // only the Qt build can change it (src/video.cpp, drivers/Qt/config.cpp).
+const display = displayOf(process.env.AAS_FCEUX_WINDOW_POS, { setting: "AAS_FCEUX_WINDOW_POS", log: console.log });
 setConfig(path.join(dir, "fceux.cfg"), {
   // The key as FCEUX writes it: NAC("eoptions", …) in drivers/win/config.cpp puts the quotes in the name.
   '"eoptions"': (v) => ((v ?? 1261569) | 1 | 2048),
   goptions: (v) => ((v ?? 1) & ~2),
   '"sicon"': 0,
+  directDrawModeWindowed: 1,
   frame_display: 0, rerecord_display: 0, input_display: 0, lagCounterDisplay: 0, Show_FPS: 0, newppu: 0, dendy: 0,
-  ...windowPos(process.env.AAS_FCEUX_WINDOW_POS),
+  ...windowPos(display ? `${display.x},${display.y}` : null),
 });
 
 // The per-machine options (off unless set in .env): the quiet audio device, displays awake. FCEUX has no setting of its
@@ -81,6 +91,7 @@ try {
 }
 if (process.env.AAS_QUIET_AUDIO_DEVICE) quiet.check();
 console.log("FCEUX is up; fceux-mcp's bridge answers on 127.0.0.1:9999.");
+if (display) placeWindows({ processName: "fceux64", main: "^FCEUX \\d", display, log: console.log });
 disconnect();
 
 /** AAS_FCEUX_WINDOW_POS ("X,Y") as FCEUX's own window position; nothing when unset. */

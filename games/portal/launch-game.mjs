@@ -16,6 +16,7 @@ import path from "node:path";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
 import { beforeGameStart } from "../../packages/core/src/windows/quiet-start.mjs";
 import { moveWindow } from "../../packages/core/src/windows/move-window.mjs";
+import { displayOf } from "../../packages/core/src/windows/displays.mjs";
 import { loadSettings } from "../../packages/core/src/settings.mjs";
 
 // This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
@@ -25,7 +26,10 @@ const args = process.argv.slice(2);
 const opt = (n, d) => { const i = args.indexOf(n); return i === -1 ? d : args[i + 1]; };
 const root = path.resolve(opt("--game-root", process.env.AAS_PORTAL_GAME_ROOT ?? ""));
 const [w, h] = opt("--size", process.env.AAS_PORTAL_RESOLUTION ?? "1920x1080").split("x").map(Number);
-const pos = opt("--pos", process.env.AAS_PORTAL_WINDOW_POS || null);
+// The display to play on, measured at this start: the window goes to its top left, whatever this machine's displays are.
+const wantedPos = opt("--pos", process.env.AAS_PORTAL_WINDOW_POS || null);
+const display = displayOf(wantedPos, { setting: "AAS_PORTAL_WINDOW_POS", log: console.log });
+const pos = display ? `${display.x},${display.y}` : null;
 const [x, y] = pos ? pos.split(",").map(Number) : [null, null];
 const port = Number(process.env.AAS_PORTAL_SPT_PORT ?? 27182);
 const exe = path.join(root, "hl2.exe");

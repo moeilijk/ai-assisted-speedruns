@@ -69,6 +69,21 @@ export function displayAt(pos, all = listDisplays()) {
   return all.find((d) => x >= d.x && x < d.x + d.width && y >= d.y && y < d.y + d.height) ?? null;
 }
 
+/**
+ * The display a setting names (an AAS_*_WINDOW_POS / AAS_LIVESPLIT_POS value: a point on that display, as the GUI
+ * writes it), measured now, so the window goes onto that display's real bounds whatever this machine has (one display
+ * or ten, any resolution, any arrangement). A setting that is on no display now (a display unplugged or moved) gives
+ * null and says so, with the displays there are: the window then stays where Windows puts it.
+ */
+export function displayOf(pos, { setting = "the display setting", all = null, log = () => {} } = {}) {
+  if (!pos) return null;
+  if (!/^-?\d+,-?\d+$/.test(String(pos).trim())) { log(`display: ${setting}=${pos} is not X,Y; the window stays where Windows puts it`); return null; }
+  const list = all ?? listDisplays();
+  const d = displayAt(pos, list);
+  if (!d) log(`display: ${setting}=${pos} is on none of this machine's displays now (${list.map((x) => `${x.name}${x.primary ? " (primary)" : ""} ${x.width}x${x.height} at ${x.x},${x.y}`).join("; ") || "none found"}); the window stays where Windows puts it. Choose the display again in the GUI's Setup tab.`);
+  return d;
+}
+
 if (process.argv[1]?.endsWith("displays.mjs")) {
   for (const d of listDisplays()) console.log(`${d.name}${d.primary ? " (primary)" : ""} ${d.width}x${d.height} at ${d.x},${d.y}`);
 }

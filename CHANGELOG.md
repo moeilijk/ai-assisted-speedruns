@@ -12,7 +12,7 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
-## 0.35.0 — not released
+## 0.35.0 — 2026-10-08
 
 Versions 1.0.0 and 1.0.1 (2026-10-01) were withdrawn on 2026-10-02 (the maintainer): their releases and tags are gone,
 and their changes are listed here, with those made since. SPEC draft 0.45, hence a minor version.
@@ -36,6 +36,27 @@ and their changes are listed here, with those made since. SPEC draft 0.45, hence
   once a pass of FCEUX's loop, about 50 ms whatever a batch holds, so there a frame now brings the RAM along in the
   same batch, and the check of the ends and the agent's reads after it ask nothing more: measured on FCEUX 2.6.6 with a
   1-frame press and four reads, 4.8 frames a second before, 18.5 after.
+- **End-to-end tests refuse the live Archive.** `e2e:real`, `e2e:chain` and `e2e:archive` start only when
+  `AAS_PROOF_URL` names another archive (the Archive's dev instance), or with `AAS_E2E_LIVE=1` on the maintainer's
+  word. An `e2e:real` started without it on 2026-10-08 talked to the live Archive and uploaded two mock bundles there
+  as the e2e account, which the test wiped at its end (the Archive's bug 18).
+- **LiveSplit's game time runs while the game plays and stands still while the agent thinks.** Since 2026-10-04 it was
+  only set at the end of every playback, so it never ran and jumped once a plan was done (seen by the owner on
+  2026-10-08). The timer hears a playback through the run log, read every half second, so it does not wait for the
+  end: a playback that says how long it plays (`seconds` from BizHawk and FCEUX, `planned_ticks` from Portal) runs
+  game time from the moment in its start event, and the timer pauses it itself at the planned end, on the exact value;
+  the end sets the same value. Game time can no longer run on past a playback and go back. A command that does not say
+  how long it plays (Slay the Spire, Balatro) moves game time at its end, as before. The overlay's IGT runs during
+  BizHawk's and FCEUX's plans too. Measured with FCEUX and LiveSplit 1.8.37: during a plan of 600 frames LiveSplit's
+  game time went up by 0.5 s every half second, from 2.59 to 10.98, and stood at 10.981, the planned end.
+- **Windows go on the display the settings name, on any machine.** Each launcher measures the displays at every start
+  (one or ten, any resolution and arrangement) and puts the game's windows at the top left of the display the GUI's
+  display choice names, the program's other windows beside it (FCEUX's Lua Script window with the bridge, BizHawk's
+  tool form, in rows inside the display), and LiveSplit at that display's top right, clear of the game. FCEUX starts with its own `directDrawModeWindowed 1`: with its default, DirectDraw in emulation, OBS's capture of
+  FCEUX on a display other than the primary one stayed black (measured 2026-10-08). FCEUX and
+  BizHawk now take part in the display choice (`AAS_FCEUX_WINDOW_POS`, `AAS_BIZHAWK_WINDOW_POS`); before, their
+  windows stayed on the main display (seen by the owner on 2026-10-08). Portal and Portal 2 check the display too. A
+  setting that is on no display now leaves the window where Windows puts it and says which displays there are.
 - **BizHawk and FCEUX play one plan per call, as Portal does.** An Opus 5.5 run to World 1 (2026-10-07) wrote a script
   that played one frame, read the RAM and played the next: 97% of its 43,419 playbacks were one frame, about 85 ms
   apart, so the recording showed Super Mario Bros at a fifth of its speed with a pause after every frame, and the agent

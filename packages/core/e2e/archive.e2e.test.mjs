@@ -19,6 +19,9 @@ import { privateEntries, proofUrl, readState, useArchiveFetch } from "../src/pro
 import { resume } from "../src/resume.mjs";
 import { run } from "../src/run.mjs";
 import { uploadBundle } from "../src/upload.mjs";
+import { requireTestArchive } from "./target.mjs";
+
+requireTestArchive();
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..", "..");

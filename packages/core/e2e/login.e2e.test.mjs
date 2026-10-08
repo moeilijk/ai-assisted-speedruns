@@ -15,6 +15,9 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { requireTestArchive } from "./target.mjs";
+
+requireTestArchive();
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const loginFile = path.join(os.homedir(), ".config", "aas", "e2e-login.json");
