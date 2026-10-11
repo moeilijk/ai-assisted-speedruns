@@ -58,12 +58,24 @@ export function listAll() {
   if (!fs.existsSync(svv)) throw new Error(`SoundVolumeView not found at ${svv} (AAS_SOUNDVOLUMEVIEW)`);
   const csv = path.join(os.tmpdir(), `svv-${process.pid}.csv`);
   const winCsv = execFileSync("wslpath", ["-w", csv], { encoding: "utf8" }).trim();
-  spawnSync(svv, ["/scomma", winCsv], { stdio: "ignore" });
-  for (let i = 0; i < 40 && !fs.existsSync(csv); i += 1) sleep(250);
-  sleep(300);
-  const text = fs.readFileSync(csv, "utf8").replace(/^﻿/, "");
-  fs.rmSync(csv, { force: true });
-  return parseCsv(text);
+  // SoundVolumeView writes the list to a file; it is started from WSL, and that call can fail while the program is
+  // fine (the interop between WSL and Windows times out under load; measured 2026-10-11 during `npm run e2e:real`,
+  // where the closing step ended in `ENOENT /tmp/svv-1263582.csv` ten seconds later and said nothing about the
+  // program). So the call's own result is read, it is asked a second time, and the error names SoundVolumeView.
+  let why = "";
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    fs.rmSync(csv, { force: true });
+    const r = spawnSync(svv, ["/scomma", winCsv], { encoding: "utf8", timeout: 30000 });
+    for (let i = 0; i < 40 && !fs.existsSync(csv); i += 1) sleep(250);
+    if (fs.existsSync(csv)) {
+      sleep(300);
+      const text = fs.readFileSync(csv, "utf8").replace(/^﻿/, "");
+      fs.rmSync(csv, { force: true });
+      return parseCsv(text);
+    }
+    why = r.error ? r.error.message : `exit ${r.status}, stderr ${JSON.stringify((r.stderr ?? "").trim().slice(0, 200))}`;
+  }
+  throw new Error(`SoundVolumeView (${svv}) wrote no list of audio devices to ${csv} within 10 s, twice: ${why}`);
 }
 const renderDevices = (rows) => rows.filter((r) => r.Type === "Device" && r.Direction === "Render" && r["Device State"] === "Active");
 export function defaults(rows = listAll()) {

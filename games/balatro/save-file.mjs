@@ -6,8 +6,8 @@
 // back gave the hands money and not the blind reward.
 import { inflateRawSync } from "node:zlib";
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import path from "node:path";
+import { winEnvPath } from "../../packages/core/src/windows/win-env.mjs";
 
 /** G.STATES of the game, as balatrobot names them. */
 export const STATES = {
@@ -23,8 +23,7 @@ export const SAVE_WAIT_MS = Number(process.env.AAS_BALATRO_SAVE_WAIT_MS) || 8000
 export function profileSaveFile() {
   if (process.env.AAS_BALATRO_SAVE_FILE) return path.resolve(process.env.AAS_BALATRO_SAVE_FILE);
   const profile = Number(process.env.AAS_BALATRO_PROFILE || 3);
-  const text = (cmd, args) => (spawnSync(cmd, args, { encoding: "utf8", cwd: "/mnt/c" }).stdout ?? "").trim();
-  const appData = text("wslpath", ["-u", text("cmd.exe", ["/c", "echo %APPDATA%"])]);
+  const appData = winEnvPath("APPDATA");
   if (!appData) throw new Error("cannot find %APPDATA%, where the game keeps its save");
   return path.join(appData, "Balatro", String(profile), "save.jkr");
 }

@@ -136,7 +136,7 @@ export function planBuilder(run) {
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.35.0",
+  version: "0.35.1",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",
@@ -298,14 +298,18 @@ export default {
   },
   /** A savestate of the emulator, next to BizHawk; the harness copies it into the run. */
   async saveState({ name }) {
-    const dir = join(bizhawkDir(), "aas-saves");
+    const base = bizhawkDir();
+    if (!base) throw new Error("the BizHawk folder is not known, so there is nowhere to save: set AAS_BIZHAWK_DIR");
+    const dir = join(base, "aas-saves");
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `${name}.State`);
     await call("save_state", { path: hostPath(file) });
     return { name, file };
   },
   async loadState({ name = null, runDir = null, log = () => {} } = {}) {
-    const candidates = [runDir && name ? join(runDir, "saves", `${name}.State`) : null, name ? join(bizhawkDir(), "aas-saves", `${name}.State`) : null].filter(Boolean);
+    // The BizHawk folder is asked of Windows and can come back unknown; a save in the run's own folder needs it not.
+    const base = bizhawkDir();
+    const candidates = [runDir && name ? join(runDir, "saves", `${name}.State`) : null, base && name ? join(base, "aas-saves", `${name}.State`) : null].filter(Boolean);
     const file = candidates.find((f) => existsSync(f));
     if (!file) throw new Error(`save ${name ?? "(none)"} not found (looked in ${candidates.join(", ")})`);
     await call("pause");

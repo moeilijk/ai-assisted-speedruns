@@ -11,6 +11,7 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
+import { winEnvPath } from "../../packages/core/src/windows/win-env.mjs";
 import { fileURLToPath } from "node:url";
 import { jsonRpcClient } from "../../packages/core/src/json-rpc-http.mjs";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
@@ -63,8 +64,8 @@ if (await health(botPort)) {
 
 // The game's own settings file (%AppData%/Balatro/settings.jkr, deflate-compressed Lua) names the profile slot it
 // opens. The run gets its own slot, so the player's profile (its unlocks, stats and saved run) is not touched.
-const text = (cmd, args) => (spawnSync(cmd, args, { encoding: "utf8", cwd: "/mnt/c" }).stdout ?? "").trim();
-const appData = text("wslpath", ["-u", text("cmd.exe", ["/c", "echo %APPDATA%"])]);
+const appData = winEnvPath("APPDATA");
+if (!appData) { console.error("Windows did not say where %APPDATA% is, so the game's own settings file cannot be found"); process.exit(1); }
 const settings = path.join(appData, "Balatro", "settings.jkr");
 // AAS_BALATRO_WINDOW_POS names the display to play on. The game has its own display setting (Options > Settings >
 // Display: monitor and window mode), a number in the order SDL gives the displays: the primary display first, then the

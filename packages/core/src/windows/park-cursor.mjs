@@ -3,7 +3,7 @@
 // bottom right, opened the deck preview and never made its Play and Discard buttons, so every play was refused
 // (measured 2026-09-26, three runs out of nine; the cursor moved into the window ended it at once). The top centre of
 // the window is empty in Balatro; a caller for another game chooses its own spot with `offset`.
-import { execFileSync } from "node:child_process";
+import { winPs } from "./win-env.mjs";
 
 /** Moves the cursor; the sentence for the log says from where to where, or null when the window was not found. */
 export function parkCursor({ processName, offset = { x: 0.5, y: 40 }, run = runScript } = {}) {
@@ -31,6 +31,6 @@ $x = [int]($r.L + ($r.Rt - $r.L) * ${Number(offset.x)}); $y = [int]($r.T + ${Num
 '{0},{1} -> {2},{3}' -f $c.X, $c.Y, $x, $y
 `;
   try {
-    return execFileSync("powershell.exe", ["-NoProfile", "-Command", script], { encoding: "utf8", cwd: "/mnt/c", timeout: 20000, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return winPs(script, { timeout: 20000 });
   } catch { return null; }
 }

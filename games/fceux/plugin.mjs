@@ -137,7 +137,7 @@ export function planBuilder(run) {
 export default {
   id: "fceux",
   name: "FCEUX",
-  version: "0.35.0",
+  version: "0.35.1",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "fceux64.exe",
@@ -333,14 +333,18 @@ export default {
   },
   /** A savestate of the emulator: FCEUX's own file, written next to FCEUX; the harness copies it into the run. */
   async saveState({ name }) {
-    const dir = join(fceuxDir(), "aas-saves");
+    const base = fceuxDir();
+    if (!base) throw new Error("the FCEUX folder is not known, so there is nowhere to save: set AAS_FCEUX_DIR");
+    const dir = join(base, "aas-saves");
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `${name}.fc0`);
     await call("savestate.savefile", { path: hostPath(file) });
     return { name, file };
   },
   async loadState({ name = null, runDir = null, log = () => {} } = {}) {
-    const candidates = [runDir && name ? join(runDir, "saves", `${name}.fc0`) : null, name ? join(fceuxDir(), "aas-saves", `${name}.fc0`) : null].filter(Boolean);
+    // The FCEUX folder is asked of Windows and can come back unknown; a save in the run's own folder needs it not.
+    const base = fceuxDir();
+    const candidates = [runDir && name ? join(runDir, "saves", `${name}.fc0`) : null, base && name ? join(base, "aas-saves", `${name}.fc0`) : null].filter(Boolean);
     const file = candidates.find((f) => existsSync(f));
     if (!file) throw new Error(`save ${name ?? "(none)"} not found (looked in ${candidates.join(", ")})`);
     await call("emu.pause");

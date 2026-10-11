@@ -2,7 +2,7 @@
 // (found by title prefix, also when hidden in the tray), answer a "save?"
 // question with a given button, wait for the exit. Nothing is ever killed: a
 // process that does not close is reported and left alone.
-import { execFileSync } from "node:child_process";
+import { winPs } from "./windows/win-env.mjs";
 
 const PS_TYPES = `
 Add-Type @'
@@ -45,7 +45,7 @@ export function closeWindows(steps, { steam = false, steamExe = process.env.AAS_
   const body = steps.map((s) => (s.wait ? `Wait-Exit ${q(s.wait)} ${Number(s.seconds) || 20}` : `Close-Gracefully ${q(s.name)} ${q(s.title)} ${Number(s.seconds) || 15} ${q(s.dialogTitle)} ${q(s.dialogButton)}`)).join("\n");
   const steamStep = steam ? `if (Get-Process steam -ErrorAction SilentlyContinue) { Start-Process -FilePath '${steamExe.replace(/'/g, "''")}' -ArgumentList '-shutdown'; 'steam shutdown requested' }` : "";
   const ps = `${PS_TYPES}\n${body}\n${steamStep}\nStart-Sleep 2\n'still running: ' + ((Get-Process ${report.join(",")} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty ProcessName) -join ',')`;
-  return execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8" }).replace(/\r/g, "").trim();
+  return winPs(ps);
 }
 
 /**
@@ -61,7 +61,7 @@ for ($i = 0; $i -lt ${Number(seconds) || 60}; $i++) {
   Start-Sleep 1
 }
 'not asked'`;
-  const out = execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", cwd: "/mnt/c" });
+  const out = winPs(ps);
   return /answered/.test(out);
 }
 
@@ -78,7 +78,7 @@ public static List<string> For(uint pid) { var r = new List<string>(); EnumWindo
 '@
 foreach ($p in Get-Process ${q(processName)} -ErrorAction SilentlyContinue) { [WT]::For([uint32]$p.Id) }`;
   try {
-    return execFileSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", cwd: "/mnt/c", timeout: 20000 }).split("\n").map((l) => l.trim()).filter(Boolean);
+    return winPs(ps, { timeout: 20000 }).split("\n").map((l) => l.trim()).filter(Boolean);
   } catch {
     return [];
   }

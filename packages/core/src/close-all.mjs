@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import { closeWindows } from "./close-windows.mjs";
+import { winEnv } from "./windows/win-env.mjs";
 
 /** Windows, or WSL with Windows next to it: the only places where there are windows to close. */
 export function hasWindowsDesktop() {
@@ -19,7 +20,8 @@ export function hasWindowsDesktop() {
 /** The marker a launcher writes when it started Steam itself, so the close step shuts Steam down again. */
 export function steamMarkerFile() {
   if (process.platform === "win32") return `${process.env.TEMP}\\aas-started-steam.flag`;
-  const winTemp = execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  const winTemp = winEnv("TEMP");
+  if (!winTemp) throw new Error("Windows did not say where %TEMP% is, so the marker of a Steam we started cannot be found");
   return execFileSync("wslpath", ["-u", `${winTemp}\\aas-started-steam.flag`], { encoding: "utf8" }).trim();
 }
 export function markSteamStarted() { fs.writeFileSync(steamMarkerFile(), new Date().toISOString()); }

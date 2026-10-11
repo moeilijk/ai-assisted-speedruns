@@ -161,7 +161,7 @@ function lastSeed(runDir) {
 export default {
   id: "slay_the_spire",
   name: "Slay the Spire",
-  version: "0.35.0",
+  version: "0.35.1",
   scopeName: "sts",
   capabilities: { turnBased: true, canPause: true, stateAccess: "full", inputRoute: "api", igt: true },
   processName: process.env.AAS_STS_PROCESS || "java.exe",
@@ -529,8 +529,10 @@ export default {
     // Communication Mod starts the bridge named in its own config (written by install-mod.mjs).
     try {
       const { spawnSync } = await import("node:child_process");
-      const local = spawnSync("cmd.exe", ["/c", "echo %LOCALAPPDATA%"], { encoding: "utf8", cwd: "/mnt/c" }).stdout.trim();
-      const file = join(spawnSync("wslpath", ["-u", local], { encoding: "utf8" }).stdout.trim(), "ModTheSpire", "CommunicationMod", "config.properties");
+      const { winEnvPath } = await import("../../packages/core/src/windows/win-env.mjs");
+      const local = winEnvPath("LOCALAPPDATA");
+      if (!local) throw new Error("Windows did not say where %LOCALAPPDATA% is");
+      const file = join(local, "ModTheSpire", "CommunicationMod", "config.properties");
       const bridgeWin = spawnSync("wslpath", ["-w", join(tools, "bridge.mjs")], { encoding: "utf8" }).stdout.trim();
       const command = (readFileSync(file, "utf8").match(/^command=(.*)$/m)?.[1] ?? "").replace(/\\(.)/g, "$1");
       add(command.includes(bridgeWin), "Communication Mod starts this bridge", command || file);

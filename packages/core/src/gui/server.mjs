@@ -110,7 +110,15 @@ const STARTED_WITH = codeHash();
 const PAGE_HASH = createHash("sha256").update(fs.readFileSync(path.join(here, "page.html"))).digest("hex").slice(0, 16);
 const PAGE = fs.readFileSync(path.join(here, "page.html"), "utf8").replace("%VERSION%", FRAMEWORK_VERSION).replace("%PAGEHASH%", PAGE_HASH);
 
+/**
+ * The exit code with which the GUI asks `aas gui` to start it again: the restart button, after the tooling was
+ * updated, gives a GUI on the new code without closing the window it runs in (AAS.cmd). `aas gui` runs the GUI as a
+ * child (AAS_GUI_CHILD=1) and starts it again on this code; a GUI started any other way cannot restart itself.
+ */
+export const RESTART_CODE = 75;
+
 export async function startGui({ port = 8770, open = true, checkAtStart = true, log = console.log } = {}) {
+  let restart = () => {};
   let note = null;
   try { note = JSON.parse(fs.readFileSync(NOTE_FILE, "utf8")); } catch { /* no GUI has run yet, or the note is gone */ }
   const live = note?.url ? await probe(note.url) : null;
@@ -299,6 +307,12 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
       } else if (req.method === "POST" && url.pathname === "/api/continue") {
         const b = await body(req);
         send(res, 200, { state: await session.resume(b.runDir, b) });
+      } else if (req.method === "POST" && url.pathname === "/api/restart") {
+        if (process.env.AAS_GUI_CHILD !== "1") throw new Error("This GUI was not started by aas gui, so it cannot start itself again: close it and start it again (AAS.cmd or npm run gui)");
+        if (session.state.phase !== "idle") throw new Error("A run is going: stop it first, then restart the GUI");
+        session.log("Restarting the GUI on the tooling as it is now; this page reloads when the new one answers", "note");
+        send(res, 200, { ok: true, message: "Restarting the GUI…" });
+        setTimeout(() => restart(), 200);
       } else if (req.method === "POST" && url.pathname === "/api/stop") {
         send(res, 200, { state: await session.stop((await body(req)).game) });
       } else if (req.method === "GET" && url.pathname === "/api/proof") {
@@ -388,6 +402,8 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
     server.close();
     process.exit(0);
   };
+  // The process ends at once: a request still arriving on a kept-alive connection would otherwise reach a closed server.
+  restart = () => { log("aas gui: restarting on the tooling as it is now"); forget(); process.exit(RESTART_CODE); };
   // Ctrl-C, a stop signal, and the window that ends the shell the GUI runs in.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.once(signal, shutdown);
   return { url: address, server, session };

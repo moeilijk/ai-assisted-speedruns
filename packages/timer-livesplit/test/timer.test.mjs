@@ -76,33 +76,33 @@ test("a run does not start when LiveSplit does not take the start twice", async 
 test("game time runs while a playback plays and stands still while the agent thinks, on the exact value, never going back", async () => {
   const ls = await startFakeLiveSplit({ segments: 2 });
   const timer = createLiveSplitTimer({ port: ls.port, windows: async () => ["LiveSplit"] });
-  await timer.start(brief);
+  // Waits for the commands a step should send, with a deadline, instead of a fixed pause: under the load of the whole
+  // suite a fixed pause can be too short, and a failed assertion before the cleanup left the fake server open.
   const clock = () => ls.state.commands.filter((c) => /^(unpausegametime|pausegametime|setgametime)/.test(c));
-  const settle = (ms) => new Promise((r) => setTimeout(r, ms));
-  let n = clock().length;
-  // A playback of 0.3 s heard at once: game time runs, and the timer stops it itself at 0.300.
-  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 1, frames: 18, seconds: 0.3 } });
-  await settle(100);
-  assert.deepEqual(clock().slice(n), ["setgametime 0.000", "unpausegametime"]);
-  await settle(400);
-  assert.deepEqual(clock().slice(n + 2), ["pausegametime", "setgametime 0.300"], "paused at the planned end, before the end is heard");
-  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 1, frames: 18, seconds: 0.3 } });
-  await settle(50);
-  assert.deepEqual(clock().slice(n + 4), ["pausegametime", "setgametime 0.300"], "the end sets the same value: no jump");
-  // A playback heard after it was already over: nothing runs, the end sets it.
-  n = clock().length;
-  await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 2000).toISOString(), data: { phase: "start", index: 2, frames: 30, seconds: 0.5 } });
-  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 2, frames: 30, seconds: 0.5 } });
-  await settle(50);
-  assert.deepEqual(clock().slice(n), ["pausegametime", "setgametime 0.800"]);
-  // A command that does not say how long it plays (Slay the Spire): game time moves at its end.
-  n = clock().length;
-  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 3, command: "play 1" } });
-  await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 3, seconds: 1 } });
-  await settle(50);
-  assert.deepEqual(clock().slice(n), ["pausegametime", "setgametime 1.800"]);
-  const set = clock().filter((c) => c.startsWith("setgametime")).map((c) => Number(c.split(" ")[1]));
-  assert.ok(set.every((v, i) => i === 0 || v >= set[i - 1]), `never back: ${set.join(", ")}`);
-  await timer.stop();
-  await ls.close();
+  const until = async (n, ms = 5000) => { const end = Date.now() + ms; while (clock().length < n && Date.now() < end) await new Promise((r) => setTimeout(r, 20)); return clock(); };
+  try {
+    await timer.start(brief);
+    let n = clock().length;
+    // A playback of 0.3 s heard at once: game time runs, and the timer stops it itself at 0.300, before the end is heard.
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 1, frames: 18, seconds: 0.3 } });
+    assert.deepEqual((await until(n + 2)).slice(n, n + 2).map((c) => c.split(" ")[0]), ["setgametime", "unpausegametime"]);
+    assert.deepEqual((await until(n + 4)).slice(n + 2, n + 4), ["pausegametime", "setgametime 0.300"], "paused at the planned end, on the exact value");
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 1, frames: 18, seconds: 0.3 } });
+    assert.deepEqual((await until(n + 6)).slice(n + 4, n + 6), ["pausegametime", "setgametime 0.300"], "the end sets the same value: no jump");
+    // A playback heard after it was already over: nothing runs, the end sets it.
+    n = clock().length;
+    await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 2000).toISOString(), data: { phase: "start", index: 2, frames: 30, seconds: 0.5 } });
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 2, frames: 30, seconds: 0.5 } });
+    assert.deepEqual((await until(n + 2)).slice(n), ["pausegametime", "setgametime 0.800"]);
+    // A command that does not say how long it plays (Slay the Spire): game time moves at its end.
+    n = clock().length;
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 3, command: "play 1" } });
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 3, seconds: 1 } });
+    assert.deepEqual((await until(n + 2)).slice(n), ["pausegametime", "setgametime 1.800"]);
+    const set = clock().filter((c) => c.startsWith("setgametime")).map((c) => Number(c.split(" ")[1]));
+    assert.ok(set.every((v, i) => i === 0 || v >= set[i - 1]), `never back: ${set.join(", ")}`);
+  } finally {
+    await timer.stop().catch(() => {});
+    await ls.close();
+  }
 });

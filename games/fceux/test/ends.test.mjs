@@ -14,6 +14,9 @@ fs.writeFileSync(join(runDir, "brief.json"), JSON.stringify({ id: "smb-ends-1", 
 process.env.AAS_FCEUX_BRIDGE_PORT = String(fake.port);
 process.env.AAS_FCEUX_PROFILE = "smb";
 process.env.AAS_RUN_DIR = runDir;
+// The folder of the emulator is named here, so no test asks Windows where it is (under WSL that is a cmd.exe call,
+// and under the load of the whole suite it came back empty, which is what a save next to FCEUX would be looked for in).
+process.env.AAS_FCEUX_DIR = join(runDir, "fceux");
 const { default: plugin } = await import("../plugin.mjs");
 const { disconnect } = await import("../bridge.mjs");
 const events = [];
@@ -38,6 +41,26 @@ test("a save made after an end shows it when it is loaded", async () => {
   assert.deepEqual(r.reached.map((m) => m.end), ["world1"]);
   fs.writeFileSync(join(runDir, "saves", "in-1-2.fc0"), JSON.stringify({ framecount: 3000, memory: { 1887: 0, 1904: 1 } }));
   assert.deepEqual((await plugin.loadState({ name: "in-1-2", runDir, log() {} })).reached, []);
+});
+
+test("a save in the run's own folder loads while the FCEUX folder is not known", async () => {
+  reset();
+  fs.mkdirSync(join(runDir, "saves"), { recursive: true });
+  fs.writeFileSync(join(runDir, "saves", "no-dir.fc0"), JSON.stringify({ framecount: 100, memory: { 1887: 0, 1904: 1 } }));
+  const dir = process.env.AAS_FCEUX_DIR, p = process.env.PATH, local = process.env.LOCALAPPDATA;
+  // The folder is asked of Windows, and that call cannot answer: a resume still finds the run's own savestate.
+  delete process.env.AAS_FCEUX_DIR;
+  delete process.env.LOCALAPPDATA;
+  process.env.PATH = "/nonexistent";
+  try {
+    const { fceuxDir } = await import("../paths.mjs");
+    assert.equal(fceuxDir(), null, "the folder is unknown for this test");
+    assert.deepEqual((await plugin.loadState({ name: "no-dir", runDir, log() {} })).reached, []);
+  } finally {
+    process.env.AAS_FCEUX_DIR = dir;
+    process.env.PATH = p;
+    if (local !== undefined) process.env.LOCALAPPDATA = local;
+  }
 });
 
 test("an end the run's log already holds is not told again", async () => {

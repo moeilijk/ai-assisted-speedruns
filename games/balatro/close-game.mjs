@@ -3,6 +3,7 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { winEnvPath } from "../../packages/core/src/windows/win-env.mjs";
 import { closeWindows } from "../../packages/core/src/close-windows.mjs";
 import { afterGameClose } from "../../packages/core/src/windows/quiet-start.mjs";
 import { readBridgeState } from "./bridge.mjs";
@@ -20,7 +21,8 @@ export async function stopBridge() {
 /** The profile slot the player had before the launcher changed it; only once the game has closed (it writes its settings on exit). */
 export function restoreProfile() {
   const text = (cmd, args) => (spawnSync(cmd, args, { encoding: "utf8", cwd: "/mnt/c" }).stdout ?? "").trim();
-  const appData = text("wslpath", ["-u", text("cmd.exe", ["/c", "echo %APPDATA%"])]);
+  const appData = winEnvPath("APPDATA");
+  if (!appData) return "profile: Windows did not say where %APPDATA% is, so the player's settings stay in settings.jkr.aas-backup";
   const settings = path.join(appData, "Balatro", "settings.jkr");
   const backup = `${settings}.aas-backup`;
   if (!fs.existsSync(backup)) return null;

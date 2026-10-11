@@ -12,6 +12,63 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 0.35.1 — not released
+
+- **A resume reads the run's own savestate even when the emulator's folder is not known.** `loadState` of BizHawk
+  and FCEUX built the path of a save next to the emulator before it looked at the save in the run itself, so a folder
+  that came back unknown ended the resume with `The "path" argument must be of type string. Received null`. Under WSL
+  that folder is asked of Windows through `cmd.exe`, and under the load of the whole suite that call came back empty
+  (measured 2026-10-09: the FCEUX end test took 10.0 s there and failed on it, while the same call on its own answers
+  in 0.1 s). A save next to the emulator is now only looked for when the folder is known, `saveState` says the folder
+  is not known instead of failing on a path, and both end tests name the emulator's folder themselves, so no test asks
+  Windows where it is.
+
+- **A Setup row that is not ready shows the button that fixes it.** The game rows of Portal and Slay the Spire said
+  "Not ready" without a button (seen by the owner on 2026-10-08): the game check took the fix of the first unmet
+  condition and then wrote `fix: undefined` over it, because only a ready row offers the install again. Now a row
+  that is not ready keeps its condition's fix, and a ready row offers the install "(again)". Tried in the real page
+  (Playwright, 2026-10-11 03:15): a row that was not ready read "Not ready" and carried the button "Put the mod next
+  to the game"; the same row, once its condition was met, read "Ready" with "Put the mod next to the game (again)".
+- **The GUI restarts itself after an update.** "The tooling was updated since this GUI started" now carries a
+  Restart the GUI button: `aas gui` runs the GUI as its child and starts it again on the code as it is now, in the
+  same window (AAS.cmd stays open), and the page reloads itself onto the new GUI. A run that is going is not cut
+  short (stop it first), and a GUI that `aas gui` did not start says how to restart it by hand. Tried in the real
+  page (Playwright, 2026-10-08 03:06): the button appeared, a click gave a new GUI process and the page reloaded onto
+  it; Ctrl-C still ends both processes.
+
+- **`aas gui` passes a stop signal on to the GUI it started.** Since the restart button the GUI runs as a child of
+  `aas gui`, and the parent ignored SIGINT, SIGTERM and SIGHUP because Ctrl-C reaches the child through the process
+  group anyway. A signal sent to that process alone did not: measured 2026-10-11, `npm run e2e:real` ended its GUI
+  with SIGINT, the GUI kept serving on port 8779 and the test hung on it for 42 minutes — and the next run of the
+  test drove that left-behind GUI, on the code it was started on, instead of starting its own. The parent now passes
+  the signal to the child and does not start it again afterwards (measured: SIGINT to `aas gui` ended both processes
+  and freed the port within 4 s). `npm run e2e:real` refuses to start while something answers on its port, and waits
+  for the GUI to be gone instead of assuming it.
+- **A call to Windows that never arrived is made again, instead of ending the run.** Under WSL the harness asks
+  Windows things through `cmd.exe` and `powershell.exe`, and that interop can time out while Windows itself is fine.
+  Measured in `npm run e2e:real` on 2026-10-11 02:05–02:07: BizHawk's launcher ended with exit 1 on
+  `<3>WSL (…) ERROR: UtilAcceptVsock:271: accept4 failed 110`, the FCEUX folder check said "not set up" while FCEUX
+  was installed, LiveSplit's launcher failed with exit 1, and the closing step ended in
+  `ENOENT /tmp/svv-1263582.csv` — four failures in three minutes, while each of those calls on its own answers in
+  40 ms to 9 s (measured afterwards, 180 calls, none failed). A call that never reached Windows is now made again
+  (`packages/core/src/windows/win-env.mjs`): `winEnv`/`winEnvPath` for an environment variable of Windows,
+  `winExec`/`winPs` for a program called for an answer. A program that did run and answered with an error is not
+  asked twice, because that answer is its own; and a variable Windows does not have is answered at once. The folder
+  of an emulator is no longer remembered as unknown after one failed call, so one hiccup does not leave the rest of a
+  run without it. In use by the launchers of LiveSplit and OBS, the window, display, cursor, screensaver, Steam and
+  close steps, the Balatro and Slay the Spire plugins and the folders of BizHawk and FCEUX.
+- **SoundVolumeView's own failure is what the log says.** The list of audio devices was read from a file the program
+  writes, and the call that starts it was not looked at: when it failed, the harness waited ten seconds and then
+  reported `ENOENT /tmp/svv-<pid>.csv`, which says nothing about the program. The call is now read and made a second
+  time, and the error names SoundVolumeView, its path and what went wrong.
+- **`npm run e2e:real` keeps every game's log.** The test printed the last twelve lines of the GUI's log when a
+  session failed, and on 2026-10-11 those twelve were taken up by the closing output while the reason had scrolled
+  off. Each game's log is now written whole to `.local/e2e-real/<time>-<game>.log` and every error line goes into the
+  test's own output.
+- **The SPEC says which draft it is.** `packages/spec/SPEC.md` still read "Status: draft 0.44, 2026-09-27" while its
+  title, the Drafts table and `SPEC_VERSION` all said 0.45 (the Archive reads 0.45; found by the Archive's session,
+  2026-10-11). The line now says draft 0.45, 2026-10-03; the text itself is unchanged, so this is no new draft.
+
 ## 0.35.0 — 2026-10-08
 
 Versions 1.0.0 and 1.0.1 (2026-10-01) were withdrawn on 2026-10-02 (the maintainer): their releases and tags are gone,

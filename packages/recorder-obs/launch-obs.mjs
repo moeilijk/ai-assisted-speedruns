@@ -5,7 +5,7 @@
 // Minimized to the taskbar, not to the tray: a tray-minimized OBS has no window
 // at all, and then it cannot be closed the way a user would (WM_CLOSE), which
 // left it running after every run.
-import { execFileSync } from "node:child_process";
+import { winPs } from "../core/src/windows/win-env.mjs";
 import net from "node:net";
 
 const exe = process.env.AAS_OBS_EXE ?? "C:\\Program Files\\obs-studio\\bin\\64bit\\obs64.exe";
@@ -16,7 +16,7 @@ if (await probe()) {
   console.log("OBS websocket already up");
   process.exit(0);
 }
-execFileSync("powershell.exe", ["-NoProfile", "-Command", `if (-not (Get-Process obs64 -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' -WorkingDirectory '${dir}' -ArgumentList '--startminimized','--disable-updater','--disable-shutdown-check' -WindowStyle Minimized }`]);
+winPs(`if (-not (Get-Process obs64 -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' -WorkingDirectory '${dir}' -ArgumentList '--startminimized','--disable-updater','--disable-shutdown-check' -WindowStyle Minimized }`);
 const deadline = Date.now() + 120000;
 while (Date.now() < deadline) {
   await new Promise((r) => setTimeout(r, 3000));

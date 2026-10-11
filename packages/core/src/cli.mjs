@@ -9,7 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { gameOfCommand, loadSettings } from "./settings.mjs";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ARCHIVE_URL, loadRuntime } from "./plugins.mjs";
 import { brokerSpec, configure } from "./configure.mjs";
 import { formatDuration } from "./videos.mjs";
@@ -349,6 +349,26 @@ if (process.argv[1]?.endsWith("cli.mjs") || process.argv[1]?.endsWith("/aas") ||
         break;
       }
       case "gui": {
+        // The GUI runs as a child of this command, so the restart button can give a GUI on updated tooling without
+        // closing the window it runs in: a child that ends with RESTART_CODE is started again, on the code as it is now.
+        if (process.env.AAS_GUI_CHILD !== "1") {
+          const { spawn } = await import("node:child_process");
+          const { RESTART_CODE } = await import("./gui/server.mjs");
+          // Ctrl-C reaches the child through the process group, but a signal sent to this process alone (a script
+          // that stops the GUI with kill) would not, so it is passed on and the GUI is not started again after it.
+          // Without that, `aas gui` ignored the signal and left the GUI it had started running (measured 2026-10-11:
+          // `npm run e2e:real` sent SIGINT, its GUI kept serving on port 8779 and the test hung for 42 minutes).
+          let child = null;
+          let stopping = null;
+          for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(signal, () => { stopping = signal; try { child?.kill(signal); } catch { /* already gone */ } });
+          let args = process.argv.slice(2);
+          for (;;) {
+            const code = await new Promise((resolve) => { child = spawn(process.execPath, [fileURLToPath(import.meta.url), ...args], { stdio: "inherit", env: { ...process.env, AAS_GUI_CHILD: "1" } }).on("exit", (c) => resolve(c)); });
+            child = null;
+            if (stopping || code !== RESTART_CODE) process.exit(code ?? 0);
+            if (!args.includes("--no-open")) args = [...args, "--no-open"];
+          }
+        }
         const { startGui } = await import("./gui/server.mjs");
         const g = await startGui({ port: Number(opts.port ?? 8770), open: !opts["no-open"] });
         // A GUI that was already running has been opened again; only the GUI of this process keeps the window busy.

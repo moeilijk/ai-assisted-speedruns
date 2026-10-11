@@ -5,7 +5,7 @@
 // falls off the screen and the taskbar ends up in the recording.
 //
 //   node packages/core/src/windows/displays.mjs
-import { execFileSync } from "node:child_process";
+import { winPs } from "./win-env.mjs";
 
 const CSHARP = `
 Add-Type -TypeDefinition @'
@@ -52,7 +52,7 @@ function Get-AasDisplays {
 }
 `;
 
-const run = (script) => execFileSync("powershell.exe", ["-NoProfile", "-Command", `${CSHARP}\n${script}`], { encoding: "utf8" }).replace(/\r/g, "").trim();
+const run = (script) => winPs(`${CSHARP}\n${script}`);
 
 /** All attached displays with their position, size and whether they are primary. */
 export function listDisplays() {

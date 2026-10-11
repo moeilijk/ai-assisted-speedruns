@@ -56,10 +56,18 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
   const games = path.join(root, ".local", "games");
   const snapshot = () => Object.fromEntries([...keep.map((f) => [f, fs.readFileSync(path.join(root, f), "utf8")]), ...(fs.existsSync(games) ? fs.readdirSync(games).map((f) => [`.local/games/${f}`, fs.readFileSync(path.join(games, f), "utf8")]) : [])]);
   const before = snapshot();
+  // The logs of this run, outside the work folder that is removed at the end, so a failure can be read afterwards.
+  const logDir = path.join(root, ".local", "e2e-real");
+  fs.mkdirSync(logDir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const quiet = machineEnv().AAS_QUIET_AUDIO_DEVICE ?? null;
   const port = 8779;
   const env = { ...process.env, AAS_ARCHIVE_FETCH: path.join(root, ".local", "e2e-archive.mjs"), XDG_CONFIG_HOME: path.join(work, "config"), AAS_PROOF: "anonymous", AAS_GUI_NOTE: path.join(work, "gui.json"), AAS_GUI_CHECKS: path.join(work, "gui-checks.json") };
   if (fs.existsSync(path.join(root, ".local", "gui-checks.json"))) fs.copyFileSync(path.join(root, ".local", "gui-checks.json"), env.AAS_GUI_CHECKS);
+  // A GUI already on this port would be driven instead of the one started here, and its code is whatever it was
+  // started on (measured 2026-10-11: a GUI left behind by an earlier run of this test served the run that followed).
+  const answers = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(2000) }).then(() => true, () => false);
+  assert.equal(answers, false, `something already answers on port ${port}; close it first, this test drives the GUI it starts itself`);
   const gui = spawn(process.execPath, [CLI, "gui", "--port", String(port), "--no-open"], { cwd: root, env, stdio: "ignore" });
   const browser = await playwright.chromium.launch();
   const page = await (await browser.newContext({ viewport: { width: 1100, height: 1000 } })).newPage();
@@ -124,10 +132,16 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       log(`${g.name}: ${result.slice(0, 140)}; sound on: ${[...sounds].join(", ") || "no session seen"}`);
       // A session that did not complete: the GUI's log holds the reason (the run's own lines); it goes into this log,
       // so a failure can be read afterwards without the page.
+      // Every game's log is kept as a file, so the reason of a failure is read afterwards whole: the twelve lines
+      // this test used to print were taken up by the closing output, and the error itself was already off the top
+      // (2026-10-11, a LiveSplit start that failed with exit 1 and no reason left in this log).
+      const logFile = path.join(logDir, `${stamp}-${g.id}.log`);
+      fs.writeFileSync(logFile, `${lines.join("\n")}\n`);
+      log(`${g.name}: log kept at ${path.relative(root, logFile)} (${lines.length} lines)`);
       if (!/completed|stopped/.test(result)) for (const l of lines.slice(-12)) log(`${g.name}: log: ${l.slice(0, 200)}`);
       const onSpeakers = [...sounds].filter((s) => !s.startsWith("none") && !(quiet && s.includes(quiet)));
       if (onSpeakers.length) failures.push(`${g.name}: sound on ${onSpeakers.join(", ")}`);
-      if (errors.length) failures.push(`${g.name}: ${errors.length} error line(s): ${errors.slice(0, 3).join(" | ")}`);
+      if (errors.length) { for (const l of errors) log(`${g.name}: error: ${l.slice(0, 400)}`); failures.push(`${g.name}: ${errors.length} error line(s): ${errors.slice(0, 3).join(" | ")}`); }
       if (!(PROVEN_SEEDS[g.id] ? /completed/ : /completed|stopped/).test(result)) failures.push(`${g.name}: session ${result.slice(0, 80)}`);
       const up = await page.$("#result button[data-upload]");
       if (!up) failures.push(`${g.name}: no bundle to upload`);
@@ -175,7 +189,9 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
   } finally {
     await browser.close();
     gui.kill("SIGINT");
-    await new Promise((r) => setTimeout(r, 1500));
+    // The GUI runs the real GUI as its child, so its end is waited for here rather than assumed.
+    const ended = await Promise.race([new Promise((r) => gui.on("exit", () => r(true))), new Promise((r) => setTimeout(() => r(false), 20000))]);
+    if (!ended) { gui.kill("SIGKILL"); failures.push(`the GUI on port ${port} did not end on SIGINT within 20 s`); }
     try {
       const { archiveFetch } = await import(path.join(root, ".local", "e2e-archive.mjs"));
       const { proofUrl } = await import("../src/proof.mjs");

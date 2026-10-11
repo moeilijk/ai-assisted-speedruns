@@ -2,19 +2,12 @@
 import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
+import { winEnvPath } from "../../packages/core/src/windows/win-env.mjs";
 
 const isWsl = () => process.platform === "linux" && /microsoft/i.test(os.release());
-let local = undefined;
-function localAppData() {
-  if (local !== undefined) return local;
-  local = null;
-  if (process.platform === "win32") local = process.env.LOCALAPPDATA ?? null;
-  else if (isWsl()) {
-    const win = (spawnSync("cmd.exe", ["/c", "echo %LOCALAPPDATA%"], { encoding: "utf8", cwd: "/mnt/c" }).stdout ?? "").trim();
-    if (win && !win.includes("%")) local = (spawnSync("wslpath", ["-u", win], { encoding: "utf8" }).stdout ?? "").trim() || null;
-  }
-  return local;
-}
+// %LOCALAPPDATA% is asked of Windows (winEnvPath asks again when the interop call comes back empty, and remembers
+// only an answer), so one hiccup does not leave the rest of the run without this folder.
+const localAppData = () => winEnvPath("LOCALAPPDATA");
 export function bizhawkDir() {
   if (process.env.AAS_BIZHAWK_DIR) return path.resolve(process.env.AAS_BIZHAWK_DIR);
   const l = localAppData();

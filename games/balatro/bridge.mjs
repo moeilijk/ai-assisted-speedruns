@@ -21,6 +21,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { jsonRpcClient } from "../../packages/core/src/json-rpc-http.mjs";
 import { loadSettings } from "../../packages/core/src/settings.mjs";
+import { winEnvPath } from "../../packages/core/src/windows/win-env.mjs";
 
 // This game's own settings, then the machine's: the same two files every command reads (settings.mjs).
 loadSettings(import.meta.url);
@@ -50,7 +51,7 @@ export async function startBridge({ port = BRIDGE_PORT, botPort = BOT_PORT, stat
   const token = randomBytes(16).toString("hex");
   // Where balatrobot writes a screenshot: a folder both the game and this process can reach.
   const dir = shotDir ?? (isWsl()
-    ? execFileSync("wslpath", ["-u", execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", cwd: "/mnt/c" }).trim()], { encoding: "utf8" }).trim()
+    ? winEnvPath("TEMP")
     : tmpdir());
   let lastStart = null; // the harness's start: { deck, stake, seed? }
   let shots = 0;

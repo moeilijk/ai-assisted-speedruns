@@ -11,8 +11,10 @@ import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { endScreensaver } from "./screensaver.mjs";
+import { winEnv } from "./win-env.mjs";
 
-const winTemp = execFileSync("cmd.exe", ["/c", "echo %TEMP%"], { encoding: "utf8", cwd: "/mnt/c", stdio: ["ignore", "pipe", "ignore"] }).trim();
+const winTemp = winEnv("TEMP");
+if (!winTemp) { console.error("Windows did not say where %TEMP% is, so the keep-awake flag has nowhere to live"); process.exit(1); }
 const flagWin = `${winTemp}\\aas-keep-awake.flag`;
 const flag = execFileSync("wslpath", ["-u", flagWin], { encoding: "utf8" }).trim();
 const cmd = process.argv[2] ?? "status";

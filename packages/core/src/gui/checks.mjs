@@ -321,7 +321,10 @@ export async function checkItem(id) {
       if (endpoint && !row.ok) tests.at(-1).what = `${row.what} (checked when a run starts the game; now: ${row.detail})`;
     }
     // Everything passed, so the same action is offered again rather than needed: the sentence stays, "again" says why.
-    return done({ ...extra, via: `node packages/core/src/cli.mjs ${via.map((a) => (a === g.file ? rel(a) : a)).join(" ")}`, fix: tests.every((x) => x.ok) && install ? { ...install, label: `${install.label} (again)` } : undefined });
+    // A row that is not ready keeps the fix of its first unmet condition (done() takes it); only a row that is ready
+    // gets the install offered again. A `fix: undefined` here wrote over that fix, and a row that was not ready showed
+    // no button at all (Portal's and Slay the Spire's rows, seen by the owner on 2026-10-08).
+    return done({ ...extra, via: `node packages/core/src/cli.mjs ${via.map((a) => (a === g.file ? rel(a) : a)).join(" ")}`, ...(tests.every((x) => x.ok) && install ? { fix: { ...install, label: `${install.label} (again)` } } : {}) });
   }
   t("the check is known", false, { detail: `Unknown check: ${id}` });
   return done();

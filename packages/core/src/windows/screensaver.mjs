@@ -3,7 +3,7 @@
 // 2026-09-26: the game rendered, OBS's Windows Graphics Capture of its window gave black for 20 s and the run did
 // not start), and ES_DISPLAY_REQUIRED only keeps it from starting, a synthetic mouse move did not end it. Windows
 // ends it on input; a program ends it the way Windows documents: open that desktop and close its windows.
-import { execFileSync } from "node:child_process";
+import { winPs } from "./win-env.mjs";
 
 const SCRIPT = `
 Add-Type -Namespace X -Name S -MemberDefinition @'
@@ -29,7 +29,7 @@ if ($was -and '__END__' -eq 'end') {
 /** Runs the script on the Windows side; "True False" means it was running and is not any more. Null when there is no Windows side. */
 function runScript(end) {
   try {
-    return execFileSync("powershell.exe", ["-NoProfile", "-Command", SCRIPT.replace("__END__", end ? "end" : "ask")], { encoding: "utf8", cwd: "/mnt/c", timeout: 20000, stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return winPs(SCRIPT.replace("__END__", end ? "end" : "ask"), { timeout: 20000 });
   } catch { return null; }
 }
 

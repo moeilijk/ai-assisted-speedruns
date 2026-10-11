@@ -1,6 +1,6 @@
 # AI Assisted Speedruns (AAS) — Specification, draft 0.45
 
-Status: draft 0.44, 2026-09-27. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
+Status: draft 0.45, 2026-10-03. Every change to this text is a new draft with the next number, listed under [Drafts](#drafts) at the end; a bundle names the draft it follows in `spec_version`. This document defines what an AI Assisted Speedrun is, what a published run must contain, and how runs may be compared. It does not prescribe how a harness works internally.
 
 Inspired by cozyblaze's Portal run. The tool interface and the log format follow his design, and the broker, the process hardening, the log sanitising and the privacy scan build on his code from [portal-agent](https://github.com/cozyblaze/portal-agent). The session log he published there (`evidence/`) serves as the worked example where this text needs one.
 

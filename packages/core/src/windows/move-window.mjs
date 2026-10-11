@@ -5,7 +5,9 @@
 // Slay the Spire's launcher already moved its own window this way; this is that, for every game.
 //
 // Only the position is set (SWP_NOSIZE): a game that does not redraw for an external resize keeps its pixel size.
-import { spawnSync } from "node:child_process";
+import { winPs } from "./win-env.mjs";
+// The answer of a PowerShell call, in the shape this file reads it; a call that never reached Windows is made again.
+const winCall = (script, opts) => { try { return { status: 0, stdout: winPs(script, opts) }; } catch (e) { return { status: 1, stdout: "", stderr: e.message }; } };
 
 const SWP = "0x0001 -bor 0x0004 -bor 0x0010"; // NOSIZE | NOZORDER | NOACTIVATE
 
@@ -29,7 +31,7 @@ if (-not $p) { 'window not found' } else {
   $r = New-Object X.W+RECT; [X.W]::GetWindowRect($h, [ref]$r) | Out-Null
   if ($r.L -eq ${x} -and $r.T -eq ${y}) { 'moved to ' + $r.L + ',' + $r.T } else { 'asked for ${x},${y} but the window is at ' + $r.L + ',' + $r.T }
 }`;
-  const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], { encoding: "utf8", timeout: 20000 });
+  const r = winCall(ps, { timeout: 20000 });
   const out = `${r.stdout ?? ""}${r.stderr ?? ""}`.trim().split("\n").at(-1) ?? "no answer";
   log(`window: ${out}`);
   return out;
@@ -80,7 +82,7 @@ public static List<IntPtr> Of(uint pid) { var list = new List<IntPtr>(); EnumWin
 public static string Title(IntPtr h) { var s = new StringBuilder(512); GetWindowText(h, s, 512); return s.ToString(); } }
 "@`;
 const powershell = (script) => {
-  const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", script], { encoding: "utf8", timeout: 30000, cwd: "/mnt/c" });
+  const r = winCall(script, { timeout: 30000 });
   return `${r.stdout ?? ""}${r.stderr ?? ""}`.replace(/\r/g, "").trim();
 };
 

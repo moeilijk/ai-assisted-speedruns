@@ -6,6 +6,7 @@
 //   node packages/timer-livesplit/launch-livesplit.mjs [games/<game>/splits/<file>.lss]
 // Env: AAS_LIVESPLIT_EXE (required), AAS_LIVESPLIT_HOST, AAS_LIVESPLIT_PORT, AAS_LIVESPLIT_POS (X,Y; optional).
 import { execFileSync } from "node:child_process";
+import { winPs } from "../core/src/windows/win-env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { connectLiveSplit, createLiveSplitTimer } from "./index.mjs";
@@ -19,7 +20,7 @@ const host = process.env.AAS_LIVESPLIT_HOST ?? "127.0.0.1";
 const port = Number(process.env.AAS_LIVESPLIT_PORT ?? 16834);
 const splits = process.argv[2] ? path.resolve(process.argv[2]) : null;
 if (splits && !fs.existsSync(splits)) throw new Error(`splits file not found: ${splits}`);
-const ps = (script) => execFileSync("powershell.exe", ["-NoProfile", "-Command", script], { encoding: "utf8", cwd: "/mnt/c" }).replace(/\r/g, "").trim();
+const ps = (script) => winPs(script);
 const running = () => /True/.test(ps("[bool](Get-Process LiveSplit -ErrorAction SilentlyContinue)"));
 const settingsFile = path.join(path.dirname(exe), "settings.cfg");
 const toWin = (p) => execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim();
