@@ -75,7 +75,11 @@ test("a second start opens the GUI that is already running instead of failing on
   const again = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
   try {
     assert.equal(again.already, undefined, "a stale note does not block a start");
-    assert.notEqual(`http://127.0.0.1:${again.server.address().port}/`, url);
+    // Not by its port: the one the first GUI left behind is free again and the OS hands it out a second time
+    // (seen 2026-10-14). The note is what shows whose GUI is up.
+    const note = JSON.parse(fs.readFileSync(process.env.AAS_GUI_NOTE, "utf8"));
+    assert.equal(note.pid, process.pid, "the stale note is replaced by this start's own");
+    assert.equal(note.url, `http://127.0.0.1:${again.server.address().port}/`, "and it points at the server that is up");
   } finally {
     again.server.close();
     process.removeAllListeners("SIGINT");

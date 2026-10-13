@@ -1,10 +1,10 @@
 # Changelog
 
-The tooling is in beta: versions stay below 1.0.0 until the AAS Archive goes live on 2026-10-15, together with 1.0.0.
+The beta ended with 1.0.0, the release the AAS Archive opens with on 2026-10-15.
 
-- **Minor** (0.x.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
+- **Minor** (x.Y.0): a new `summary.json` schema or a new SPEC draft, so a bundle may look different and the archive
   reads it before the release comes out.
-- **Patch** (0.x.y): everything else.
+- **Patch** (x.y.Z): everything else.
 - **BREAKING**: a release after which a run directory or a bundle made with an earlier version is no longer read,
   republished or ranked. Such a release says so in its first line, and what to do with existing runs. None so far.
 
@@ -12,7 +12,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
-## 0.35.1 — not released
+## 1.0.0 — 2026-10-14
+
+Not BREAKING: a run directory or a bundle made with 0.35.0 is still read and republished, the spec is draft 0.45 as
+it was, and the runtime hashes of 0.35.0 the archive already trusts are the ones those bundles carry. The number was
+used once before, on 2026-10-01, and withdrawn the next day together with 1.0.1; those releases and tags are gone,
+and this is the 1.0.0 that stands.
+
+Seven parts carry the new number because their code changed since 0.35.0: the harness itself, `recorder-obs`,
+`timer-livesplit`, and the game plugins for Balatro, BizHawk, FCEUX and Slay the Spire. The runtime plugins and the
+Portal plugin did not change and keep 0.35.0, so a bundle made with them verifies against the hash that is already
+trusted. What changed is below.
 
 - **A resume reads the run's own savestate even when the emulator's folder is not known.** `loadState` of BizHawk
   and FCEUX built the path of a save next to the emulator before it looked at the save in the run itself, so a folder

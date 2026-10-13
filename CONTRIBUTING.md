@@ -1,6 +1,6 @@
 # Contributing
 
-Issues and pull requests are welcome, for a new game plugin as much as for a fix. The tooling is in beta until 1.0.0 on 1 October 2026 (see [CHANGELOG.md](CHANGELOG.md)), so things still move.
+Issues and pull requests are welcome, for a new game plugin as much as for a fix. The tooling is at 1.0.0 (see [CHANGELOG.md](CHANGELOG.md)); the SPEC is still a draft, so what a bundle holds moves with it.
 
 ## Before you start
 

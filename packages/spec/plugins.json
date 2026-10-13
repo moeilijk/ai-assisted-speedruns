@@ -51,8 +51,8 @@
       "dir": "packages/recorder-obs",
       "id": "obs",
       "name": "OBS Studio (video)",
-      "version": "0.35.1",
-      "sha256": "eb913ea4aee1ba688450c8df738a5c65c58d6104457b7c9af0da9e68b5d126bc"
+      "version": "1.0.0",
+      "sha256": "279fa689bc255eaf7aa4927a086773e4801f572b67d02489ef66a65b9359cc54"
     },
     {
       "kind": "recorder",
@@ -67,26 +67,26 @@
       "dir": "packages/timer-livesplit",
       "id": "livesplit",
       "name": "LiveSplit",
-      "version": "0.35.1",
-      "sha256": "2ae8a48b94cc9674aaf45213a031531cc0faae7f2d88d236e41c5754f0bc96da"
+      "version": "1.0.0",
+      "sha256": "d53e55c4d47386259f5d679dc3a6a5878bbcf0da40e2da15dc9384318afd4497"
     },
     {
       "kind": "game",
       "dir": "games/balatro",
       "id": "balatro",
       "name": "Balatro",
-      "version": "0.35.1",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "b637c72b65733d9395ef49b426d6f310b6d212133d9634ad8e9cde721733cd57"
+      "sha256": "e9d1c6aac0c09c2c21093042ad09afc3dbbb134eca1f0a6c1cfdda60075bfbe3"
     },
     {
       "kind": "game",
       "dir": "games/bizhawk",
       "id": "bizhawk",
       "name": "BizHawk",
-      "version": "0.35.1",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "0e65c660c425106e3909911dd7968e4f85e269aea71cd1139c2bf055b59312fa"
+      "sha256": "aec1b145514c152afbdb3e7985434e9787b5a3e52747e48db9005a3fdbb20652"
     },
     {
       "kind": "game",
@@ -102,9 +102,9 @@
       "dir": "games/fceux",
       "id": "fceux",
       "name": "FCEUX",
-      "version": "0.35.1",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "d634235c8328a316edd3877014d8bfce3437b4a30dfe9891bdcdce874a54799a"
+      "sha256": "19ab91d62ecab59377bfbae368737feaaa2e76738ca89fd46c85b4f8bc243dd2"
     },
     {
       "kind": "game",
@@ -156,9 +156,9 @@
       "dir": "games/slay-the-spire",
       "id": "slay_the_spire",
       "name": "Slay the Spire",
-      "version": "0.35.1",
+      "version": "1.0.0",
       "stub": false,
-      "sha256": "505e2c7031a298981e467aa2d1c704b56ea490f9e721f2dd47e275b78671f52d"
+      "sha256": "23bda1accc5d6bb66525b207676978d48ca97046628d1fa404b8a4ef9b146b2d"
     },
     {
       "kind": "game",

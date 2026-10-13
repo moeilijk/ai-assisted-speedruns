@@ -136,7 +136,7 @@ export function planBuilder(run) {
 export default {
   id: "bizhawk",
   name: "BizHawk",
-  version: "0.35.1",
+  version: "1.0.0",
   scopeName: "emu",
   capabilities: { turnBased: false, canPause: true, stateAccess: "full", inputRoute: "input", igt: true },
   processName: "EmuHawk.exe",

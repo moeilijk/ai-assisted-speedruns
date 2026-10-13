@@ -157,9 +157,9 @@ test("saveState waits for the game's save to describe the reported state, and sa
     await bal.select();
     await bal.play([0]); // one card: 100 chips, the blind (300) stands, the hand goes on
     const logs = [];
-    const t0 = Date.now();
+    const t0 = performance.now(); // not Date.now(): this machine's clock steps back a few tenths now and then (2026-10-13), and a wait measured over such a step reads short
     const saved = await t.plugin.saveState({ name: "aas_test_002", log: (m) => logs.push(m) });
-    assert.ok(Date.now() - t0 >= 600, "waited for the game's file");
+    assert.ok(performance.now() - t0 >= 600, "waited for the game's file");
     const d = readSave(saved.file);
     assert.equal(d.state, STATES.SELECTING_HAND);
     assert.equal(d.hands_left, 3, "the save holds the hand just played, not the one before");
