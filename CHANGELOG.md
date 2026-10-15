@@ -16,6 +16,18 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.2 — 2026-10-15
+
+- **A run's address on the Archive carries the publisher's handle, and the suggested video descriptions follow it.**
+  The Archive gives a run the address `/runs/<handle>/<run id>/`, so a run name is only taken within one account; the
+  shorter `/runs/<run id>/` is answered with a redirect for as long as one account uses that name, and with a 404 once
+  two do. A line in a video's description stands there for good, so `AAS_ARCHIVE_HANDLE` (the handle of the account the
+  runs are published under, from its page on the Archive) makes `aas publish` and `aas upload-sheet` write the whole
+  address. Without it they write the shorter form, as every description written before this did, so nothing changes for
+  anyone who does not set it. The address is in the suggested text only: a video stays bound to its bundle by the
+  verification code `aas<32 hex>`, which comes from the timeline's fingerprint, so a description can be written again
+  without moving anything the Archive checks.
+
 ## 1.0.0 — 2026-10-14
 
 Not BREAKING: a run directory or a bundle made with 0.35.0 is still read and republished, the spec is draft 0.45 as

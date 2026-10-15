@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { hasCode, recordingVideos, videoCode, viewerLabel } from "../src/videos.mjs";
-import { momentLabel, videoDescription, videoMoments, videoTitle, youtubeChapters } from "../src/youtube-text.mjs";
+import { momentLabel, runAddress, videoDescription, videoMoments, videoTitle, youtubeChapters } from "../src/youtube-text.mjs";
 import { modelDisplayName } from "../src/models.mjs";
 
 const timeline = {
@@ -127,4 +127,31 @@ test("a video's text tells what that video shows, and nothing it does not", () =
 test("a recording without a measured length lists no whole video, whose line nothing could back", () => {
   const one = { segments: [{ index: 0, offset: 0, seconds: 2.74, file: null }], sections: [], keep: [], totals: {} };
   assert.deepEqual(recordingVideos({ runId: "x", fingerprint: "f", durationSeconds: null, files: ["recording/a.dem"], timeline: one }), []);
+});
+
+// A run's address on the Archive carries the publisher's handle, so a run name is only ever taken within one account.
+// The bare form is answered with a redirect while one account uses the name and with a 404 once two do, so a
+// description that will stand under a video forever names the whole address wherever the handle is known.
+test("the run's address names the handle when AAS_ARCHIVE_HANDLE is set, and the bare form when it is not", () => {
+  const origin = "https://ai-assisted-speedruns.org";
+  assert.equal(runAddress(origin, "portal-opus-01", "cvdveer"), `${origin}/runs/cvdveer/portal-opus-01/`);
+  assert.equal(runAddress(origin, "portal-opus-01", ""), `${origin}/runs/portal-opus-01/`);
+  assert.equal(runAddress(origin, "portal-opus-01", undefined), `${origin}/runs/portal-opus-01/`);
+  assert.equal(runAddress(origin, "a run/with slash", "o ne"), `${origin}/runs/o%20ne/a%20run%2Fwith%20slash/`);
+
+  const summary = {
+    run_id: "portal-opus-01", completed_at: "t", totals_to_completion: { igt_seconds: 139.7, rta_seconds: 313 },
+    models: [{ model: "claude-opus-5-5" }], game: { game: "Portal" },
+    harness: { plugins: { runtime: { name: "Claude Code" }, recorder: { id: "obs" }, timer: { id: "livesplit" } } },
+    category: { goal_end: { id: "chamber01", label: "Chamber 01" }, human: "none" }, ends: [{ id: "chamber01", label: "Chamber 01" }],
+    recording: { duration_seconds: 323, overlay: { shown: true, keys: true } },
+  };
+  const video = { kind: "cut", seconds: 241, line: "aasbcd1b54b11e4024a404223f79437a4d1", chapters: [{ at: 0, label: "Start" }] };
+  const before = process.env.AAS_ARCHIVE_HANDLE;
+  try {
+    process.env.AAS_ARCHIVE_HANDLE = "cvdveer";
+    assert.match(videoDescription(summary, video, { archiveUrl: origin }), /This run in the archive: https:\/\/ai-assisted-speedruns\.org\/runs\/cvdveer\/portal-opus-01\//);
+    delete process.env.AAS_ARCHIVE_HANDLE;
+    assert.match(videoDescription(summary, video, { archiveUrl: origin }), /This run in the archive: https:\/\/ai-assisted-speedruns\.org\/runs\/portal-opus-01\//);
+  } finally { if (before === undefined) delete process.env.AAS_ARCHIVE_HANDLE; else process.env.AAS_ARCHIVE_HANDLE = before; }
 });

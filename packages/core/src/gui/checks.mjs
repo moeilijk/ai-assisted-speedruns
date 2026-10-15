@@ -113,6 +113,7 @@ export async function configItems() {
     // Which folder, said before anything is checked: an empty box that says "folder" asks the question instead of
     // answering it. A game's own folder setting says it too, in the game plugin (setup.settings[].what).
     item("General", "output", "Output location", "dir", "AAS_OUTPUT_DIR", { what: "Where your runs are kept. Each run gets its own folder under <this folder>\\<Game>\\<run name>, with its log, its recording and its bundle. Pick a drive with room for video." }),
+    item("General", "handle", "Your handle on the Archive", "text", "AAS_ARCHIVE_HANDLE", { what: "The name your runs stand under in their address on the Archive (https://ai-assisted-speedruns.org/runs/<handle>/<run name>/). It is on your account page there. Filled in, the suggested video descriptions link to the run's own page; left empty they use the shorter address, which the Archive answers for as long as no other account uses that run name." }),
     item(HARNESS, "repo", "Repository", "info", null, { value: toWindows(REPO) }),
     item(HARNESS, "node", "Node.js", "info", null, { value: `${toWindows(process.execPath)} (${process.version})` }),
     item(HARNESS, "ffmpeg", "ffmpeg (video cut, length)", "info", null, { value: which("ffmpeg") }),

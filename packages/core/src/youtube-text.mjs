@@ -128,6 +128,19 @@ function momentText(labels, summary, f) {
  * origin is linked, and the run's page under it, /runs/<run_id>/); `note` is the publisher's own sentence, or null. The wording is the one the owner approved
  * on 2026-09-16 for the cut of portal-02.
  */
+/**
+ * The run's page in the archive. A run's address carries the publisher's handle, `/runs/<handle>/<run_id>/`, so a run
+ * name is only ever taken within one account; the bare `/runs/<run_id>/` is answered with a redirect for as long as
+ * exactly one account uses that name, and with a 404 once two do. AAS_ARCHIVE_HANDLE is the handle of the account the
+ * runs are published under: with it the whole address is written, without it the bare form, which is what every
+ * description written before this held.
+ */
+export function runAddress(origin, runId, handle = process.env.AAS_ARCHIVE_HANDLE) {
+  const h = String(handle ?? "").trim();
+  const run = encodeURIComponent(runId);
+  return h ? `${origin}/runs/${encodeURIComponent(h)}/${run}/` : `${origin}/runs/${run}/`;
+}
+
 export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const s = summary;
   const f = facts(s);
@@ -174,7 +187,7 @@ export function videoDescription(summary, video, { archiveUrl, note = null }) {
   const about = [
     "An AI Assisted Speedrun (AAS): a language model plays a game by itself, timed in game time and in real time.",
     `The AAS Archive: ${origin}/`,
-    `This run in the archive: ${origin}/runs/${encodeURIComponent(s.run_id)}/`,
+    `This run in the archive: ${runAddress(origin, s.run_id)}`,
   ].join("\n");
   const code = /^aas[0-9a-f]+$/.test(String(video.line));
   return [
