@@ -7,6 +7,10 @@ The beta ended with 1.0.0, the release the AAS Archive opens with on 2026-10-15.
 - **Patch** (x.y.Z): everything else.
 - **BREAKING**: a release after which a run directory or a bundle made with an earlier version is no longer read,
   republished or ranked. Such a release says so in its first line, and what to do with existing runs. None so far.
+- **A number is used once.** The next release counts past the highest that ever existed, withdrawn ones included, so
+  no two builds ever carry the same string. 1.0.1 is therefore skipped: it belongs to the build of 2026-10-01 that was
+  withdrawn the next day, and the archive trusts two runtime hashes under that name. An archive tells builds apart by
+  their hash, but a run page shows the version, and a reader must be able to see which build played.
 
 Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the repository going public on 2026-09-13.
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
