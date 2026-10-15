@@ -4,6 +4,7 @@
 // chapters.txt, timeline.json, splits.lss, manifest.json — and no recording:
 // the video is published where video is published and linked from the summary.
 // Then scans the result for private data and runs the conformance check.
+import { runNameTakenElsewhere, takenMessage } from "./run-name.mjs";
 import { createHash, randomBytes } from "node:crypto";
 import os from "node:os";
 import fs from "node:fs";
@@ -103,6 +104,12 @@ async function publishInto(runDir, outDir, { session, completionMarker, log = co
   // The marker the exporters fall back on, fixed once: proof.json names it, so the archive makes the same timeline.
   completionMarker = completionMarker || process.env.AAS_COMPLETION_MARKER || null;
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length) throw new Error(`Refusing to write into non-empty ${outDir}`);
+  // The bundle's name is the run's id on the Archive. Published where runs are kept (<Game>/public/<name>), a name
+  // another game's run already carries is refused here, before a signed bundle with it exists.
+  if (path.basename(path.dirname(outDir)) === "public") {
+    const clash = runNameTakenElsewhere(path.dirname(path.dirname(outDir)), path.basename(outDir));
+    if (clash) throw new Error(takenMessage(path.basename(outDir), clash));
+  }
   const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));
   const recording = fs.existsSync(path.join(runDir, "recording.json")) ? JSON.parse(fs.readFileSync(path.join(runDir, "recording.json"), "utf8")) : null;
   fs.mkdirSync(outDir, { recursive: true });

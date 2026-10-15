@@ -16,6 +16,25 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.4 — 2026-10-16
+
+- **A run's name is unique among all of a publisher's runs, in the GUI and on the command line.** A run's name is its
+  id on the Archive and the last part of its address there, but runs are kept per game and the GUI counted names per
+  game folder, so every game began at the same "opus-01" and "codex-01". On 2026-10-15 that put three runs under one
+  address, and two recordings were filed under the wrong run because all six files began `AAS_opus-01_`; the three
+  bundles were then renamed by hand, which left the cause in place, and the next Codex run was called "codex-01" again.
+  The GUI now proposes the game's id first — `balatro-codex-01`, `portal-codex-01`, `slay-the-spire-codex-01` — and
+  `aas configure` and `aas publish` refuse a name another game's run or bundle already has in the output location,
+  naming the folder that has it. The GUI runs those same commands, so a name typed by hand in either place is caught
+  before a run starts or a signed bundle exists. Runs made outside the output location are not looked at: the folders
+  next to them are not games. Measured on the real output folder: `portal-01` refused for Balatro by `aas configure`,
+  `aas publish` and the GUI's plan alike, with nothing written; the GUI proposing `balatro-codex-01`.
+
+- **A setting that is not a path no longer reaches wslpath.** The GUI showed every value the Windows way, and a window
+  position such as `-1920,1` (a display left of the main one) went to `wslpath`, which read the minus as an option and
+  wrote "Invalid command line argument" into the console, once for every game, at every start. Only an absolute Linux
+  path is turned round now, and wslpath's own complaints no longer reach the console.
+
 ## 1.0.3 — 2026-10-16
 
 - **A check result made by another version is not kept: that row is checked again.** The Setup tab keeps each row's

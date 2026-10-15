@@ -3,6 +3,7 @@
 // has a top-level await; a module importing cli.mjs from a dynamic import
 // inside it would deadlock).
 import { checkEffort, checkModel, checkName, checkProofMode, checkSeed } from "./validate.mjs";
+import { runNameTakenElsewhere, takenMessage } from "./run-name.mjs";
 import fs from "node:fs";
 import { randomBytes } from "node:crypto";
 import { resolveGoal } from "./goal.mjs";
@@ -62,8 +63,13 @@ export async function configure(opts) {
   if (!brief.model && runtime.id === "scripted") brief.model = `scripted:${path.basename(brief.bot ?? "bot")}`;
   if (plugin.cutDefaults) brief.cut = { ...plugin.cutDefaults };
   if (opts["max-turns"] || opts["max-minutes"]) brief.budget = { ...(opts["max-turns"] ? { toolCalls: Number(opts["max-turns"]) } : {}), ...(opts["max-minutes"] ? { minutes: Number(opts["max-minutes"]) } : {}) };
-  fs.mkdirSync(runDir, { recursive: true });
   const briefFile = path.join(runDir, "brief.json");
+  // A new run only: a run that is already there keeps its name (and is refused just below for its brief anyway).
+  if (!fs.existsSync(briefFile)) {
+    const clash = runNameTakenElsewhere(path.dirname(path.resolve(runDir)), brief.id);
+    if (clash) throw new Error(takenMessage(brief.id, clash));
+  }
+  fs.mkdirSync(runDir, { recursive: true });
   if (fs.existsSync(briefFile)) throw new Error(`Refusing to overwrite ${briefFile}`);
   const result = await runtime.configure(runDir, spec, brief);
   fs.writeFileSync(briefFile, `${JSON.stringify(brief, null, 2)}\n`, { flag: "wx" });

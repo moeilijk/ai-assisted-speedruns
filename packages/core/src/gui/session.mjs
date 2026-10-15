@@ -2,6 +2,7 @@
 // shown in the log with the command line, so whatever the GUI does can be done (and continued) from a shell.
 // One session at a time: start the game, its recorder and its timer, run `aas run` (which makes the timeline and the cut), then
 // `aas publish`.
+import { runNameOf, runNameTakenElsewhere, takenMessage } from "../run-name.mjs";
 import { checkEffort, checkInside, checkModel, checkName, checkNumber, checkSeed } from "../validate.mjs";
 import crypto from "node:crypto";
 import { AAS_KEY_FILE, resolveSignKey } from "../publish.mjs";
@@ -95,14 +96,15 @@ export function createSession() {
     child.on("close", (code) => { child = null; resolve(code ?? 1); });
   });
 
-  const nextRunName = (gameFolder, prefix) => {
+  // The proposed name carries the game (run-name.mjs says why); `aas configure` refuses one another game has.
+  const nextRunName = (gameFolder, prefix, gameId) => {
     const out = toLocal(readEnv().AAS_OUTPUT_DIR ?? "");
     const dir = out ? path.join(out, gameFolder) : null;
     for (let n = 1; n < 1000; n += 1) {
-      const name = `${prefix}-${String(n).padStart(2, "0")}`;
+      const name = runNameOf(gameId, prefix, n);
       if (!dir || !fs.existsSync(path.join(dir, name))) return name;
     }
-    return `${prefix}-${Date.now()}`;
+    return runNameOf(gameId, prefix, Date.now());
   };
 
   // A word for the shown command line: quoted when it has to be, with what a double-quoted bash word cannot hold escaped.
@@ -122,7 +124,10 @@ export function createSession() {
     const setup = g.plugin.setup;
     const runtime = (await runtimes()).find((r) => r.id === opts.runtime && r.present);
     if (!runtime) throw new Error(`Unknown run type: ${opts.runtime}`);
-    const run = checkName("Run name", String(opts.run || nextRunName(setup.folder, runtime.prefix)).trim());
+    const run = checkName("Run name", String(opts.run || nextRunName(setup.folder, runtime.prefix, g.plugin.id)).trim());
+    // Said before the game starts rather than by `aas configure` once it has: the same check, earlier.
+    const clash = output ? runNameTakenElsewhere(path.join(output, setup.folder), run, output) : null;
+    if (clash) throw new Error(takenMessage(run, toWindows(clash)));
     const runDir = output ? path.join(output, setup.folder, run) : `<output>/${setup.folder}/${run}`;
     const pub = output ? path.join(output, setup.folder, "public", run) : `<output>/${setup.folder}/public/${run}`;
     // Without a goal from the page: the game's own end for an AI run, its first end for a mock run, which is a

@@ -269,7 +269,7 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
           mock: Boolean(plugin.setup.bot),
           ready: settingReady(plugin.setup.settings[0], env),
           stop: plugin.setup.stop ? shownScript(plugin.setup.stop) : null,
-          next: Object.fromEntries(rts.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix)])),
+          next: Object.fromEntries(rts.map((r) => [r.id, session.nextRunName(plugin.setup.folder, r.prefix, plugin.id)])),
         })));
         send(res, 200, { games, runtimes: rts.map(({ id, label, ai, present }) => ({ id, label, ai, present })), timers: (await timers()).filter((t) => t.ready).map(({ id, name }) => ({ id, name })), autosaveMinutes: AUTOSAVE_MINUTES, output: toWindows(toLocal(env.AAS_OUTPUT_DIR ?? "")) });
       } else if (req.method === "GET" && url.pathname === "/api/options") {

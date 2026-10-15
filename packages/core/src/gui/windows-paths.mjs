@@ -11,7 +11,12 @@ export function toWindows(p) {
   if (!p || !IS_WSL) return p ?? "";
   const m = /^\/mnt\/([a-z])(\/.*)?$/.exec(p);
   if (m) return `${m[1].toUpperCase()}:${(m[2] ?? "\\").replace(/\//g, "\\")}`;
-  try { return execFileSync("wslpath", ["-w", p], { encoding: "utf8" }).trim(); } catch { return p; }
+  // Only a Linux path is a path wslpath can turn round. Settings that are no path at all came through here too — a
+  // window position such as -1920,1 (a display left of the main one) — and wslpath read the minus as an option and
+  // wrote "Invalid command line argument" into the GUI's console at every start (the owner, 2026-10-16). Anything that
+  // is not an absolute path is shown as it is, and wslpath's own complaints stay out of the console.
+  if (!String(p).startsWith("/")) return p;
+  try { return execFileSync("wslpath", ["-w", "--", p], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return p; }
 }
 
 /** A path the harness can open: D:\Runs -> /mnt/d/Runs (under WSL); a WSL path stays as it is. */
@@ -20,7 +25,7 @@ export function toLocal(p) {
   if (!s || !IS_WSL) return s;
   const m = /^([a-zA-Z]):[\\/]*(.*)$/.exec(s);
   if (m) return `/mnt/${m[1].toLowerCase()}/${m[2].replace(/\\/g, "/")}`.replace(/\/+$/, "") || `/mnt/${m[1].toLowerCase()}`;
-  if (s.startsWith("\\\\")) { try { return execFileSync("wslpath", ["-u", s], { encoding: "utf8" }).trim(); } catch { return s; } }
+  if (s.startsWith("\\\\")) { try { return execFileSync("wslpath", ["-u", "--", s], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return s; } }
   return s;
 }
 
