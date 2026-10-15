@@ -16,6 +16,19 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.3 — 2026-10-16
+
+- **A check result made by another version is not kept: that row is checked again.** The Setup tab keeps each row's
+  result so a start does not re-run every check, but it did not keep which code made the result. An update can change
+  what a check establishes, and the old answer then stood there as if it were current: rows kept from before 0.35.1
+  read "Not ready" with no button, while the same check run again offered the button that repairs it (the owner,
+  2026-10-15; measured here on the Portal row, which after a fresh check reads "Copy SourcePauseTool and
+  portal-agent's configs into the Source Unpack folder"). A stored result now carries the hash of the GUI's code, and
+  a result from other code counts as no result, so the row is checked once more at the next start after an update.
+
+- **"Your handle on the Archive" is a setting, not a check.** The row added in 1.0.2 asked for a check that does not
+  exist: it stood at "unchecked" whatever was in it, and the button would have answered "Unknown check: handle".
+
 ## 1.0.2 — 2026-10-15
 
 - **A run's address on the Archive carries the publisher's handle, and the suggested video descriptions follow it.**

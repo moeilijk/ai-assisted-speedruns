@@ -489,3 +489,37 @@ test("who plays is one list, built from the runtime plugins: a new one appears w
     if (previous === undefined) delete process.env.AAS_PLUGIN_DIRS; else process.env.AAS_PLUGIN_DIRS = previous;
   }
 });
+
+// An update can change what a check establishes: the fix button of 0.35.1 appeared in the answer, not in the row the
+// GUI had kept. The owner saw the result of that on 2026-10-15 — rows reading "Not ready" with no button, while the
+// same check run again offered the button that repairs it. A result is therefore tied to the code that made it.
+test("a check result made by other code is not kept: the row is checked again", { timeout: 240000 }, async () => {
+  const { startGui } = await import("../src/gui/server.mjs");
+  fs.rmSync(process.env.AAS_GUI_CHECKS, { force: true });
+  const close = (g) => { g.server.close(); process.removeAllListeners("SIGINT"); process.removeAllListeners("SIGTERM"); };
+  // A row the first pass checks: the settings rows are only checked when they have nothing in them, so they never
+  // reach the file, while the plugins' rows do (the test above this one).
+  const rows = async (port) => (await (await fetch(`http://127.0.0.1:${port}/api/setup`)).json()).items;
+
+  let gui = await startGui({ port: 0, open: false, log() {} });
+  let id;
+  try {
+    const port = gui.server.address().port;
+    for (let t = Date.now(); Date.now() - t < 150000; await new Promise((r) => setTimeout(r, 500))) {
+      const done = (await rows(port)).filter((i) => i.id.startsWith("plugin:") && i.check !== false && i.status !== "unchecked" && i.status !== "pending");
+      if (done.length) { id = done[0].id; break; }
+    }
+    assert.ok(id, "a row the first pass checks has a result to keep");
+  } finally { close(gui); }
+
+  const cache = JSON.parse(fs.readFileSync(process.env.AAS_GUI_CHECKS, "utf8"));
+  assert.ok(cache[id]?.code, "a stored result says which code made it");
+  cache[id] = { ...cache[id], code: "made by another version", result: { ...cache[id].result, detail: "answer from older code" } };
+  fs.writeFileSync(process.env.AAS_GUI_CHECKS, JSON.stringify(cache));
+
+  gui = await startGui({ port: 0, open: false, log() {} });
+  try {
+    const again = (await rows(gui.server.address().port)).find((i) => i.id === id);
+    assert.notEqual(again.detail, "answer from older code", "the answer of other code is not shown as this row's result");
+  } finally { close(gui); }
+});

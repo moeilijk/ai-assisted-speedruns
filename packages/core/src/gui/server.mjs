@@ -143,7 +143,11 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
     if (item.check === false) return item;
     if (pending.has(item.id)) return { ...item, status: "pending", detail: "" };
     const c = cache[item.id];
-    if (!c || c.value !== checkedValue(item)) return { ...item, status: "unchecked", detail: "" };
+    // A result made by other code than this GUI runs on is not a result any more: an update can change what a check
+    // establishes, and the old answer then stands there as if it were current. The owner saw it on 2026-10-15 — rows
+    // kept from before the fix of 0.35.1 showed "Not ready" with no button, while the same check run again offered
+    // the button that repairs it. A row whose result comes from other code is checked again, once, at the next start.
+    if (!c || c.value !== checkedValue(item) || c.code !== STARTED_WITH) return { ...item, status: "unchecked", detail: "" };
     return { ...item, ...c.result, value: item.value, options: c.result.options ?? item.options, at: c.at };
   };
   // Every check is a child process (checks.mjs <id>), a few at a time; each result is pushed to the page when it is in.
@@ -164,7 +168,7 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         try { result = JSON.parse(out); } catch { result = { status: "fail", detail: "The check did not answer." }; }
         const item = (await configItems()).find((i) => i.id === id);
         if (item) {
-          cache[id] = { value: checkedValue(item), result, at: new Date().toTimeString().slice(0, 8) };
+          cache[id] = { value: checkedValue(item), result, at: new Date().toTimeString().slice(0, 8), code: STARTED_WITH };
           saveCache();
           const failed = (result.tests ?? []).find((x) => !x.ok);
           // A game that is not built yet is information, not a failure: it is listed, not marked.
