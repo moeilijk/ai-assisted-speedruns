@@ -151,7 +151,7 @@ export default {
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "codex",
   setup: { group: "Agents" },
-  version: "0.35.0",
+  version: "1.0.5",
   /** The models and efforts Codex's own catalog names (`aas options`); an effort a model does not take is refused at the start. */
   async options() { return codexOptions(); },
   /** The ChatGPT plan's stand as Codex last recorded it: runs stay under AAS_CODEX_BUDGET_MAX percent of the window. */
@@ -185,8 +185,8 @@ export default {
     return { ok: false, detail: `codex mcp list did not name the ${gameId} server${out.trim() ? `: ${out.trim().split("\n").at(-1)}` : ""}` };
   },
   /** Exports a rollout into the public timeline and summary (schema 2). */
-  async exportSession(session, outDir, { completionMarker } = {}) {
-    const r = spawnSync(process.execPath, [path.join(here, "export-rollout.mjs"), session, outDir], { env: { ...process.env, AAS_COMPLETION_MARKER: completionMarker ?? process.env.AAS_COMPLETION_MARKER ?? "" }, encoding: "utf8" });
+  async exportSession(session, outDir, { completionMarker, completionTime } = {}) {
+    const r = spawnSync(process.execPath, [path.join(here, "export-rollout.mjs"), session, outDir], { env: { ...process.env, AAS_COMPLETION_MARKER: completionMarker ?? process.env.AAS_COMPLETION_MARKER ?? "", AAS_COMPLETION_TIME: completionTime ?? "" }, encoding: "utf8" });
     if (r.status !== 0) throw new Error(`Codex export failed: ${r.stderr}`);
   },
   async configure(runDir, broker, brief) {

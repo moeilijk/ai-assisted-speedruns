@@ -94,11 +94,31 @@ test("game time runs while a playback plays and stands still while the agent thi
     await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 2000).toISOString(), data: { phase: "start", index: 2, frames: 30, seconds: 0.5 } });
     await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 2, frames: 30, seconds: 0.5 } });
     assert.deepEqual((await until(n + 2)).slice(n), ["pausegametime", "setgametime 0.800"]);
-    // A command that does not say how long it plays (Slay the Spire): game time moves at its end.
+    // A command that does not say how long it plays (Balatro, Slay the Spire) runs game time too, from the moment in its
+    // start event and a little behind it, so it has not passed the end when the end is heard; the end moves it forward
+    // to the exact value. Until 1.0.5 it stood still until the end, up to six seconds, and then jumped (2026-10-16).
     n = clock().length;
-    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 3, command: "play 1" } });
+    await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 300).toISOString(), data: { phase: "start", index: 3, command: "play 1" } });
+    const running = (await until(n + 2)).slice(n, n + 2);
+    assert.deepEqual(running.map((c) => c.split(" ")[0]), ["setgametime", "unpausegametime"], "game time runs during the command");
+    const from = Number(running[0].split(" ")[1]);
+    assert.ok(from > 0.8 && from < 0.8 + 0.3, `it runs from the command's start, a little behind it: ${from}`);
     await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 3, seconds: 1 } });
-    assert.deepEqual((await until(n + 2)).slice(n), ["pausegametime", "setgametime 1.800"]);
+    assert.deepEqual((await until(n + 4)).slice(n + 2, n + 4), ["pausegametime", "setgametime 1.800"], "the end moves it forward to the exact value");
+    // An end heard after LiveSplit already shows more than the command's game time: it pauses where it is and is not
+    // put back, and the next command waits until game time has caught up before LiveSplit runs again.
+    n = clock().length;
+    await timer.onEvent({ event: "game.playback", timestamp: new Date(Date.now() - 600).toISOString(), data: { phase: "start", index: 4, command: "play 2" } });
+    await until(n + 2);
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 4, seconds: 0.1 } });
+    const late = (await until(n + 3)).slice(n + 2);
+    assert.deepEqual(late, ["pausegametime"], `paused where it stands, no value below it: ${late.join(", ")}`);
+    n = clock().length;
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "start", index: 5, command: "play 3" } });
+    const held = (await until(n + 1)).slice(n);
+    assert.ok(held.every((c) => c !== "unpausegametime"), `it does not run before game time reaches what LiveSplit shows: ${held.join(", ")}`);
+    await timer.onEvent({ event: "game.playback", timestamp: new Date().toISOString(), data: { phase: "end", index: 5, seconds: 2 } });
+    assert.ok((await until(n + 3)).includes("setgametime 3.900"), "and the next end lands on the exact value again: 0.8 + 1 + 0.1 + 2");
     const set = clock().filter((c) => c.startsWith("setgametime")).map((c) => Number(c.split(" ")[1]));
     assert.ok(set.every((v, i) => i === 0 || v >= set[i - 1]), `never back: ${set.join(", ")}`);
   } finally {

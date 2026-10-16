@@ -46,6 +46,21 @@ async function buildTimelineWith({ runDir, outDir, brief, exportSession, session
   // The runtime exports its own private log; a runtime without an exporter keeps the harness's own session
   // shape (session.jsonl in the run directory, as the scripted and stub runtimes write it).
   await exportSession(session, outDir, { completionMarker, completionTime: won?.timestamp ?? null });
+  // completed_at is the game.over with victory: true (SPEC §6), whatever runtime played. Each runtime has its own
+  // exporter, and two of them knew only the agent's completion marker: a Codex run that won published completed_at
+  // null, and the archive read it as a run that did not reach its goal (balatro-codex-01, 2026-10-16). The harness
+  // saw the victory itself, so it writes it here for every runtime, and a runtime added later cannot leave it out.
+  if (won) {
+    const file = path.join(outDir, "summary.json");
+    try {
+      const s = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (s.completed_at !== won.timestamp) {
+        s.completed_at = won.timestamp;
+        s.elapsed_to_completion_seconds = s.started_at ? Math.round((Date.parse(won.timestamp) - Date.parse(s.started_at)) / 1000) : s.elapsed_to_completion_seconds ?? null;
+        fs.writeFileSync(file, `${JSON.stringify(s, null, 2)}\n`);
+      }
+    } catch { /* no summary from the exporter: nothing to correct */ }
+  }
   // The harness's own events (run.started, game.playback, game.milestone, game.over, run.human, recording.*) belong
   // in the public timeline: the spec reserves them, and without run.human the human axis cannot be verified. They
   // are merged from run.jsonl on the same clock, sanitised, and the file is renumbered.

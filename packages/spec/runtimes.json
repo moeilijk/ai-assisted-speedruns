@@ -12,16 +12,16 @@
     {
       "id": "codex",
       "name": "Codex",
-      "version": "0.35.0",
+      "version": "1.0.5",
       "ai": true,
-      "sha256": "043099be3face0cd2866995f52b271776b74af17f6f665b540b6b882945896a1"
+      "sha256": "846c7a163392fc6a67cb9eb0816bb7a71a3d9aa9ba574ccbbe1f2468eef36c57"
     },
     {
       "id": "mistral-vibe",
       "name": "Mistral Vibe",
-      "version": "0.35.0",
+      "version": "1.0.5",
       "ai": true,
-      "sha256": "5c929d925223815fbe32e8e9031537925d26d9083c050ede66424c3281450398"
+      "sha256": "cc54e80c70c191e0e76133facda74ea1c5edfbf734dba261f8c4768041f12298"
     },
     {
       "id": "scripted",

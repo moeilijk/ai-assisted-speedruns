@@ -36,7 +36,7 @@ function tick(){
  let g=igt;
  if(playing){const el=(Date.now()-playing.t)/1000;let acc=0;let on=[];
   for(const st of playing.steps){const d=st.ticks*0.015;if(el<acc+d){on=st.keys||[];break}acc+=d}
-  g+=Math.min(el,playing.total);setKeys(on)}
+  g+=playing.total>0?Math.min(el,playing.total):Math.max(0,el-0.3);setKeys(on)}
  document.getElementById("igt").textContent=hms(g,true);
  requestAnimationFrame(tick)}
 requestAnimationFrame(tick);

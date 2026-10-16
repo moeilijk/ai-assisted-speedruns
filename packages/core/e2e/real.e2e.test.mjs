@@ -158,8 +158,13 @@ test("every game's mock through the real GUI: silent, bundled, uploaded, everyth
       await page.selectOption("#playedby", "scripted");
       await page.waitForTimeout(800);
       if (PROVEN_SEEDS[g.id]) { await page.fill("#seed", PROVEN_SEEDS[g.id]); await page.waitForTimeout(500); }
+      // Stopped once the agent's session itself plays, not once the GUI says Running: Running covers the start of the
+      // game too, and a game that takes long to be ready (Portal: its map, its save, the bridge) was stopped before it
+      // played at all, so there was nothing to continue (2026-10-16, AAS_E2E_GAMES=portal).
+      const sessionStarts = () => page.$eval("#log", (e) => (e.textContent.match(/the \S+ session starts/g) ?? []).length);
+      const startsBefore = await sessionStarts();
       await page.click("#start");
-      for (let i = 0; i < 300 && (await phase()) !== "Running"; i += 1) await page.waitForTimeout(1000);
+      for (let i = 0; i < 600 && (await sessionStarts()) <= startsBefore; i += 1) await page.waitForTimeout(1000);
       await page.waitForTimeout(15000);
       await page.click("#stop");
       for (let i = 0; i < 900 && (await phase()) !== "Ready"; i += 1) await page.waitForTimeout(1000);

@@ -5,7 +5,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import path from "node:path";
 import { closeWindows } from "../../packages/core/src/close-windows.mjs";
 import { ensureSteam } from "../../packages/core/src/windows/steam.mjs";
-import { afterGameClose } from "../../packages/core/src/windows/quiet-start.mjs";
+import { afterGameClose, clearAppRoute } from "../../packages/core/src/windows/quiet-start.mjs";
 
 export async function closeGame({ log = () => {} } = {}) {
   const lines = [];
@@ -19,5 +19,9 @@ export async function closeGame({ log = () => {} } = {}) {
   }
   say(afterGameClose());
   say(closeWindows([{ wait: "hl2", seconds: 25 }], { report: ["hl2"] }));
+  // The launcher pinned hl2.exe to the quiet device; once it has closed, Portal follows the Windows default again, so
+  // a Portal played outside the tooling is heard.
+  const stillUp = /True/i.test(execFileSync("powershell.exe", ["-NoProfile", "-Command", "[bool](Get-Process hl2 -ErrorAction SilentlyContinue)"], { encoding: "utf8" }));
+  if (!stillUp) say(clearAppRoute("hl2.exe"));
   return lines.join("\n");
 }

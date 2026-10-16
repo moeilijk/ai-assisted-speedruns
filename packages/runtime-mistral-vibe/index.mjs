@@ -93,7 +93,7 @@ export default {
   /** a model plays. */
   ai: true,
   name: "Mistral Vibe",
-  version: "0.35.0",
+  version: "1.0.5",
   /** Its CLI: `aas gui` offers the runtime when this is on the PATH. */
   cli: "vibe",
   /** The Setup tab's button: Mistral's own installer (it installs uv, pinned and checked by sha256, then mistral-vibe). */
@@ -144,9 +144,9 @@ export default {
     const { checkConfiguredServer } = await import("./connect-check.mjs");
     return checkConfiguredServer(runDir, { expect: ["documentation", "screenshot", "exec"].map((t) => `${gameId}_${t}`) });
   },
-  async exportSession(session, outDir, { completionMarker } = {}) {
+  async exportSession(session, outDir, { completionMarker, completionTime } = {}) {
     const { exportStream } = await import("./export-stream.mjs");
-    await exportStream(session, outDir, { completionMarker: completionMarker ?? process.env.AAS_COMPLETION_MARKER ?? null });
+    await exportStream(session, outDir, { completionMarker: completionMarker ?? process.env.AAS_COMPLETION_MARKER ?? null, completionTime: completionTime ?? null });
   },
   async configure(runDir, broker, brief) {
     const config = path.join(runDir, ".vibe", "config.toml");

@@ -87,7 +87,13 @@ async function call(method, url, { headers = {}, body = null, timeoutMs = 15000,
   const text = await res.text();
   let json = null;
   try { json = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-  if (!res.ok) throw new Error(`${method} ${new URL(url).pathname} answered ${res.status}${json?.error ? `: ${json.error}` : ""}`);
+  // The archive answers JSON with an error; anything else came from in front of it, and its own words (a proxy's page,
+  // a firewall's text) are what tells where the refusal came from. A refused end head said only "answered 403" on
+  // 2026-10-16, and that it was not the archive had to be inferred from what was missing.
+  if (!res.ok) {
+    const why = json?.error ?? (text ? `not the archive's answer (${res.headers.get("content-type") ?? "no content type"}): ${text.replace(/\s+/g, " ").trim().slice(0, 160)}` : "an empty answer");
+    throw new Error(`${method} ${new URL(url).pathname} answered ${res.status}: ${why}`);
+  }
   return json;
 }
 

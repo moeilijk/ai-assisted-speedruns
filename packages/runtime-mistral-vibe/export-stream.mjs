@@ -33,7 +33,7 @@ export function savedSessions(ids, home = vibeHome()) {
   return out;
 }
 
-export async function exportStream(input, destination, { completionMarker = process.env.AAS_COMPLETION_MARKER || null, timeZone = defaultTimeZone(), home = vibeHome() } = {}) {
+export async function exportStream(input, destination, { completionMarker = process.env.AAS_COMPLETION_MARKER || null, completionTime: knownCompletion = null, timeZone = defaultTimeZone(), home = vibeHome() } = {}) {
   const ts = (v) => localTimestamp(v, timeZone);
   fs.mkdirSync(destination, { recursive: true });
   const rows = fs.readFileSync(input, "utf8").split("\n").filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
@@ -43,7 +43,8 @@ export async function exportStream(input, destination, { completionMarker = proc
   const versions = new Set();
   const sessionIds = new Set();
   const requested = [];
-  let completionTime = null;
+  // The game's own victory first, the agent's completion marker only without it (see the Codex exporter).
+  let completionTime = knownCompletion || null;
   const ids = new Map();
   for (const r of rows) {
     if (r.vibe) { if (r.vibe.version) versions.add(r.vibe.version); requested.push({ model: r.vibe.model ?? null, thinking: r.vibe.thinking ?? null }); counts.omitted_records++; continue; }
@@ -55,7 +56,7 @@ export async function exportStream(input, destination, { completionMarker = proc
       const text = textOf(e.content);
       if (!text.trim()) { counts.omitted_records++; continue; }
       records.push({ at, item: { kind: "message", role: e.role, channel: null, text: cleanText(text) } });
-      if (e.role === "assistant" && completionMarker && text.startsWith(completionMarker)) completionTime = at;
+      if (e.role === "assistant" && completionMarker && !completionTime && text.startsWith(completionMarker)) completionTime = at;
     } else if (e.type === "effect" && e.detail?.toolName) {
       const id = `call-${String(ids.size + 1).padStart(5, "0")}`;
       ids.set(e.id, id);

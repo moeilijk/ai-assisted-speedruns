@@ -16,18 +16,18 @@
       "dir": "packages/runtime-codex",
       "id": "codex",
       "name": "Codex",
-      "version": "0.35.0",
+      "version": "1.0.5",
       "ai": true,
-      "sha256": "043099be3face0cd2866995f52b271776b74af17f6f665b540b6b882945896a1"
+      "sha256": "846c7a163392fc6a67cb9eb0816bb7a71a3d9aa9ba574ccbbe1f2468eef36c57"
     },
     {
       "kind": "runtime",
       "dir": "packages/runtime-mistral-vibe",
       "id": "mistral-vibe",
       "name": "Mistral Vibe",
-      "version": "0.35.0",
+      "version": "1.0.5",
       "ai": true,
-      "sha256": "5c929d925223815fbe32e8e9031537925d26d9083c050ede66424c3281450398"
+      "sha256": "cc54e80c70c191e0e76133facda74ea1c5edfbf734dba261f8c4768041f12298"
     },
     {
       "kind": "runtime",
@@ -67,8 +67,8 @@
       "dir": "packages/timer-livesplit",
       "id": "livesplit",
       "name": "LiveSplit",
-      "version": "1.0.0",
-      "sha256": "d53e55c4d47386259f5d679dc3a6a5878bbcf0da40e2da15dc9384318afd4497"
+      "version": "1.0.5",
+      "sha256": "262235b81e4a9b6bb31609fb8271760b6dacd5941d5870d0cbd0b6e9ee7b9d28"
     },
     {
       "kind": "game",
@@ -138,9 +138,9 @@
       "dir": "games/portal",
       "id": "portal",
       "name": "Portal",
-      "version": "0.35.0",
+      "version": "1.0.5",
       "stub": false,
-      "sha256": "465a18902927059d8b8f152843f41ab9110f289ed72a7485ffee821acae41f87"
+      "sha256": "c74f159cce87e0e74fbc3aa3b0b1e3b0d5db30696c4e539767b427cf93e437e7"
     },
     {
       "kind": "game",

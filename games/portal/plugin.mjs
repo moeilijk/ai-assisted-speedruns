@@ -163,7 +163,7 @@ export default {
     return rows;
   },
   name: "Portal",
-  version: "0.35.0",
+  version: "1.0.5",
   scopeName: "portal",
   capabilities: { turnBased: false, canPause: true, stateAccess: "none", inputRoute: "input", igt: false },
   // Source Unpack runs Portal as hl2.exe; used by the OBS recorder for window match and application audio.

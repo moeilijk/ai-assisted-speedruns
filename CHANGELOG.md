@@ -16,6 +16,36 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.5 — 2026-10-16
+
+- **A run that won is completed at its victory, whatever AI played it.** `completed_at` is the `game.over` with
+  `victory: true` (SPEC §6), but each runtime brings its own exporter, and those of Codex and Mistral Vibe took the
+  completion only from the agent's own words. balatro-codex-01 won Ante 1 at 02:08:13 (The Goad, 636 of 600) and was
+  published with `completed_at: null`, which the Archive read as a run that did not reach its goal. Both exporters now
+  take the game's victory first and the agent's marker only without one, as the Claude Code exporter always did, and
+  the harness writes the victory after any exporter, so a runtime added later cannot leave it out. Measured:
+  balatro-codex-01 published again has `completed_at` 02:08:13.144 and conforms, with the same log and video code;
+  the three launch runs come out byte for byte the same.
+- **LiveSplit's game time runs during every command and never steps back.** From 2026-10-03 a command that does not
+  say how long it plays (Balatro, Slay the Spire) left game time standing still until its end — up to six seconds on
+  a Codex run of Balatro — and then it jumped; that change had been made to stop LiveSplit running past a command's
+  end and being put back. Game time now runs from the command's own start, a little behind it so it has not passed
+  the end when the end is heard, and only moves forward to the exact value; the session reads the run log every tenth
+  of a second instead of every half. For those games a command's game time is its real time (Balatro 28 of 28
+  commands, Slay the Spire 295 and 267, equal to the thousandth). The overlay's IGT does the same. Measured in the
+  recordings of `e2e:real` on the real LiveSplit: through a 6.5 s Balatro command 4.44, 5.42, 6.41 … 12.40 a second
+  apart; a 5.9 s Slay the Spire command 2:15.05 to 2:21.93; FCEUX and Portal running to their planned end (Portal
+  stopping at 58.00 for 3867 ticks).
+- **Portal's sound stays off the speakers.** hl2.exe opens its audio on the Windows default and then follows the
+  default when it changes, so when the quiet device was the default during the start and the speakers came back
+  after it, Portal went with them (measured in `e2e:real`: "hl2.exe active audio session on: Realtek(R) Audio", and
+  the check stopped the run). Once it runs it is now also set to the quiet device in Windows' own per-program setting,
+  before the default goes back, and that is undone when Portal has closed. Measured: hl2.exe on the BenQ quiet device
+  after the default was back on the speakers, and no sound on them.
+- **A refused request to the Archive says what answered it.** The error kept only the status, so an end head refused
+  in front of the archive (a 403 that was not the archive's JSON) could only be told apart by what was missing. It
+  now carries the archive's own error, or else the content type and the first 160 characters of what came back.
+
 ## 1.0.4 — 2026-10-16
 
 - **A run's name is unique among all of a publisher's runs, in the GUI and on the command line.** A run's name is its

@@ -22,7 +22,7 @@ function tool(name, args, { processName, log }) {
 // `route: "app"` is for a game that follows the Windows default when it changes and has no output setting of its own
 // (FCEUX): the quiet device is set as the program's own output in Windows' per-app setting instead, once it runs
 // (started()); clearAppRoute() undoes that when it has closed.
-export async function beforeGameStart({ processName, snapshotFile, log = console.log, route = "default" } = {}) {
+export async function beforeGameStart({ processName, snapshotFile, log = console.log, route = "default", pinApp = false } = {}) {
   const quiet = Boolean(process.env.AAS_QUIET_AUDIO_DEVICE);
   const run = (name, ...args) => tool(name, args, { processName, log });
   if (process.env.AAS_KEEP_DISPLAYS_AWAKE === "1") run("keep-display-awake.mjs", "start");
@@ -46,7 +46,11 @@ export async function beforeGameStart({ processName, snapshotFile, log = console
     }
   }
   return {
-    started() {},
+    // pinApp is for a game that opens its audio on the default at its start and then follows the default when it
+    // changes (Portal: hl2.exe was on the quiet device until the default was put back, then on the speakers — measured
+    // 2026-10-16 03:00:16 in e2e:real). Once it runs, its own per-app output is set to the quiet device too, so putting
+    // the default back leaves it where it is; clearAppRoute() undoes that when it has closed.
+    started() { if (quiet && pinApp) run("audio-route.mjs", "--set-app", "--process", processName); },
     /** Puts the saved defaults back; call it once the game has its audio open (or has failed to start). */
     restore() { if (quiet) run("audio-route.mjs", "--restore", snapshotFile); },
     /** Reports where the game's audio session is; fails when it is not on the quiet device. */

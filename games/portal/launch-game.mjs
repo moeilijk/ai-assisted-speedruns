@@ -46,7 +46,7 @@ if (await probe()) {
 console.log(`steam: ${await ensureSteam({ log: console.log })}`);
 // Optional quiet audio (the Windows default is the quiet device while the game opens its audio device, then
 // restored) and displays kept awake; stop-all ends the latter.
-const quiet = await beforeGameStart({ processName: "hl2.exe", snapshotFile: path.join(root, "aas-audio-defaults.json") });
+const quiet = await beforeGameStart({ processName: "hl2.exe", snapshotFile: path.join(root, "aas-audio-defaults.json"), pinApp: true });
 // -condebug: the engine writes portal/console.log, where the plugin reads which map loaded (SPT does not say).
 const gameArgs = ["-game", "portal", "-novid", "-console", "-condebug", "-noborder", "-window", "-high", "-w", String(w), "-h", String(h), ...(pos ? ["-x", String(x), "-y", String(y)] : []), "+snd_mute_losefocus", "0"];
 console.log(`starting ${exe} ${gameArgs.join(" ")}`);
@@ -61,6 +61,8 @@ while (Date.now() < deadline) {
     // The engine centres its window on the primary display whatever -x/-y says (measured 2026-09-19), so the window
     // is moved here, the way Slay the Spire's launcher does it.
     if (pos) moveWindow({ processName: "hl2", pos, log: console.log });
+    // Pinned to the quiet device before the default goes back: hl2.exe follows the default when it changes.
+    quiet.started();
     quiet.restore();
     quiet.check();
     process.exit(0);

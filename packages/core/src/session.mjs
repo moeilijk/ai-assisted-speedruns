@@ -84,7 +84,8 @@ export async function session({ runDir, brief, opts, log, plugin, runtime, recor
       await timer?.onEvent(ev);
     });
     await autosave?.onEvent(ev);
-  });
+    // Every tenth of a second: the timer runs game time behind a command by as long as its end can take to be heard.
+  }, { intervalMs: 100 });
 
   // A stop from outside (Ctrl-C, the GUI's Stop, `aas stop`) ends the agent session the way a budget does. The handler
   // is in place before the start's catcher is released, so no signal falls between them; a stop the catcher already

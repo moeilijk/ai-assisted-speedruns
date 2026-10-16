@@ -147,6 +147,27 @@ test("the export makes the timeline from Vibe's own times and the summary from i
   assert.equal(summary.last_reported_thread_token_usage.cost_usd, 0.01);
 });
 
+// completed_at is the game.over with victory: true (SPEC §6); the agent's completion marker only counts without one. The
+// exporter knew only the marker, so a Vibe run that won published completed_at null (as Codex did: balatro-codex-01,
+// 2026-10-16), and an archive read it as a run that did not reach its goal.
+test("the export completes a run at the game's victory, and the agent's marker only without one", async () => {
+  const { dir } = await startWith(fakeVibe(), { AAS_VIBE_MAX_PRICE: "1" });
+  const home = tmp();
+  fs.mkdirSync(path.join(home, "logs", "session", "session_20260929_1"), { recursive: true });
+  fs.writeFileSync(path.join(home, "logs", "session", "session_20260929_1", "meta.json"), JSON.stringify({ session_id: "s-123", config: { active_model: "mistral-medium-3.5", models: { "mistral-medium-3.5": { name: "mistral-vibe-cli-latest", provider: "mistral", thinking: "high" } } }, stats: {} }));
+  const { exportStream } = await import("../export-stream.mjs");
+  const victory = "2026-09-29T16:40:01.500+00:00";
+  const completedAt = async (opts) => {
+    const out = path.join(tmp(), "export");
+    await exportStream(path.join(dir, "vibe-stream.jsonl"), out, { timeZone: "UTC", home, ...opts });
+    return JSON.parse(fs.readFileSync(path.join(out, "summary.json"), "utf8")).completed_at;
+  };
+  assert.equal(Date.parse(await completedAt({ completionMarker: null, completionTime: victory })), Date.parse(victory), "won, no marker: the victory");
+  assert.equal(Date.parse(await completedAt({ completionMarker: "DONE:", completionTime: victory })), Date.parse(victory), "won and marked: the victory decides");
+  assert.match(await completedAt({ completionMarker: "DONE:", completionTime: null }), /^2026-09-29T16:40:03\.000\+00:00$/, "no victory: the marked message, as before");
+  assert.equal(await completedAt({ completionMarker: null, completionTime: null }), null, "neither: not completed");
+});
+
 test("the connection check starts the server the configuration names and asks it for the broker's tools", async () => {
   const dir = tmp();
   const server = path.join(dir, "server.mjs");

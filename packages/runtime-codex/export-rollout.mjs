@@ -20,7 +20,7 @@ import {defaultTimeZone, localTimestamp} from '../core/src/timestamp.mjs';
 import {createSanitizer} from '../core/src/sanitize.mjs';
 import {fileURLToPath} from 'node:url';
 /** The public timeline and summary (schema 2) of a rollout; also what an archive runs to make a bundle's timeline again. */
-export async function exportRollout(input, destination, {completionMarker = process.env.AAS_COMPLETION_MARKER || null, timeZone = defaultTimeZone()} = {}) {
+export async function exportRollout(input, destination, {completionMarker = process.env.AAS_COMPLETION_MARKER || null, completionTime: knownCompletion = process.env.AAS_COMPLETION_TIME || null, timeZone = defaultTimeZone()} = {}) {
   const TIME_ZONE = timeZone;
   const COMPLETION_MARKER = completionMarker;
   const ts = value => localTimestamp(value, TIME_ZONE);
@@ -31,7 +31,11 @@ export async function exportRollout(input, destination, {completionMarker = proc
   // What the rollout itself reports, per model: its provider (session_meta), its context window (token_count, for the
   // model of the turn it follows) and the Codex CLI version. Codex reports no maximum output.
   let provider=null,currentModel=null;const cliVersions=new Set();
-  let firstTime, lastTime, completionTime, finalUsage, sequence=0;
+  // The game's own victory, when the harness saw one, is the completion (SPEC §6: completed_at is the game.over with
+  // victory: true); the agent's completion marker only counts without it. Codex's exporter knew only the marker, so a
+  // Codex run that won published completed_at null and an archive read it as a run that did not reach its goal
+  // (balatro-codex-01, 2026-10-16). The Claude Code exporter has done it this way all along.
+  let firstTime, lastTime, completionTime = knownCompletion || undefined, finalUsage, sequence=0;
   const {cleanText,clean,counts:imageCounts,redactions}=createSanitizer();
   function contentText(content){return (content??[]).filter(c=>typeof c.text==='string').map(c=>c.text).join('\n');}
   for await(const line of readline.createInterface({input:fs.createReadStream(input),crlfDelay:Infinity})){
@@ -41,7 +45,7 @@ export async function exportRollout(input, destination, {completionMarker = proc
    if(row.type==='turn_context'){currentModel=JSON.stringify({model:p.model,reasoning_effort:p.effort??null});if(!models.has(currentModel))models.set(currentModel,{provider,context_window:null});}
    if(row.type==='event_msg'&&p.type==='token_count'&&currentModel&&Number.isInteger(p.info?.model_context_window))models.get(currentModel).context_window=p.info.model_context_window;
    if(row.type==='token_usage_record')finalUsage=p.thread_token_usage;
-   if(row.type==='event_msg'&&p.type==='task_complete'&&COMPLETION_MARKER&&p.last_agent_message?.startsWith(COMPLETION_MARKER))completionTime=row.timestamp;
+   if(row.type==='event_msg'&&p.type==='task_complete'&&COMPLETION_MARKER&&!completionTime&&p.last_agent_message?.startsWith(COMPLETION_MARKER))completionTime=row.timestamp;
    let item;
    if(row.type==='response_item'){
     if(p.type==='message'&&['user','assistant'].includes(p.role)){

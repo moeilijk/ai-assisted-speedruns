@@ -156,6 +156,13 @@ test("a ticket request that gets no connection is tried again a few times; an an
   const refusing = (url, init) => { calls += 1; return fetch(url, { ...init, headers: { ...init.headers, Authorization: "Bearer not-a-token" } }); };
   await assert.rejects(proofClient({ baseUrl: site.url, fetchImpl: refusing, retryWaits: [10, 10, 10] }).ticket(), /answered 401/);
   assert.equal(calls, 1, "a 401 is the archive's answer, not a missing connection");
+  // A refusal from in front of the archive (a proxy, a firewall) says so, with its own words: on 2026-10-16 an end head
+  // was refused with only "answered 403", and that it was not the archive had to be inferred from what was missing.
+  const proxy = () => Promise.resolve(new Response("<html><body><h1>403 Forbidden</h1>Access denied by policy</body></html>", { status: 403, headers: { "content-type": "text/html" } }));
+  await assert.rejects(proofClient({ baseUrl: site.url, fetchImpl: proxy, retryWaits: [10] }).ticket(),
+    (e) => /answered 403: not the archive's answer \(text\/html\): <html><body><h1>403 Forbidden<\/h1>Access denied by policy/.test(e.message));
+  const empty = () => Promise.resolve(new Response("", { status: 403 }));
+  await assert.rejects(proofClient({ baseUrl: site.url, fetchImpl: empty, retryWaits: [10] }).ticket(), /answered 403: an empty answer/);
 });
 
 test("without an account or a yes, a run is unsigned and says so; --proof off overrides both", async (t) => {

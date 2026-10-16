@@ -93,6 +93,15 @@ const lsTime = (seconds) => {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${s.toFixed(7).padStart(10, "0")}`;
 };
 
+/** How late the end of a command can be heard: the session reads the run log every tenth of a second. */
+const HEARD_WITHIN = 0.15;
+/**
+ * The smallest step back that LiveSplit cannot show: it shows hundredths. A timer that pauses itself at a planned end
+ * fires a few milliseconds late, so LiveSplit stands at 0.3002 where the exact value is 0.300; setting that is no step
+ * anyone sees, while refusing it left LiveSplit a hair too high (measured in the timer test, 1 run in 4).
+ */
+const UNSEEN = 0.01;
+
 export function createLiveSplitTimer(options = {}) {
   const host = options.host ?? process.env.AAS_LIVESPLIT_HOST ?? "127.0.0.1";
   const port = Number(options.port ?? process.env.AAS_LIVESPLIT_PORT ?? 16834);
@@ -100,6 +109,10 @@ export function createLiveSplitTimer(options = {}) {
   let igt = 0;
   let playing = null;
   const stopPlaying = () => { if (playing) { clearTimeout(playing); playing = null; } };
+  // What LiveSplit's game time shows, as the timer set it: a value, and since when it runs from it (null: paused).
+  // LiveSplit is never told a value below this, so its game time does not go back.
+  let shown = { value: 0, since: null };
+  const showing = () => (shown.since == null ? shown.value : shown.value + (Date.now() - shown.since) / 1000);
   let over = false;
   const sent = [];
   // What LiveSplit did not do as asked (its timer not running after the start, a split that did not move on): kept
@@ -113,7 +126,10 @@ export function createLiveSplitTimer(options = {}) {
     ls?.send(c);
   };
   const phase = async () => { try { return await ls.query("getcurrenttimerphase"); } catch { return null; } };
-  const startCommands = (from) => { send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send(`setgametime ${from.toFixed(3)}`); };
+  const startCommands = (from) => { send("reset"); send("initgametime"); send("starttimer"); send("pausegametime"); send(`setgametime ${from.toFixed(3)}`); shown = { value: from, since: null }; };
+  const setGame = (v) => { send(`setgametime ${v.toFixed(3)}`); shown = { value: v, since: shown.since == null ? null : Date.now() }; };
+  const runGame = () => { send("unpausegametime"); shown = { value: showing(), since: Date.now() }; };
+  const pauseGame = () => { send("pausegametime"); shown = { value: showing(), since: null }; };
   return {
     processName: "LiveSplit",
     name: "LiveSplit",
@@ -132,7 +148,7 @@ export function createLiveSplitTimer(options = {}) {
       return closeWindows([{ name: "LiveSplit", title: "LiveSplit", seconds: 15, dialogTitle: "Save Splits?", dialogButton: "&No" }], { report: ["LiveSplit"] });
     },
     id: "livesplit",
-    version: "1.0.0",
+    version: "1.0.5",
     sent,
     async preflight() {
       const probe = await connectLiveSplit({ host, port });
@@ -159,25 +175,44 @@ export function createLiveSplitTimer(options = {}) {
       switch (event.event) {
         case "game.playback":
           if (event.data?.phase === "start") {
+            // Game time runs during every command and stands still while the agent thinks (timing paused-think). A
+            // command that says how long it plays (Portal's ticks, an emulator's seconds) is stopped by the timer at
+            // its planned end. One that does not (Balatro, Slay the Spire) runs behind the command by as long as its end
+            // can take to be heard — the session reads the run log every tenth of a second — so LiveSplit has not passed
+            // the end when it hears it, and only moves forward to the exact value. For those games a command's game time
+            // is its real time (measured: Balatro 28 of 28 commands, Slay the Spire 295 and 267, equal to the thousandth).
+            // From 2026-10-03 to 1.0.5 such a command left game time standing still until its end, for up to six seconds,
+            // and then it jumped (the owner, 2026-10-16); before that it ran ahead and was put back.
             const planned = plannedSeconds(event.data);
-            if (planned > 0) {
-              const startedAt = Date.parse(event.timestamp ?? "");
-              const played = Number.isFinite(startedAt) ? Math.min(planned, Math.max(0, (Date.now() - startedAt) / 1000)) : 0;
-              stopPlaying();
-              if (played < planned) {
-                send(`setgametime ${(igt + played).toFixed(3)}`);
-                send("unpausegametime");
-                const end = igt + planned;
-                playing = setTimeout(() => { playing = null; send("pausegametime"); send(`setgametime ${end.toFixed(3)}`); }, (planned - played) * 1000);
+            const startedAt = Date.parse(event.timestamp ?? "");
+            const since = Number.isFinite(startedAt) ? Math.max(0, (Date.now() - startedAt) / 1000) : 0;
+            stopPlaying();
+            const finish = planned > 0 ? igt + planned : Infinity;
+            const now = igt + since - (planned > 0 ? 0 : HEARD_WITHIN);
+            const from = Math.max(now, igt, showing());
+            if (from < finish) {
+              setGame(from);
+              const pauseAtFinish = () => {
+                if (!Number.isFinite(finish)) return;
+                playing = setTimeout(() => { playing = null; pauseGame(); if (finish >= showing() - UNSEEN) setGame(finish); }, (finish - from) * 1000);
                 playing.unref?.();
-              }
+              };
+              // Never below what LiveSplit shows: when it already shows more, it waits until game time reaches it.
+              const wait = from - now;
+              if (wait > 0) {
+                playing = setTimeout(() => { playing = null; runGame(); pauseAtFinish(); }, wait * 1000);
+                playing.unref?.();
+              } else { runGame(); pauseAtFinish(); }
             }
           }
           if (event.data?.phase === "end") {
             stopPlaying();
-            send("pausegametime");
+            pauseGame();
             igt += playbackSeconds(event.data);
-            send(`setgametime ${igt.toFixed(3)}`);
+            // Only forward. Should the end have been heard later than the command ran behind, LiveSplit keeps the value
+            // it shows and the next command waits until game time reaches it; the published times come from the
+            // timeline, not from LiveSplit, and are exact either way.
+            if (igt >= showing() - UNSEEN) setGame(igt);
           }
           break;
         case "game.milestone":

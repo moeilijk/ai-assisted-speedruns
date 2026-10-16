@@ -1,6 +1,6 @@
 {
   "name": "@aas/runtime-mistral-vibe",
-  "version": "0.35.0",
+  "version": "1.0.5",
   "description": "AAS runtime plugin: Mistral Vibe",
   "type": "module",
   "engines": { "node": ">=22" },
