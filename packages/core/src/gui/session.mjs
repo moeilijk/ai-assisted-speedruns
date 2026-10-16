@@ -310,8 +310,13 @@ export function createSession() {
     const recorder = await loadRecorder(recorderId);
     const timer = started.timer ? (await timers()).find((t) => t.id === started.timer) ?? null : null;
     const revision = (() => { try { return Number(JSON.parse(fs.readFileSync(path.join(runDir, "publish-revision.json"), "utf8")).revision) + 1 || 2; } catch { return 1; } })();
-    const run = path.basename(runDir);
-    const pub = path.join(path.dirname(runDir), "public", revision > 1 ? `${run}-r${revision}` : run);
+    // A new revision keeps the run's id: it is the name of the bundle's directory (SPEC §4) and the run's address on the
+    // Archive. Publishing it as <run>-r<n> made every revision a run of another name, at another address, while the
+    // video descriptions kept linking to the first (2026-10-16). Each revision goes into a folder of its own instead,
+    // under the run's own name, so the earlier ones stay as they are: public/revision-<n>/<run id>. The id is the one
+    // the run was published under before (a run renamed at its publication keeps that name), else the run's folder.
+    const run = (() => { try { return JSON.parse(fs.readFileSync(path.join(runDir, "publish-revision.json"), "utf8")).run_id || path.basename(runDir); } catch { return path.basename(runDir); } })();
+    const pub = revision > 1 ? path.join(path.dirname(runDir), "public", `revision-${revision}`, run) : path.join(path.dirname(runDir), "public", run);
     const args = ["resume", "--run-dir", runDir, "--recorder", recorderId, ...(timer ? ["--timer", timer.id] : []), "--overlay-port", String(OVERLAY_PORT), "--headless"];
     // The choices Continue offers, as `aas resume` takes them: a later end, the save to start from, the limits, a
     // prompt for the next segment, and going on past a breaking release of the tooling.

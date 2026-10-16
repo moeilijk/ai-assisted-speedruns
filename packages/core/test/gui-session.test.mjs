@@ -65,6 +65,13 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
     assert.ok(s.state.result.bundle, "Continue made the bundle again");
     const revision = JSON.parse(fs.readFileSync(path.join(localRun, "publish-revision.json"), "utf8")).revision;
     assert.equal(revision, 2, "the bundle is the run's second revision");
+    // The second revision keeps the run's id — the name of its directory and its address on the Archive — in a folder of
+    // its own, so the first stays as it was. It was published as <run>-r2 until 1.0.6: a run of another name.
+    const second = path.join(output, "GuiFake", "public", "revision-2", s.state.run);
+    const manifest = JSON.parse(fs.readFileSync(path.join(second, "manifest.json"), "utf8"));
+    assert.deepEqual([manifest.run_id, manifest.revision], [s.state.run, 2], "same run id, revision 2");
+    assert.ok(fs.existsSync(`${second}-upload.zip`), "its upload zip beside it");
+    assert.equal(JSON.parse(fs.readFileSync(path.join(output, "GuiFake", "public", s.state.run, "manifest.json"), "utf8")).revision, 1, "the first revision is left as it was");
     const segments = fs.readFileSync(path.join(localRun, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"') || l.includes('"run.resumed"')).length;
     assert.ok(segments >= 2, "the run log holds both segments");
 

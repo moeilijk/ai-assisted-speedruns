@@ -106,8 +106,10 @@ async function publishInto(runDir, outDir, { session, completionMarker, log = co
   if (fs.existsSync(outDir) && fs.readdirSync(outDir).length) throw new Error(`Refusing to write into non-empty ${outDir}`);
   // The bundle's name is the run's id on the Archive. Published where runs are kept (<Game>/public/<name>), a name
   // another game's run already carries is refused here, before a signed bundle with it exists.
-  if (path.basename(path.dirname(outDir)) === "public") {
-    const clash = runNameTakenElsewhere(path.dirname(path.dirname(outDir)), path.basename(outDir));
+  // A later revision sits one level deeper, under public/revision-<n>/, with the run's own name.
+  const publicDir = /^revision-\d+$/.test(path.basename(path.dirname(outDir))) ? path.dirname(path.dirname(outDir)) : path.dirname(outDir);
+  if (path.basename(publicDir) === "public") {
+    const clash = runNameTakenElsewhere(path.dirname(publicDir), path.basename(outDir));
     if (clash) throw new Error(takenMessage(path.basename(outDir), clash));
   }
   const brief = JSON.parse(fs.readFileSync(path.join(runDir, "brief.json"), "utf8"));

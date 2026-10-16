@@ -16,6 +16,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.6 — 2026-10-16
+
+- **A run's next revision keeps its id, and so its address on the Archive.** A run's id is the name of its bundle's
+  directory (SPEC §4) and the last part of its address, but the GUI published the bundle Continue makes as
+  `<run>-r2`, a run of another name: every revision stood at a new address while the video descriptions kept linking
+  to the first. Each revision now goes into a folder of its own under the run's own name, `public/revision-<n>/<run
+  id>`, so the earlier one stays as it was, and a run that was published under another name than its folder keeps
+  that name. Measured: Balatro stopped and continued through the real GUI published revision 2 as
+  `revision-2/balatro-mock-04`, run id unchanged, revision 1 untouched; and the Archive on dev took a revision 2
+  under the same run id with its proof signed (`e2e:chain`, which now publishes its own second revision this way).
+
 ## 1.0.5 — 2026-10-16
 
 - **A run that won is completed at its victory, whatever AI played it.** `completed_at` is the `game.over` with

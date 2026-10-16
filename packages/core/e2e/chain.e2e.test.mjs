@@ -109,8 +109,9 @@ test("the live Archive and the tooling agree on every fixture, the proof and the
     // The run accepted, then a new revision of the same run: its tickets are its own, so the proof stays signed.
     const acc = await call("POST", `/api/v1/e2e/submissions/${r.json.submission}/accept`);
     assert.equal(acc.status, 200, `accept the signed run: ${JSON.stringify(acc.json)}`);
-    await publish(runDir, path.join(work, "public", "proof-01-r2"), { log() {} });
-    const again = await upload(path.join(work, "public", "proof-01-r2-upload.zip"), "proof-01-r2-upload.zip");
+    // Under the run's own id, revision 2, in a folder of its own: as the GUI publishes a revision since 1.0.6.
+    await publish(runDir, path.join(work, "public", "revision-2", "proof-01"), { log() {} });
+    const again = await upload(path.join(work, "public", "revision-2", "proof-01-upload.zip"), "proof-01-upload.zip");
     log(`new revision, same run: ${again.status} ${again.json?.status} proof ${again.json?.proof}`);
     assert.equal(again.status, 200, JSON.stringify(again.json));
     assert.equal(again.json.proof, "signed", "a new revision of the same run keeps its signed proof");
