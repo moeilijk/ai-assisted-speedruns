@@ -73,6 +73,31 @@ export const loadRuntime = async (id) => {
  * (`ai`), and `sha256`, the plugin as it ran (pluginDigest). Null for `sha256` when the plugin cannot be read
  * from here, which is what a bundle then says: nothing is guessed.
  */
+/**
+ * pluginDigest as the plugin stood at a commit of this repository, read from git rather than the disk: the same files,
+ * the same order, the same hash. A run records the tooling commit it ran on, so the runtime that drove it can be named
+ * by its hash after the tooling has moved on. null when git cannot answer (no history, a commit it does not know).
+ */
+export function pluginDigestAt(file, commit) {
+  const abs = path.resolve(file);
+  const repo = path.dirname(PACKAGES);
+  const rel = (p) => path.relative(repo, p).split(path.sep).join("/");
+  const git = (args) => execFileSync("git", ["-C", repo, ...args], { maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] });
+  try {
+    const one = (p) => createHash("sha256").update(git(["show", `${commit}:${p}`])).digest("hex");
+    const dir = path.dirname(abs);
+    const inPackage = path.basename(abs) === "index.mjs" && path.dirname(dir) === PACKAGES;
+    if (!inPackage) return createHash("sha256").update(`${path.basename(abs)} ${one(rel(abs))}\n`).digest("hex");
+    const prefix = `${rel(dir)}/`;
+    const lines = git(["ls-tree", "-r", "--name-only", commit, "--", rel(dir)]).toString("utf8").split("\n").filter(Boolean)
+      .map((p) => p.slice(prefix.length))
+      .filter((p) => !/(^|\/)(test|node_modules)\//.test(p) && /\.(mjs|json|md)$/.test(p))
+      .sort()
+      .map((p) => `${p} ${one(prefix + p)}`);
+    return lines.length ? createHash("sha256").update(`${lines.join("\n")}\n`).digest("hex") : null;
+  } catch { return null; }
+}
+
 export function runtimeIdentity(runtime, idOrPath) {
   let sha256 = null;
   try { sha256 = pluginDigest(pluginFile("runtime", idOrPath ?? runtime?.id)); } catch { sha256 = null; }

@@ -22,7 +22,7 @@ import { zipBuffer } from "./zip.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { createSanitizer } from "./sanitize.mjs";
 import { checkRun, formatReport } from "./check-run.mjs";
-import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin, runtimeIdentity } from "./plugins.mjs";
+import { ARCHIVE_URL, FRAMEWORK_VERSION, loadGamePlugin, pluginDigestAt, pluginFile, runtimeIdentity } from "./plugins.mjs";
 import { applyRunEnv, loadSettings } from "./settings.mjs";
 import { endsOf, goalHistory, publicEnd } from "./goal.mjs";
 import { modelParts } from "./models.mjs";
@@ -96,6 +96,33 @@ export async function publish(runDir, outDir, opts = {}) {
     if (owned) for (const p of [dir, `${dir}-public.zip`, `${dir}-upload.zip`]) fs.rmSync(p, { recursive: true, force: true });
     throw error;
   }
+}
+
+/**
+ * The hash of the runtime that played the run, not of the one on disk when it is published. A bundle names the runtime
+ * that drove the run by its hash, and an archive goes on that hash; publishing a run again with a later tooling named
+ * the later code (balatro-codex-01, played on runtime-codex 0.35.0 `043099be…`, republished with 1.0.6 named 1.0.5's
+ * `846c7a16…` beside version 0.35.0, 2026-10-16). Since 1.0.7 every segment's start records it; a run from before
+ * that has it from the tooling commit its start recorded, when that tree was clean. Only failing both is it the
+ * runtime on disk now, and the log says so.
+ */
+export function runtimeHashAsRan(runDir, brief, rt, log = () => {}) {
+  const starts = readRunEvents(runDir).filter((e) => e.event === "run.started");
+  const recorded = starts.map((e) => e.data?.runtime_sha256).filter(Boolean);
+  if (recorded.length) {
+    if (new Set(recorded).size > 1) log(`the run's segments ran on ${new Set(recorded).size} builds of the runtime; the bundle names the first`);
+    return recorded[0];
+  }
+  const tooling = starts[0]?.data?.tooling;
+  let file = null;
+  try { file = pluginFile("runtime", brief.runtimeModule ?? brief.runtime); } catch { /* a runtime this tooling does not have */ }
+  if (tooling?.commit && tooling.modified === false && file) {
+    const then = pluginDigestAt(file, tooling.commit);
+    if (then) return then;
+  }
+  const now = runtimeIdentity(rt, brief.runtimeModule ?? brief.runtime).sha256;
+  log(`the run did not record its runtime's hash and its tooling commit cannot be read; the bundle names the runtime on disk now (${String(now).slice(0, 12)})`);
+  return now;
 }
 
 async function publishInto(runDir, outDir, { session, completionMarker, log = console.log , signKey = null } = {}) {
@@ -260,7 +287,7 @@ async function publishInto(runDir, outDir, { session, completionMarker, log = co
       // version is the runtime plugin's; cli_versions are the versions of the runtime's own CLI its session log
       // records; sha256 is the plugin as it ran, so an archive reads which runtime drove the run instead of
       // believing a name and an `ai` the plugin declares about itself (SPEC §3).
-      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, ai: rt?.ai ?? null, sha256: runtimeIdentity(rt, brief.runtimeModule ?? brief.runtime).sha256, cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
+      runtime: { id: runtime ?? null, name: rt?.name ?? null, version: brief.runtimeVersion ?? null, ai: rt?.ai ?? null, sha256: runtimeHashAsRan(runDir, brief, rt, log), cli_versions: Array.isArray(summary.cli_versions) ? summary.cli_versions : [] },
       recorder: { id: recording?.recorder ?? null, version: recording?.recorder_version ?? null },
       timer: { id: recording?.timer?.id ?? null, version: recording?.timer?.version ?? null },
     },

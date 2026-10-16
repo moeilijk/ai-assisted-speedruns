@@ -16,6 +16,17 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.7 — 2026-10-16
+
+- **A bundle names the runtime that played the run, not the one on disk when it is published.** The runtime's hash is
+  what an archive goes on to see which runtime drove a run, but publish computed it from the plugin as it stood at
+  publication: balatro-codex-01, played on runtime-codex 0.35.0 (`043099be…`), republished with 1.0.6, named 1.0.5's
+  `846c7a16…` beside version 0.35.0. Every segment's start now records its runtime's hash in `run.started`, and publish
+  names the hash the run recorded; a run from before that has it from the tooling commit its start recorded, read from
+  git with the same algorithm, when that tree was clean, and only failing both the runtime on disk now, which the log
+  says. Measured: balatro-codex-01 published again names `043099be3fac`, as runtimes.json named codex 0.35.0, and
+  conforms; the three launch runs keep `d45aaef7310f`.
+
 ## 1.0.6 — 2026-10-16
 
 - **A run's next revision keeps its id, and so its address on the Archive.** A run's id is the name of its bundle's

@@ -11,7 +11,7 @@ import { resolveGoal, laterGoal } from "./goal.mjs";
 import { applyRunEnv } from "./settings.mjs";
 import path from "node:path";
 import { createEventLog, readRunLog } from "./events.mjs";
-import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
+import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, runtimeIdentity, toolingIdentity } from "./plugins.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { brokerSpec } from "./configure.mjs";
 import { earlyStop, writePidFile } from "./run.mjs";
@@ -163,7 +163,7 @@ export async function resume(opts, { log = (t) => process.stderr.write(`[aas res
     events.append("run.human", { note: `goal extended from ${goalExtended.from} to ${goalExtended.to}`, segment });
     events.append("game.goal", { from: goalExtended.from, to: goalExtended.to, segment });
   }
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, runtime_sha256: runtimeIdentity(runtime, brief.runtimeModule ?? brief.runtime).sha256, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: brief.category?.goal ?? null, resumed: true, segment, tooling, overlay: Boolean(overlay) });
   await proof.start();
   const goal = resolveGoal(plugin, brief.category?.goal);
   const { outcome: result, recording } = await session({ runDir, brief, opts, log, plugin, runtime, recorder, timer, overlay, events, early, proof, goal, ready, t0, segment, sessionId, deathsBefore: outcome.deaths ?? 0, outcomeExtra: { resumedFrom: save, segment } });

@@ -112,7 +112,11 @@ test("aas run + timeline + publish produce a conforming Portal run directory", {
     writeFileSync(join(runDir, "documentation.md"), documentation);
     const resumed = await resume({ "run-dir": runDir, recorder: "source-demo", timer: "livesplit", "no-autosave": true, "keep-open": true }, { log: () => {} });
     assert.equal(resumed.segment, 2);
-    const starts = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data.tooling);
+    const startData = readFileSync(join(runDir, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"')).map((l) => JSON.parse(l).data);
+    // Each segment names the runtime that drives it by its hash, so a bundle published later by another tooling still
+    // names the runtime that played (since 1.0.7; a Codex run republished with 1.0.6 named the newer code's hash).
+    for (const d of startData) assert.match(String(d.runtime_sha256), /^[0-9a-f]{64}$/, "the segment's runtime by its hash");
+    const starts = startData.map((d) => d.tooling);
     assert.equal(starts.length, 2, "each session says which tooling ran it");
     for (const t of starts) {
       assert.equal(t.version, JSON.parse(readFileSync(join(root, "packages", "core", "package.json"), "utf8")).version);

@@ -7,7 +7,7 @@ import { resolveGoal } from "./goal.mjs";
 import path from "node:path";
 import { configure } from "./configure.mjs";
 import { createEventLog } from "./events.mjs";
-import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, toolingIdentity } from "./plugins.mjs";
+import { loadGamePlugin, loadRecorder, loadRuntime, loadTimer, runtimeIdentity, toolingIdentity } from "./plugins.mjs";
 import { startSegmentProof } from "./proof-run.mjs";
 import { startOverlayServer } from "./overlay-server.mjs";
 import { COST_TEXT } from "./cost-text.mjs";
@@ -226,7 +226,9 @@ export async function run(opts, { log = (t) => process.stderr.write(`[aas run] $
     throw error;
   }
   const goal = resolveGoal(plugin, brief.category?.goal);
-  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
+  // The runtime as it drives this segment, by its hash: a bundle names the runtime that played, and a later tooling
+  // that publishes it again has other code on disk (a Codex run republished with 1.0.6 named 1.0.5's hash, 2026-10-16).
+  events.append("run.started", { id: brief.id, game: plugin.id, runtime: runtime.id, runtime_sha256: runtimeIdentity(runtime, brief.runtimeModule ?? brief.runtime).sha256, recorder: recorder.id, timer: timer?.id ?? null, model: brief.model ?? null, goal: goal.id, tooling, overlay: Boolean(overlay) });
   await proof.start();
   const { outcome, recording } = await session({ runDir, brief, opts, log, plugin, runtime, recorder, timer, overlay, events, early, proof, goal, ready, t0 });
   return { runDir, outcome, recording };
