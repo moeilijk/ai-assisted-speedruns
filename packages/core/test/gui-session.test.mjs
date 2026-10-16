@@ -23,6 +23,7 @@ Object.assign(process.env, {
 delete process.env.AAS_LIVESPLIT_EXE;
 fs.writeFileSync(process.env.AAS_ENV_FILE, `AAS_OUTPUT_DIR=${output}\nAAS_PROOF=off\n`);
 
+let shownRun = null;
 test("Start runs the game, the run and the bundle; Continue runs the next segment and a new revision", { timeout: 180000 }, async () => {
   const { startGui } = await import("../src/gui/server.mjs");
   const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
@@ -74,6 +75,24 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
     assert.equal(JSON.parse(fs.readFileSync(path.join(output, "GuiFake", "public", s.state.run, "manifest.json"), "utf8")).revision, 1, "the first revision is left as it was");
     const segments = fs.readFileSync(path.join(localRun, "run.jsonl"), "utf8").split("\n").filter((l) => l.includes('"run.started"') || l.includes('"run.resumed"')).length;
     assert.ok(segments >= 2, "the run log holds both segments");
+    // Published again outside the GUI, and the zip the result named moved away: the result follows the run's current
+    // bundle, and an Upload from a page that still shows the older zip sends the current one and says so. On
+    // 2026-10-16 the Upload button failed with "…-upload.zip is not there" after a republish of that kind.
+    const rev3 = path.join(output, "GuiFake", "public", "revision-3", s.state.run);
+    fs.mkdirSync(rev3, { recursive: true });
+    fs.copyFileSync(`${second}-upload.zip`, `${rev3}-upload.zip`);
+    fs.copyFileSync(`${second}-public.zip`, `${rev3}-public.zip`);
+    const revFile = path.join(localRun, "publish-revision.json");
+    fs.writeFileSync(revFile, JSON.stringify({ ...JSON.parse(fs.readFileSync(revFile, "utf8")), revision: 3, bundle_dir: rev3 }));
+    const stale = s.state.result.bundle;
+    fs.renameSync(`${second}-upload.zip`, `${second}-upload.zip.moved`);
+    const now = (await (await fetch(`${base}/api/state`)).json()).state.result;
+    assert.match(now.bundle, /revision-3[\\/][^\\/]+-upload\.zip$/, `the result names the run's current bundle: ${now.bundle}`);
+    assert.match(now.publicBundle, /revision-3[\\/][^\\/]+-public\.zip$/);
+    await post("/api/archive", { action: "upload", arg: stale });
+    const told = (await (await fetch(`${base}/api/state`)).json()).lines.map((l) => l.text).join("\n");
+    assert.match(told, /is no longer there; the run's current bundle is .*revision-3.*-upload\.zip, and that one is sent/, "it says which zip it sent");
+    assert.match(told, /cli\.mjs upload .*revision-3/, "and sends that one");
 
     // Continue refuses a run whose goal was reached, as aas resume does, and allows one whose agent ended its own
     // session; a Continue whose start fails shows that, not the previous session's outcome (2026-10-02).
@@ -99,6 +118,32 @@ test("Start runs the game, the run and the bundle; Continue runs the next segmen
     assert.equal(stop.status, 200);
     await untilIdle();
     assert.match((await state()).lines.map((l) => l.text).join("\n"), /close: GUI Fake closed/);
+
+    // Open a run: any run of the output location in the panel, with its buttons, as its last session ended — also one
+    // this GUI did not run, and after a restart (2026-10-16: "na gui restart ben ik de huidige run en knopjes kwijt").
+    const opened = await post("/api/show", { runDir: first.runDir });
+    assert.equal(opened.status, 200, JSON.stringify(opened.json));
+    assert.equal(opened.json.state.result.runDir, first.runDir);
+    assert.match(opened.json.state.result.bundle, /revision-3[\\/][^\\/]+-upload\.zip$/, "with the run's current bundle, so Upload sends that");
+    const notARun = await post("/api/show", { runDir: path.join(output, "GuiFake") });
+    assert.notEqual(notARun.status, 200);
+    assert.match(JSON.stringify(notARun.json), /Not a run/);
+    shownRun = first.runDir;
+  } finally {
+    gui.server.close();
+    process.removeAllListeners("SIGINT");
+    process.removeAllListeners("SIGTERM");
+  }
+});
+
+test("a GUI started again shows the run its panel showed last, with that run's current bundle", { timeout: 60000 }, async () => {
+  assert.ok(shownRun, "the test above opened a run");
+  const { startGui } = await import("../src/gui/server.mjs");
+  const gui = await startGui({ port: 0, open: false, checkAtStart: false, log() {} });
+  try {
+    const r = (await (await fetch(`http://127.0.0.1:${gui.server.address().port}/api/state`)).json()).state.result;
+    assert.equal(r?.runDir, shownRun, "the run is back after the restart");
+    assert.match(r.bundle, /-upload\.zip$/, "and its Upload button with it");
   } finally {
     gui.server.close();
     process.removeAllListeners("SIGINT");

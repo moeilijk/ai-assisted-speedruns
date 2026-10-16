@@ -32,6 +32,9 @@ test("a name another game's run or bundle already has is found; this game's own 
   assert.equal(runNameTakenElsewhere(path.join(out, "Portal"), "opus-01", out), null, "a run is not taken by itself");
   assert.equal(runNameTakenElsewhere(path.join(out, "Nowhere", "deeper"), "x", out), null, "a folder that is not there finds nothing");
   assert.equal(runNameTakenElsewhere(path.join(out, "Balatro"), "opus-01", path.join(out, "Balatro")), null, "outside the output location nothing is taken");
+  // A run whose first revision was moved aside is only under public/revision-<n>/ (since 1.0.6): still taken.
+  bundle(path.join(out, "Portal", "public", "revision-2", "only-rev2"));
+  assert.equal(runNameTakenElsewhere(path.join(out, "Balatro"), "only-rev2", out), path.join(out, "Portal", "public", "revision-2", "only-rev2"));
 });
 
 test("aas configure refuses a new run whose name another game's run has, and says which one", async () => {

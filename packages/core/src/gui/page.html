@@ -164,6 +164,7 @@
     <p class="feedback" id="runmsg"></p>
     <p class="muted" id="proofnow" style="margin:10px 0 0"></p>
     <div class="result muted" id="result" style="margin-top:10px"></div>
+    <div style="margin-top:6px"><button class="b" id="openrun" title="Show a run of the output location here with its buttons: upload, check, its video and its YouTube text, Continue">Open a run…</button></div>
   </div>
   <div class="panel" id="proof">
     <h2>The Archive</h2>
@@ -493,6 +494,14 @@ $("result").onclick = (e) => {
   const z = e.target.dataset?.upload;
   if (z && !confirm("Upload this bundle to the Archive under your account? This is the upload zip: it carries the run's logs in a private part, which the Archive uses to check the proof and deletes after its decision. The public zip next to it is the one to share.")) feedback("runmsg", "busy", "Cancelled; nothing was uploaded.");
   else if (z) act("runmsg", "Uploading to the Archive…", () => api("/api/archive", { action: "upload", arg: z }), "Upload sent; the Archive's answer stands in the log below.");
+};
+// Open a run: any run of the output location in the panel above, with its buttons, as its last session ended. The panel
+// only ever had the session the GUI had just run, so after a restart a run and its Upload button were out of reach.
+$("openrun").onclick = async () => {
+  const start = (await api("/api/state").catch(() => null))?.state?.result?.runDir ?? "";
+  const picked = await browse(start.replace(/[\\/][^\\/]*$/, ""), "dir");
+  if (!picked) { feedback("runmsg", "busy", "No run chosen."); return; }
+  act("runmsg", "Opening the run…", () => api("/api/show", { runDir: picked }), `Opened ${picked}.`);
 };
 // Continue: the choices `aas resume` takes, asked in a dialog with what this run has (its later ends, its saves).
 async function continueRun(runDir) {

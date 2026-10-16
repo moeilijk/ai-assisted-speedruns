@@ -16,6 +16,22 @@ Versions 0.1.0 to 0.10.0 were numbered afterwards, on 2026-09-16; 0.1.0 is the r
 Their tags point at the commits listed; the `package.json` in those commits still says 0.1.0, and a bundle made with
 them carries `harness.version` 0.1.0.
 
+## 1.0.8 — 2026-10-16
+
+- **The GUI shows any run with its buttons, also after a restart, with the run's current bundle.** The Last session
+  panel — Upload, Check bundle, the video, the YouTube text, Continue — only ever had the session the GUI had just
+  run, in memory: after a restart the run and its buttons were gone, and a run published again since (a later revision
+  under `public/revision-<n>/`, since 1.0.6, or an older one moved aside) kept a zip in the panel that was no longer
+  there, so Upload failed with "…-upload.zip is not there". The panel now reads a run from disk — how its last session
+  ended, its recording, and its bundle as `publish-revision.json` names the last publication — and remembers the run
+  it showed last beside the GUI's note, so a restart shows it again. **Open a run…** puts any run of the output location
+  in the panel, also one the GUI did not run itself. An Upload from a page that still shows an older zip sends the
+  run's current one and says so. Tried in the real page (Playwright, a GUI of its own): Open a run on
+  `G:\OBS\Balatro\balatro-codex-01` gave its panel with Upload on `public\revision-2\balatro-codex-01-upload.zip`,
+  and the same GUI started again showed it at once.
+- **The run-name check sees a run whose bundle is only under `public/revision-<n>/`.** It looked in `public/<name>`
+  only, so a run whose first revision was moved aside could have its name taken by another game.
+
 ## 1.0.7 — 2026-10-16
 
 - **A bundle names the runtime that played the run, not the one on disk when it is published.** The runtime's hash is

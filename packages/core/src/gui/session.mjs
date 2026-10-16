@@ -52,6 +52,42 @@ export function createSession() {
   const lines = [];
   const listeners = new Set();
   let state = { phase: "idle", step: null, game: null, run: null, runDir: null, runtime: null, startedAt: null, result: null };
+  // The run's bundle as it stands now: its last publication, as publish-revision.json names it. A session's result
+  // kept the path it made, while the run could be published again since — a later revision under public/revision-<n>/
+  // (1.0.6), an older one moved aside — and the Upload button and the Show links then pointed at a zip that was no
+  // longer there (the owner, 2026-10-16: "…/public/balatro-codex-01-upload.zip is not there").
+  const currentBundle = (runDirLocal) => {
+    try {
+      const dir = JSON.parse(fs.readFileSync(path.join(runDirLocal, "publish-revision.json"), "utf8")).bundle_dir;
+      return dir && fs.existsSync(`${dir}-upload.zip`) ? dir : null;
+    } catch { return null; }
+  };
+  const withCurrentBundle = (s) => {
+    const r = s.result;
+    const dir = r?.runDir ? currentBundle(toLocal(r.runDir)) : null;
+    if (!dir) return s;
+    return { ...s, result: { ...r, bundle: toWindows(`${dir}-upload.zip`), publicBundle: fs.existsSync(`${dir}-public.zip`) ? toWindows(`${dir}-public.zip`) : r.publicBundle ?? null } };
+  };
+  // What a run's panel shows, read from the run on disk: how its last session ended (outcome.json), its recording and
+  // its current bundle. The panel only ever had a session's own result, so after a restart of the GUI the run and its
+  // buttons were gone, and a run the GUI did not end itself could not be uploaded or checked from it (the owner,
+  // 2026-10-16: "na gui restart ben ik de huidige run en knopjes kwijt").
+  const resultOf = (runDirLocal) => {
+    let outcome = null;
+    try { outcome = JSON.parse(fs.readFileSync(path.join(runDirLocal, "outcome.json"), "utf8")); } catch { /* no session ended in this run */ }
+    const result = { status: outcome?.status ?? "no session ended", notes: outcome?.notes ?? null, runDir: toWindows(runDirLocal), recording: null, bundle: null };
+    try { const rec = fs.readdirSync(path.join(runDirLocal, "recording")).find((f) => /\.(mp4|mkv)$/i.test(f)); if (rec) result.recording = toWindows(path.join(runDirLocal, "recording", rec)); } catch { /* no recording */ }
+    const dir = currentBundle(runDirLocal);
+    if (dir) { result.bundle = toWindows(`${dir}-upload.zip`); if (fs.existsSync(`${dir}-public.zip`)) result.publicBundle = toWindows(`${dir}-public.zip`); }
+    return result;
+  };
+  // The run the panel showed last, kept beside this GUI's note (AAS_GUI_NOTE), so a GUI started for a test keeps its own.
+  const LAST_RUN = (process.env.AAS_GUI_NOTE || path.join(REPO, ".local", "gui.json")).replace(/(\.json)?$/, "-last-run.json");
+  const rememberRun = (runDirShown) => { try { fs.mkdirSync(path.dirname(LAST_RUN), { recursive: true }); fs.writeFileSync(LAST_RUN, `${JSON.stringify({ runDir: toLocal(runDirShown) }, null, 2)}\n`); } catch { /* the panel just starts empty next time */ } };
+  try {
+    const last = toLocal(JSON.parse(fs.readFileSync(LAST_RUN, "utf8")).runDir ?? "");
+    if (last && fs.existsSync(path.join(last, "run.jsonl"))) state = { ...state, result: resultOf(last) };
+  } catch { /* nothing remembered yet */ }
   let child = null;
   let cancelled = false;
   const emit = (type, data) => { for (const l of listeners) l(type, data); };
@@ -70,7 +106,7 @@ export function createSession() {
       emit("line", line);
     }
   };
-  const set = (patch) => { state = { ...state, ...patch }; emit("state", state); };
+  const set = (patch) => { state = { ...state, ...patch }; if (patch.result?.runDir) rememberRun(patch.result.runDir); emit("state", withCurrentBundle(state)); };
 
   /** Runs `node <args>` from the repository; resolves with the exit code. `shown` is the command as a person would type it. */
   const node = (args, shown) => new Promise((resolve) => {
@@ -285,6 +321,17 @@ export function createSession() {
     return { runDir: toWindows(runDir), game: g?.plugin.id ?? null, runtime: brief.runtime, programs, goal, ends: ends.map((e) => ({ id: e.id, label: e.label, later: at >= 0 && ends.indexOf(e) > at })), saves, lastSave: saves.at(-1) ?? null, ai: (await runtimes()).find((r) => r.id === brief.runtime)?.ai === true };
   }
 
+  /** Shows a run of the output location in the panel, with its buttons, as its last session ended. */
+  async function show(runDirShown) {
+    if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    const runDir = toLocal(runDirShown ?? "");
+    await checkInside("Run folder", runDir, toLocal(readEnv().AAS_OUTPUT_DIR ?? ""));
+    if (!runDir || !fs.existsSync(path.join(runDir, "run.jsonl"))) throw new Error("Not a run: this folder has no run.jsonl. Choose the run's own folder, under <output>\\<Game>\\<run name>.");
+    set({ result: resultOf(runDir) });
+    log(`Opened run ${toWindows(runDir)}`, "note");
+    return withCurrentBundle(state);
+  }
+
   async function resume(runDirShown, opts = {}) {
     if (state.phase !== "idle") throw new Error("A session is already running.");
     const runDir = toLocal(runDirShown ?? "");
@@ -366,6 +413,15 @@ export function createSession() {
    */
   async function archive(action, arg = null) {
     if (state.phase !== "idle") throw new Error("Wait until the session has ended.");
+    // A page opened before the run was published again still shows the older zip; when that one is gone, the run's
+    // current bundle is the one meant, and the log names it, so what was sent is never a guess.
+    if (action === "upload" && arg && !fs.existsSync(toLocal(arg)) && state.result?.runDir) {
+      const dir = currentBundle(toLocal(state.result.runDir));
+      if (dir && path.basename(dir) === path.basename(toLocal(arg)).replace(/-upload\.zip$/i, "")) {
+        log(`${toWindows(toLocal(arg))} is no longer there; the run's current bundle is ${toWindows(`${dir}-upload.zip`)}, and that one is sent.`, "note");
+        arg = toWindows(`${dir}-upload.zip`);
+      }
+    }
     const cmds = {
       login: [["login"], "login"],
       logout: [["logout"], "logout"],
@@ -556,9 +612,9 @@ export function createSession() {
   }
 
   return {
-    get state() { return state; },
+    get state() { return withCurrentBundle(state); },
     get lines() { return lines; },
     subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
-    plan, start, resume, runInfo, stop, fix, archive, key, budget, options, tool, nextRunName, log,
+    plan, start, resume, runInfo, show, stop, fix, archive, key, budget, options, tool, nextRunName, log,
   };
 }

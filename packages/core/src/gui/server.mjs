@@ -308,6 +308,8 @@ export async function startGui({ port = 8770, open = true, checkAtStart = true, 
         req.on("close", () => clients.delete(res));
       } else if (req.method === "POST" && url.pathname === "/api/start") {
         send(res, 200, { state: await session.start(await body(req)) });
+      } else if (req.method === "POST" && url.pathname === "/api/show") {
+        send(res, 200, { state: await session.show((await body(req)).runDir) });
       } else if (req.method === "POST" && url.pathname === "/api/continue") {
         const b = await body(req);
         send(res, 200, { state: await session.resume(b.runDir, b) });

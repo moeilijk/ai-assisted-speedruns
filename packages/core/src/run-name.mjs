@@ -31,8 +31,13 @@ export function runNameTakenElsewhere(gameDir, name, root = outputRoot()) {
     if (!e.isDirectory() || e.name === path.basename(here)) continue;
     const run = path.join(path.resolve(root), e.name, name);
     if (fs.existsSync(path.join(run, "brief.json"))) return run;
-    const bundle = path.join(path.resolve(root), e.name, "public", name);
+    const pub = path.join(path.resolve(root), e.name, "public");
+    const bundle = path.join(pub, name);
     if (fs.existsSync(path.join(bundle, "manifest.json"))) return bundle;
+    // A later revision lies under public/revision-<n>/ (1.0.6); a run whose first revision was moved aside is there only.
+    let revisions = [];
+    try { revisions = fs.readdirSync(pub, { withFileTypes: true }).filter((r) => r.isDirectory() && /^revision-\d+$/.test(r.name)); } catch { /* no public folder */ }
+    for (const r of revisions) if (fs.existsSync(path.join(pub, r.name, name, "manifest.json"))) return path.join(pub, r.name, name);
   }
   return null;
 }
